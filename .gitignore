@@ -1,0 +1,20 @@
+# Python
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+.venv/
+
+# Frontend
+node_modules/
+dist/
+*.tsbuildinfo
+
+# Environment and local state
+.env
+docker/.env
+.DS_Store
+
+# Logs
+*.log
