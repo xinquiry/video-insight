@@ -10,6 +10,7 @@ export default defineConfig(({ mode }) => {
         .map((h) => h.trim())
         .filter(Boolean)
     : [];
+  const proxyTarget = env.BACKEND_URL || "http://localhost:8000";
 
   return {
     plugins: [tanstackRouter(), react(), tailwindcss()],
@@ -22,7 +23,7 @@ export default defineConfig(({ mode }) => {
       allowedHosts,
       proxy: {
         "/api": {
-          target: "http://localhost:8000",
+          target: proxyTarget,
           changeOrigin: true,
         },
       },
