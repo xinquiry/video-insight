@@ -1,0 +1,21 @@
+services:
+  backend:
+    build:
+      context: ../backend
+      target: dev
+    command: ./scripts/start-dev.sh
+    volumes:
+      - ../backend:/app
+      - backend-venv:/app/.venv
+
+  frontend:
+    build:
+      context: ../frontend
+      target: dev
+    volumes:
+      - ../frontend:/app
+      - frontend-node-modules:/app/node_modules
+
+volumes:
+  backend-venv:
+  frontend-node-modules:
