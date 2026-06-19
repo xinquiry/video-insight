@@ -1,0 +1,23 @@
+{
+  "$schema": "./node_modules/oxlint/configuration_schema.json",
+  "plugins": ["react", "typescript", "import", "jsx-a11y"],
+  "env": {
+    "browser": true
+  },
+  "categories": {
+    "correctness": "error",
+    "perf": "warn",
+    "suspicious": "warn"
+  },
+  "settings": {
+    "react": {
+      "linkComponents": [{ "name": "Link", "linkAttribute": "to" }]
+    }
+  },
+  "rules": {
+    "react/react-in-jsx-scope": "off",
+    "jsx-a11y/media-has-caption": "off",
+    "no-console": "warn",
+    "typescript/no-explicit-any": "warn"
+  }
+}
