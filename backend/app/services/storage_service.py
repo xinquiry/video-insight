@@ -16,11 +16,14 @@ class StorageService:
             secure=settings.minio_secure,
         )
         public_endpoint = settings.minio_public_endpoint or settings.minio_endpoint
+        public_secure = (
+            settings.minio_public_secure if settings.minio_public_secure is not None else settings.minio_secure
+        )
         self._public_client = Minio(
             public_endpoint,
             access_key=settings.minio_access_key,
             secret_key=settings.minio_secret_key,
-            secure=settings.minio_secure,
+            secure=public_secure,
             region="us-east-1",
         )
 
