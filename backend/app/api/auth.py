@@ -1,6 +1,7 @@
 from fastapi import APIRouter
 
-from app.core.dependencies import CurrentSettings, CurrentUser, DbSession
+from app.core.dependencies import CurrentAdminUser, CurrentSettings, CurrentUser, DbSession
+from app.repositories.group_repo import GroupRepository
 from app.repositories.user_repo import UserRepository
 from app.schemas.auth import TokenRead, UserCreate, UserLogin, UserRead
 from app.services.auth_service import AuthService
@@ -9,13 +10,18 @@ router = APIRouter(prefix="/auth")
 
 
 def _build_service(session: DbSession, settings: CurrentSettings) -> AuthService:
-    return AuthService(repo=UserRepository(session), settings=settings)
+    return AuthService(repo=UserRepository(session), settings=settings, group_repo=GroupRepository(session))
 
 
-@router.post("/register", response_model=TokenRead, status_code=201)
-async def register(data: UserCreate, session: DbSession, settings: CurrentSettings):
+@router.post("/users", response_model=UserRead, status_code=201)
+async def create_user(
+    data: UserCreate,
+    session: DbSession,
+    settings: CurrentSettings,
+    _current_admin: CurrentAdminUser,
+):
     service = _build_service(session, settings)
-    return await service.register(data)
+    return await service.create_user(data)
 
 
 @router.post("/login", response_model=TokenRead)

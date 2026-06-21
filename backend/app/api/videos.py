@@ -20,31 +20,31 @@ def _build_service(session: DbSession, settings: CurrentSettings) -> VideoServic
 async def list_videos(
     session: DbSession,
     settings: CurrentSettings,
-    _current_user: CurrentUser,
+    current_user: CurrentUser,
     page: int = Query(1, ge=1),
     page_size: int = Query(20, ge=1, le=100),
 ):
     service = _build_service(session, settings)
-    return await service.list_paginated(page, page_size)
+    return await service.list_paginated(current_user.group_id, page, page_size)
 
 
 @router.post("", response_model=VideoRead, status_code=201)
 async def create_video(
     session: DbSession,
     settings: CurrentSettings,
-    _current_user: CurrentUser,
+    current_user: CurrentUser,
     title: str = Form(min_length=1, max_length=200),
     description: str | None = Form(default=None),
     file: UploadFile = File(),
 ):
     service = _build_service(session, settings)
-    return await service.create(title, description, file)
+    return await service.create(title, description, file, current_user.group_id)
 
 
 @router.get("/{video_id}", response_model=VideoRead)
-async def get_video(video_id: uuid.UUID, session: DbSession, settings: CurrentSettings, _current_user: CurrentUser):
+async def get_video(video_id: uuid.UUID, session: DbSession, settings: CurrentSettings, current_user: CurrentUser):
     service = _build_service(session, settings)
-    return await service.get_by_id(video_id)
+    return await service.get_by_id(video_id, current_user.group_id)
 
 
 @router.patch("/{video_id}", response_model=VideoRead)
@@ -53,13 +53,13 @@ async def update_video(
     data: VideoUpdate,
     session: DbSession,
     settings: CurrentSettings,
-    _current_user: CurrentUser,
+    current_user: CurrentUser,
 ):
     service = _build_service(session, settings)
-    return await service.update(video_id, data)
+    return await service.update(video_id, current_user.group_id, data)
 
 
 @router.delete("/{video_id}", status_code=204)
-async def delete_video(video_id: uuid.UUID, session: DbSession, settings: CurrentSettings, _current_user: CurrentUser):
+async def delete_video(video_id: uuid.UUID, session: DbSession, settings: CurrentSettings, current_user: CurrentUser):
     service = _build_service(session, settings)
-    await service.delete(video_id)
+    await service.delete(video_id, current_user.group_id)

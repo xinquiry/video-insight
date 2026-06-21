@@ -16,9 +16,9 @@ def _build_service(session: DbSession) -> AnnotationService:
 
 
 @router.get("/videos/{video_id}/annotations", response_model=list[AnnotationRead])
-async def list_annotations(video_id: uuid.UUID, session: DbSession, _current_user: CurrentUser):
+async def list_annotations(video_id: uuid.UUID, session: DbSession, current_user: CurrentUser):
     service = _build_service(session)
-    return await service.list_for_video(video_id)
+    return await service.list_for_video(video_id, current_user.group_id)
 
 
 @router.post("/videos/{video_id}/annotations", response_model=AnnotationRead, status_code=201)
@@ -26,10 +26,10 @@ async def create_annotation(
     video_id: uuid.UUID,
     data: AnnotationCreate,
     session: DbSession,
-    _current_user: CurrentUser,
+    current_user: CurrentUser,
 ):
     service = _build_service(session)
-    return await service.create(video_id, data)
+    return await service.create(video_id, current_user.group_id, data)
 
 
 @router.patch("/annotations/{annotation_id}", response_model=AnnotationRead)
@@ -37,13 +37,13 @@ async def update_annotation(
     annotation_id: uuid.UUID,
     data: AnnotationUpdate,
     session: DbSession,
-    _current_user: CurrentUser,
+    current_user: CurrentUser,
 ):
     service = _build_service(session)
-    return await service.update(annotation_id, data)
+    return await service.update(annotation_id, current_user.group_id, data)
 
 
 @router.delete("/annotations/{annotation_id}", status_code=204)
-async def delete_annotation(annotation_id: uuid.UUID, session: DbSession, _current_user: CurrentUser):
+async def delete_annotation(annotation_id: uuid.UUID, session: DbSession, current_user: CurrentUser):
     service = _build_service(session)
-    await service.delete(annotation_id)
+    await service.delete(annotation_id, current_user.group_id)

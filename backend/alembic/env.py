@@ -5,6 +5,7 @@ from sqlalchemy import pool
 from sqlalchemy.ext.asyncio import async_engine_from_config
 
 import app.models.annotation
+import app.models.group
 import app.models.user
 import app.models.video  # noqa: F401 — ensure models are registered
 from alembic import context

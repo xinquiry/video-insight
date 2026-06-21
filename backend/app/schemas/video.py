@@ -13,6 +13,7 @@ class VideoRead(BaseModel):
     model_config = {"from_attributes": True}
 
     id: uuid.UUID
+    group_id: uuid.UUID
     title: str
     description: str | None
     original_filename: str

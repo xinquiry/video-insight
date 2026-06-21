@@ -19,13 +19,23 @@ class VideoRepository:
     async def get_by_id(self, video_id: uuid.UUID) -> Video | None:
         return await self._session.get(Video, video_id)
 
-    async def list_paginated(self, page: int, page_size: int) -> tuple[list[Video], int]:
-        count_result = await self._session.execute(select(func.count(Video.id)))
+    async def get_by_id_for_group(self, video_id: uuid.UUID, group_id: uuid.UUID) -> Video | None:
+        result = await self._session.execute(
+            select(Video).where(Video.id == video_id, Video.group_id == group_id)
+        )
+        return result.scalar_one_or_none()
+
+    async def list_paginated(self, group_id: uuid.UUID, page: int, page_size: int) -> tuple[list[Video], int]:
+        count_result = await self._session.execute(select(func.count(Video.id)).where(Video.group_id == group_id))
         total = count_result.scalar_one()
 
         offset = (page - 1) * page_size
         result = await self._session.execute(
-            select(Video).order_by(Video.created_at.desc()).offset(offset).limit(page_size)
+            select(Video)
+            .where(Video.group_id == group_id)
+            .order_by(Video.created_at.desc())
+            .offset(offset)
+            .limit(page_size)
         )
         return list(result.scalars().all()), total
 

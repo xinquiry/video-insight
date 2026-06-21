@@ -5,10 +5,17 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from app.api.router import api_router
 from app.core.config import get_settings
+from app.core.database import async_session_factory
+from app.repositories.group_repo import GroupRepository
+from app.repositories.user_repo import UserRepository
+from app.services.admin_seed import ensure_admin_user
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    settings = get_settings()
+    async with async_session_factory() as session:
+        await ensure_admin_user(UserRepository(session), GroupRepository(session), settings)
     yield
 
 

@@ -1,9 +1,20 @@
 import uuid
+from typing import Protocol
 
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.user import User
+
+
+class UserRepositoryProtocol(Protocol):
+    async def create(self, user: User) -> User: ...
+
+    async def save(self, user: User) -> User: ...
+
+    async def get_by_id(self, user_id: uuid.UUID) -> User | None: ...
+
+    async def get_by_username(self, username: str) -> User | None: ...
 
 
 class UserRepository:
@@ -12,6 +23,11 @@ class UserRepository:
 
     async def create(self, user: User) -> User:
         self._session.add(user)
+        await self._session.commit()
+        await self._session.refresh(user)
+        return user
+
+    async def save(self, user: User) -> User:
         await self._session.commit()
         await self._session.refresh(user)
         return user
