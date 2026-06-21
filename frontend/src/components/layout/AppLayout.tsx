@@ -15,17 +15,22 @@ export function AppLayout({ children }: { children: ReactNode }) {
   };
 
   return (
-    <div className="flex h-screen bg-gray-50">
+    <div className="flex min-h-screen flex-col bg-[var(--paper)] text-[var(--ink)] md:h-screen md:flex-row">
       <Sidebar />
       <div className="flex min-w-0 flex-1 flex-col">
-        <header className="flex h-14 items-center justify-end border-b border-gray-200 bg-white px-6">
+        <header className="flex h-14 items-center justify-between border-b border-[var(--ink)] bg-[var(--paper)] px-6">
+          <div className="hidden items-baseline gap-3 md:flex">
+            <span className="vi-kicker">Studio</span>
+            <span className="vi-display text-base italic">A reader's edition for video</span>
+          </div>
           {user && (
             <div className="flex items-center gap-3 text-sm">
-              <span className="font-medium text-gray-700">{user.username}</span>
+              <span className="vi-mono text-xs text-[var(--muted)]">Signed in</span>
+              <span className="vi-display text-base italic">{user.username}</span>
               <button
                 type="button"
                 onClick={handleLogout}
-                className="inline-flex h-9 w-9 items-center justify-center rounded-md border border-gray-300 text-gray-600 hover:bg-gray-50"
+                className="vi-icon-button"
                 aria-label="Log out"
                 title="Log out"
               >
@@ -34,7 +39,9 @@ export function AppLayout({ children }: { children: ReactNode }) {
             </div>
           )}
         </header>
-        <main className="flex-1 overflow-y-auto p-6">{children}</main>
+        <main className="flex-1 overflow-y-auto px-5 py-6 md:px-8 lg:px-10">
+          {children}
+        </main>
       </div>
     </div>
   );

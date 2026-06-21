@@ -41,9 +41,9 @@ function VideoDetailPage() {
     isAnnotationActive(annotation, currentVideoTime),
   );
 
-  if (isLoading) return <p className="text-gray-500">Loading...</p>;
+  if (isLoading) return <p className="text-[var(--muted)]">Loading...</p>;
   if (isError || !video)
-    return <p className="text-red-600">Video not found.</p>;
+    return <p className="text-[var(--danger)]">Video not found.</p>;
 
   const handleDeleteVideo = () => {
     deleteVideo.mutate(videoId, {
@@ -66,19 +66,20 @@ function VideoDetailPage() {
   };
 
   return (
-    <div className="space-y-6">
+    <div className="mx-auto max-w-7xl space-y-8">
       <Link
         to="/videos"
-        className="inline-flex items-center gap-1 text-sm text-gray-500 hover:text-gray-700"
+        className="inline-flex items-center gap-1 text-sm text-[var(--muted)] hover:text-[var(--ink)]"
       >
         <ArrowLeft className="h-4 w-4" />
         Back to videos
       </Link>
 
-      <div className="flex flex-wrap items-start justify-between gap-4">
+      <div className="flex flex-wrap items-end justify-between gap-6 border-b border-[var(--ink)] pb-8">
         <div>
-          <h1 className="text-2xl font-bold">{video.title}</h1>
-          <p className="mt-1 max-w-3xl text-sm text-gray-500">
+          <p className="vi-kicker">Watching edition</p>
+          <h1 className="vi-display mt-3 max-w-4xl text-5xl">{video.title}</h1>
+          <p className="mt-4 max-w-3xl text-sm text-[var(--muted)]">
             {video.description ?? "No description"}
           </p>
         </div>
@@ -86,16 +87,16 @@ function VideoDetailPage() {
           type="button"
           onClick={handleDeleteVideo}
           disabled={deleteVideo.isPending}
-          className="inline-flex items-center gap-2 rounded-md border border-red-300 px-3 py-2 text-sm text-red-600 hover:bg-red-50 disabled:opacity-60"
+          className="vi-button-danger disabled:opacity-60"
         >
           <Trash2 className="h-4 w-4" />
           Delete Video
         </button>
       </div>
 
-      <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_420px]">
-        <section className="space-y-4">
-          <div className="relative overflow-hidden rounded-lg border border-gray-200 bg-black">
+      <div className="grid gap-8 xl:grid-cols-[minmax(0,1fr)_400px]">
+        <section className="space-y-5">
+          <div className="relative overflow-hidden rounded-lg border border-[var(--rule)] bg-[#0f0e0c]">
             {video.playback_url ? (
               <>
                 <video
@@ -105,29 +106,35 @@ function VideoDetailPage() {
                   onDurationChange={updateVideoTiming}
                   onLoadedMetadata={updateVideoTiming}
                   onTimeUpdate={updateVideoTiming}
-                  className="aspect-video w-full bg-black"
+                  className="aspect-video w-full bg-[#0f0e0c]"
                 />
                 <AnnotationOverlay annotations={activeAnnotations} />
               </>
             ) : (
-              <div className="flex aspect-video items-center justify-center text-sm text-white">
+              <div className="flex aspect-video items-center justify-center text-sm text-[var(--paper)]">
                 Video URL unavailable.
               </div>
             )}
           </div>
 
-          <dl className="grid gap-4 rounded-lg border border-gray-200 bg-white p-4 text-sm sm:grid-cols-3">
+          <dl className="vi-panel grid gap-0 overflow-hidden text-sm sm:grid-cols-3">
             <div>
-              <dt className="text-gray-500">File</dt>
-              <dd className="mt-1 font-medium">{video.original_filename}</dd>
+              <div className="border-b border-[var(--rule)] p-4 sm:border-r sm:border-b-0">
+                <dt className="vi-kicker">File</dt>
+                <dd className="mt-2 font-medium">{video.original_filename}</dd>
+              </div>
             </div>
             <div>
-              <dt className="text-gray-500">Size</dt>
-              <dd className="mt-1 font-medium">{formatBytes(video.size_bytes)}</dd>
+              <div className="border-b border-[var(--rule)] p-4 sm:border-r sm:border-b-0">
+                <dt className="vi-kicker">Size</dt>
+                <dd className="vi-mono mt-2 text-xs">{formatBytes(video.size_bytes)}</dd>
+              </div>
             </div>
             <div>
-              <dt className="text-gray-500">Created</dt>
-              <dd className="mt-1 font-medium">{formatDate(video.created_at)}</dd>
+              <div className="p-4">
+                <dt className="vi-kicker">Created</dt>
+                <dd className="vi-mono mt-2 text-xs">{formatDate(video.created_at)}</dd>
+              </div>
             </div>
           </dl>
 
@@ -142,23 +149,23 @@ function VideoDetailPage() {
           />
         </section>
 
-        <aside className="space-y-3">
-          <div className="flex items-center justify-between">
-            <h2 className="text-lg font-semibold">Annotations</h2>
-            <span className="text-sm text-gray-500">{annotations.length}</span>
+        <aside className="space-y-4 xl:sticky xl:top-6 xl:self-start">
+          <div className="flex items-baseline justify-between border-b border-[var(--ink)] pb-3">
+            <h2 className="vi-display text-2xl">Annotations</h2>
+            <span className="vi-mono text-xs text-[var(--muted)]">{annotations.length}</span>
           </div>
           <div className="space-y-3">
             {annotations.map((annotation) => (
               <article
                 key={annotation.id}
-                className="rounded-lg border border-gray-200 bg-white p-4"
-                style={{ borderLeft: `4px solid ${annotation.color}` }}
+                className="vi-panel vi-soft-shadow p-4"
+                style={{ borderLeft: `3px solid ${annotation.color}` }}
               >
                 <div className="flex items-start justify-between gap-3">
                   <button
                     type="button"
                     onClick={() => seekTo(annotation.timestamp_seconds)}
-                    className="inline-flex items-center gap-2 rounded-md bg-gray-100 px-2 py-1 text-sm font-medium text-gray-800 hover:bg-gray-200"
+                    className="inline-flex items-center gap-2 rounded-md border border-[var(--rule)] bg-[var(--paper)] px-2 py-1 text-sm font-semibold text-[var(--ink)] hover:border-[var(--ink)]"
                   >
                     <Clock className="h-4 w-4" />
                     {formatDuration(annotation.timestamp_seconds)}
@@ -167,7 +174,7 @@ function VideoDetailPage() {
                     <button
                       type="button"
                       onClick={() => setEditingAnnotation(annotation)}
-                      className="inline-flex h-8 w-8 items-center justify-center rounded-md border border-gray-300 text-gray-600 hover:bg-gray-50"
+                      className="vi-icon-button h-8 min-h-8 w-8"
                       aria-label="Edit annotation"
                       title="Edit annotation"
                     >
@@ -181,19 +188,19 @@ function VideoDetailPage() {
                 </div>
                 <div className="mt-3">
                   <div className="flex flex-wrap items-center gap-2">
-                    <h3 className="font-semibold">{annotation.title}</h3>
-                    <span className="rounded bg-gray-100 px-2 py-0.5 text-xs text-gray-600">
+                    <h3 className="vi-display text-lg">{annotation.title}</h3>
+                    <span className="vi-kicker rounded border border-[var(--rule)] px-2 py-0.5">
                       {annotation.kind}
                     </span>
                   </div>
-                  <p className="mt-2 whitespace-pre-wrap text-sm text-gray-700">
+                  <p className="mt-2 whitespace-pre-wrap text-sm text-[var(--ink)]">
                     {annotation.body}
                   </p>
                 </div>
               </article>
             ))}
             {annotations.length === 0 && (
-              <p className="rounded-lg border border-dashed border-gray-300 bg-white p-6 text-center text-sm text-gray-500">
+              <p className="rounded-lg border border-dashed border-[var(--rule-strong)] bg-[var(--surface)] p-6 text-center text-sm text-[var(--muted)]">
                 No annotations yet.
               </p>
             )}
@@ -212,7 +219,7 @@ function AnnotationOverlay({ annotations }: { annotations: Annotation[] }) {
       {annotations.slice(0, 3).map((annotation) => (
         <div
           key={annotation.id}
-          className="max-w-2xl rounded-md border bg-black/78 p-3 text-white shadow-lg backdrop-blur"
+          className="max-w-2xl rounded-lg border bg-[#1c1a17]/90 p-3 text-[var(--paper)]"
           style={{ borderColor: annotation.color }}
         >
           <div className="flex flex-wrap items-center gap-2">
@@ -220,17 +227,17 @@ function AnnotationOverlay({ annotations }: { annotations: Annotation[] }) {
               className="h-2.5 w-2.5 rounded-full"
               style={{ backgroundColor: annotation.color }}
             />
-            <span className="text-xs font-medium uppercase text-white/70">
+            <span className="vi-kicker text-[rgba(250,247,242,0.72)]">
               {annotation.kind}
             </span>
-            <span className="text-xs text-white/60">
+            <span className="vi-mono text-xs text-[rgba(250,247,242,0.62)]">
               {formatDuration(annotation.timestamp_seconds)}
             </span>
           </div>
-          <h3 className="mt-1 text-base font-semibold leading-tight">
+          <h3 className="vi-display mt-1 text-lg leading-tight">
             {annotation.title}
           </h3>
-          <p className="mt-1 line-clamp-3 whitespace-pre-wrap text-sm leading-relaxed text-white/88">
+          <p className="mt-1 line-clamp-3 whitespace-pre-wrap text-sm leading-relaxed text-[rgba(250,247,242,0.88)]">
             {annotation.body}
           </p>
         </div>
@@ -275,7 +282,7 @@ function AnnotationForm({
   const [title, setTitle] = useState(editing?.title ?? "");
   const [body, setBody] = useState(editing?.body ?? "");
   const [kind, setKind] = useState(editing?.kind ?? "note");
-  const [color, setColor] = useState(editing?.color ?? "#0f766e");
+  const [color, setColor] = useState(editing?.color ?? "#C0512F");
   const [customData, setCustomData] = useState(
     editing ? JSON.stringify(editing.custom_data, null, 2) : "{}",
   );
@@ -325,7 +332,7 @@ function AnnotationForm({
         setTitle("");
         setBody("");
         setKind("note");
-        setColor("#0f766e");
+        setColor("#C0512F");
         setCustomData("{}");
       },
     });
@@ -336,14 +343,15 @@ function AnnotationForm({
   return (
     <form
       onSubmit={submit}
-      className="space-y-4 rounded-lg border border-gray-200 bg-white p-5"
+      className="vi-panel space-y-5 p-5"
     >
       <div className="flex items-center justify-between">
         <div>
-          <h2 className="text-lg font-semibold">
+          <p className="vi-kicker">Studio note</p>
+          <h2 className="vi-display mt-1 text-2xl">
             {editing ? "Edit Annotation" : "New Annotation"}
           </h2>
-          <p className="mt-1 text-sm text-gray-500">
+          <p className="vi-mono mt-1 text-xs text-[var(--muted)]">
             Current {formatDuration(currentVideoTime)}
           </p>
         </div>
@@ -351,7 +359,7 @@ function AnnotationForm({
           <button
             type="button"
             onClick={() => setBoundedTimestamp(currentTimestamp())}
-            className="inline-flex items-center gap-2 rounded-md border border-gray-300 px-3 py-1.5 text-sm hover:bg-gray-50"
+            className="vi-button-secondary min-h-0 px-3 py-1.5 text-sm"
           >
             <Clock className="h-4 w-4" />
             Use Current Time
@@ -359,8 +367,8 @@ function AnnotationForm({
         )}
       </div>
 
-      <div className="space-y-2 rounded-md border border-gray-200 bg-gray-50 p-3">
-        <div className="flex items-center justify-between text-sm text-gray-600">
+      <div className="vi-panel-paper space-y-2 p-3">
+        <div className="vi-mono flex items-center justify-between text-xs text-[var(--muted)]">
           <span>{formatDuration(boundedTimestamp)}</span>
           <span>{hasDuration ? formatDuration(videoDuration) : "--:--"}</span>
         </div>
@@ -372,13 +380,13 @@ function AnnotationForm({
           value={hasDuration ? boundedTimestamp : 0}
           onChange={(event) => setBoundedTimestamp(Number(event.target.value))}
           disabled={!hasDuration}
-          className="block w-full accent-[var(--color-primary)] disabled:opacity-50"
+          className="block w-full accent-[var(--accent)] disabled:opacity-50"
           aria-label="Annotation timestamp"
         />
       </div>
 
       <div className="grid gap-4 md:grid-cols-4">
-        <label className="block text-sm font-medium text-gray-700">
+        <label className="vi-label">
           Time in seconds
           <input
             type="number"
@@ -389,36 +397,36 @@ function AnnotationForm({
             onChange={(event) => setTimestamp(event.target.value)}
             onBlur={() => setBoundedTimestamp(Number(timestamp))}
             required
-            className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-[var(--color-primary)] focus:outline-none focus:ring-1 focus:ring-[var(--color-primary)]"
+            className="vi-input vi-mono mt-1 text-sm normal-case"
           />
         </label>
-        <label className="block text-sm font-medium text-gray-700 md:col-span-2">
+        <label className="vi-label md:col-span-2">
           Title
           <input
             value={title}
             onChange={(event) => setTitle(event.target.value)}
             required
-            className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-[var(--color-primary)] focus:outline-none focus:ring-1 focus:ring-[var(--color-primary)]"
+            className="vi-input mt-1 text-base normal-case"
           />
         </label>
-        <label className="block text-sm font-medium text-gray-700">
+        <label className="vi-label">
           Color
           <input
             type="color"
             value={color}
             onChange={(event) => setColor(event.target.value)}
-            className="mt-1 h-10 w-full rounded-md border border-gray-300 bg-white p-1"
+            className="mt-3 h-10 w-full rounded-lg border border-[var(--rule-strong)] bg-[var(--surface)] p-1"
           />
         </label>
       </div>
 
       <div className="grid gap-4 md:grid-cols-[180px_minmax(0,1fr)]">
-        <label className="block text-sm font-medium text-gray-700">
+        <label className="vi-label">
           Type
           <select
             value={kind}
             onChange={(event) => setKind(event.target.value)}
-            className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-[var(--color-primary)] focus:outline-none focus:ring-1 focus:ring-[var(--color-primary)]"
+            className="vi-select mt-1 text-sm normal-case"
           >
             <option value="note">Note</option>
             <option value="question">Question</option>
@@ -426,25 +434,25 @@ function AnnotationForm({
             <option value="highlight">Highlight</option>
           </select>
         </label>
-        <label className="block text-sm font-medium text-gray-700">
+        <label className="vi-label">
           Body
           <textarea
             value={body}
             onChange={(event) => setBody(event.target.value)}
             rows={3}
             required
-            className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-[var(--color-primary)] focus:outline-none focus:ring-1 focus:ring-[var(--color-primary)]"
+            className="vi-textarea mt-1 text-base normal-case"
           />
         </label>
       </div>
 
-      <label className="block text-sm font-medium text-gray-700">
+      <label className="vi-label">
         Custom JSON
         <textarea
           value={customData}
           onChange={(event) => setCustomData(event.target.value)}
           rows={4}
-          className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 font-mono text-xs focus:border-[var(--color-primary)] focus:outline-none focus:ring-1 focus:ring-[var(--color-primary)]"
+          className="vi-textarea vi-mono mt-1 text-xs normal-case"
         />
       </label>
 
@@ -452,7 +460,7 @@ function AnnotationForm({
         <button
           type="submit"
           disabled={!title || !body || isPending}
-          className="inline-flex items-center gap-2 rounded-md bg-[var(--color-primary)] px-4 py-2 text-sm text-white hover:bg-[var(--color-primary-hover)] disabled:opacity-50"
+          className="vi-button-primary disabled:opacity-50"
         >
           <Plus className="h-4 w-4" />
           {isPending ? "Saving..." : editing ? "Save" : "Add Annotation"}
@@ -461,20 +469,20 @@ function AnnotationForm({
           <button
             type="button"
             onClick={onDone}
-            className="rounded-md border border-gray-300 px-4 py-2 text-sm hover:bg-gray-50"
+            className="vi-button-secondary"
           >
             Cancel
           </button>
         )}
       </div>
-      {jsonError && <p className="text-sm text-red-600">{jsonError}</p>}
+      {jsonError && <p className="text-sm text-[var(--danger)]">{jsonError}</p>}
       {!hasDuration && (
-        <p className="text-sm text-amber-700">
+        <p className="text-sm text-[var(--muted)]">
           Video duration is still loading.
         </p>
       )}
       {(createAnnotation.isError || updateAnnotation.isError) && (
-        <p className="text-sm text-red-600">Could not save annotation.</p>
+        <p className="text-sm text-[var(--danger)]">Could not save annotation.</p>
       )}
     </form>
   );
@@ -503,7 +511,7 @@ function DeleteAnnotationButton({
       type="button"
       onClick={() => deleteAnnotation.mutate(annotationId)}
       disabled={deleteAnnotation.isPending}
-      className="inline-flex h-8 w-8 items-center justify-center rounded-md border border-red-300 text-red-600 hover:bg-red-50 disabled:opacity-60"
+      className="vi-icon-button h-8 min-h-8 w-8 border-[rgba(159,47,36,0.35)] text-[var(--danger)] hover:bg-[rgba(159,47,36,0.07)] disabled:opacity-60"
       aria-label="Delete annotation"
       title="Delete annotation"
     >

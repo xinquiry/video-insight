@@ -1,6 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { apiClient } from "@/lib/api-client";
-import { fetchMe, login, register } from "./api";
+import { createGroup, createUser, fetchGroups, fetchMe, login } from "./api";
 
 export function getStoredToken() {
   return localStorage.getItem(apiClient.tokenKey);
@@ -34,13 +34,26 @@ export function useLogin() {
   });
 }
 
-export function useRegister() {
+export function useCreateUser() {
+  return useMutation({
+    mutationFn: createUser,
+  });
+}
+
+export function useGroups(enabled = true) {
+  return useQuery({
+    queryKey: ["groups"],
+    queryFn: fetchGroups,
+    enabled,
+  });
+}
+
+export function useCreateGroup() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: register,
-    onSuccess: (data) => {
-      storeToken(data.access_token);
-      queryClient.setQueryData(["me"], data.user);
+    mutationFn: createGroup,
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: ["groups"] });
     },
   });
 }

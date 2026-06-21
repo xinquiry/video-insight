@@ -22,18 +22,19 @@ function VideosPage() {
   const deleteVideo = useDeleteVideo();
 
   return (
-    <div className="space-y-6">
-      <div className="flex flex-wrap items-center justify-between gap-3">
+    <div className="mx-auto max-w-6xl space-y-8">
+      <div className="flex flex-wrap items-end justify-between gap-6 border-b border-[var(--ink)] pb-8">
         <div>
-          <h1 className="text-2xl font-bold">Videos</h1>
-          <p className="mt-1 text-sm text-gray-500">
+          <p className="vi-kicker">Archive</p>
+          <h1 className="vi-display mt-3 text-5xl">Videos</h1>
+          <p className="mt-3 max-w-2xl text-sm text-[var(--muted)]">
             Upload source videos for shared student learning materials.
           </p>
         </div>
         <button
           type="button"
           onClick={() => setShowForm((value) => !value)}
-          className="inline-flex items-center gap-2 rounded-md bg-[var(--color-primary)] px-4 py-2 text-sm font-medium text-white hover:bg-[var(--color-primary-hover)]"
+          className="vi-button-primary"
         >
           <Plus className="h-4 w-4" />
           New Video
@@ -45,51 +46,51 @@ function VideosPage() {
         <EditVideoForm video={editing} onDone={() => setEditing(null)} />
       )}
 
-      {isLoading && <p className="text-gray-500">Loading...</p>}
+      {isLoading && <p className="text-[var(--muted)]">Loading...</p>}
 
       {data && (
         <>
-          <div className="overflow-hidden rounded-lg border border-gray-200 bg-white">
-            <table className="min-w-full divide-y divide-gray-200">
-              <thead className="bg-gray-50">
+          <div className="vi-panel overflow-hidden">
+            <table className="min-w-full divide-y divide-[var(--rule)]">
+              <thead className="bg-[var(--paper)]">
                 <tr>
-                  <th className="px-5 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500">
+                  <th className="vi-kicker px-5 py-3 text-left">
                     Title
                   </th>
-                  <th className="px-5 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500">
+                  <th className="vi-kicker px-5 py-3 text-left">
                     File
                   </th>
-                  <th className="px-5 py-3 text-left text-xs font-medium uppercase tracking-wider text-gray-500">
+                  <th className="vi-kicker px-5 py-3 text-left">
                     Created
                   </th>
-                  <th className="px-5 py-3 text-right text-xs font-medium uppercase tracking-wider text-gray-500">
+                  <th className="vi-kicker px-5 py-3 text-right">
                     Actions
                   </th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-gray-200">
+              <tbody className="divide-y divide-[var(--rule)]">
                 {data.items.map((video) => (
-                  <tr key={video.id} className="hover:bg-gray-50">
+                  <tr key={video.id} className="hover:bg-[rgba(192,81,47,0.04)]">
                     <td className="px-5 py-4">
                       <Link
                         to="/videos/$videoId"
                         params={{ videoId: video.id }}
-                        className="font-medium text-[var(--color-primary)] hover:underline"
+                        className="vi-display vi-link text-lg"
                       >
                         {video.title}
                       </Link>
-                      <p className="mt-1 max-w-xl text-sm text-gray-500">
+                      <p className="mt-1 max-w-xl text-sm text-[var(--muted)]">
                         {video.description ?? "No description"}
                       </p>
                     </td>
-                    <td className="px-5 py-4 text-sm text-gray-500">
+                    <td className="px-5 py-4 text-sm text-[var(--muted)]">
                       <div className="flex items-center gap-2">
                         <VideoIcon className="h-4 w-4" />
                         <span>{video.original_filename}</span>
                       </div>
-                      <p className="mt-1">{formatBytes(video.size_bytes)}</p>
+                      <p className="vi-mono mt-1 text-xs">{formatBytes(video.size_bytes)}</p>
                     </td>
-                    <td className="px-5 py-4 text-sm text-gray-500">
+                    <td className="vi-mono px-5 py-4 text-xs text-[var(--muted)]">
                       {formatDate(video.created_at)}
                     </td>
                     <td className="px-5 py-4">
@@ -97,7 +98,7 @@ function VideosPage() {
                         <button
                           type="button"
                           onClick={() => setEditing(video)}
-                          className="inline-flex h-9 w-9 items-center justify-center rounded-md border border-gray-300 text-gray-600 hover:bg-gray-50"
+                          className="vi-icon-button"
                           aria-label="Edit video"
                           title="Edit video"
                         >
@@ -107,7 +108,7 @@ function VideosPage() {
                           type="button"
                           onClick={() => deleteVideo.mutate(video.id)}
                           disabled={deleteVideo.isPending}
-                          className="inline-flex h-9 w-9 items-center justify-center rounded-md border border-red-300 text-red-600 hover:bg-red-50 disabled:opacity-60"
+                          className="vi-icon-button border-[rgba(159,47,36,0.35)] text-[var(--danger)] hover:bg-[rgba(159,47,36,0.07)] disabled:opacity-60"
                           aria-label="Delete video"
                           title="Delete video"
                         >
@@ -119,7 +120,7 @@ function VideosPage() {
                 ))}
                 {data.items.length === 0 && (
                   <tr>
-                    <td className="px-5 py-8 text-center text-sm text-gray-500" colSpan={4}>
+                    <td className="px-5 py-12 text-center text-sm text-[var(--muted)]" colSpan={4}>
                       No videos yet.
                     </td>
                   </tr>
@@ -129,7 +130,7 @@ function VideosPage() {
           </div>
 
           <div className="flex items-center justify-between">
-            <p className="text-sm text-gray-500">
+            <p className="vi-mono text-xs text-[var(--muted)]">
               {data.total} video{data.total !== 1 && "s"} total
             </p>
             <div className="flex gap-2">
@@ -137,7 +138,7 @@ function VideosPage() {
                 type="button"
                 disabled={page <= 1}
                 onClick={() => setPage((value) => value - 1)}
-                className="rounded-md border border-gray-300 px-3 py-1 text-sm disabled:opacity-50"
+                className="vi-button-secondary min-h-0 px-3 py-1 text-sm disabled:opacity-50"
               >
                 Previous
               </button>
@@ -145,7 +146,7 @@ function VideosPage() {
                 type="button"
                 disabled={page * 20 >= data.total}
                 onClick={() => setPage((value) => value + 1)}
-                className="rounded-md border border-gray-300 px-3 py-1 text-sm disabled:opacity-50"
+                className="vi-button-secondary min-h-0 px-3 py-1 text-sm disabled:opacity-50"
               >
                 Next
               </button>
@@ -175,44 +176,44 @@ function CreateVideoForm({ onDone }: { onDone: () => void }) {
   return (
     <form
       onSubmit={submit}
-      className="space-y-4 rounded-lg border border-gray-200 bg-white p-5"
+      className="vi-panel space-y-5 p-5"
     >
       <div className="grid gap-4 md:grid-cols-2">
-        <label className="block text-sm font-medium text-gray-700">
+        <label className="vi-label">
           Title
           <input
             type="text"
             value={title}
             onChange={(event) => setTitle(event.target.value)}
             required
-            className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-[var(--color-primary)] focus:outline-none focus:ring-1 focus:ring-[var(--color-primary)]"
+            className="vi-input mt-1 text-base normal-case"
           />
         </label>
-        <label className="block text-sm font-medium text-gray-700">
+        <label className="vi-label">
           Video file
           <input
             type="file"
             accept="video/*"
             onChange={(event) => setFile(event.target.files?.[0] ?? null)}
             required
-            className="mt-1 block w-full text-sm file:mr-3 file:rounded-md file:border-0 file:bg-gray-100 file:px-3 file:py-2 file:text-sm file:font-medium file:text-gray-700 hover:file:bg-gray-200"
+            className="mt-3 block w-full text-sm normal-case text-[var(--muted)] file:mr-3 file:rounded-lg file:border file:border-[var(--ink)] file:bg-transparent file:px-3 file:py-2 file:text-sm file:font-semibold file:text-[var(--ink)] hover:file:bg-[var(--ink)] hover:file:text-[var(--paper)]"
           />
         </label>
       </div>
-      <label className="block text-sm font-medium text-gray-700">
+      <label className="vi-label">
         Description
         <textarea
           value={description}
           onChange={(event) => setDescription(event.target.value)}
           rows={3}
-          className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-[var(--color-primary)] focus:outline-none focus:ring-1 focus:ring-[var(--color-primary)]"
+          className="vi-textarea mt-1 text-base normal-case"
         />
       </label>
       <div className="flex gap-2">
         <button
           type="submit"
           disabled={!title || !file || createVideo.isPending}
-          className="inline-flex items-center gap-2 rounded-md bg-[var(--color-primary)] px-4 py-2 text-sm text-white hover:bg-[var(--color-primary-hover)] disabled:opacity-50"
+          className="vi-button-primary disabled:opacity-50"
         >
           <Upload className="h-4 w-4" />
           {createVideo.isPending ? "Uploading..." : "Upload"}
@@ -220,13 +221,13 @@ function CreateVideoForm({ onDone }: { onDone: () => void }) {
         <button
           type="button"
           onClick={onDone}
-          className="rounded-md border border-gray-300 px-4 py-2 text-sm hover:bg-gray-50"
+          className="vi-button-secondary"
         >
           Cancel
         </button>
       </div>
       {createVideo.isError && (
-        <p className="text-sm text-red-600">Upload failed. Please try again.</p>
+        <p className="text-sm text-[var(--danger)]">Upload failed. Please try again.</p>
       )}
     </form>
   );
@@ -254,46 +255,46 @@ function EditVideoForm({
   return (
     <form
       onSubmit={submit}
-      className="space-y-4 rounded-lg border border-gray-200 bg-white p-5"
+      className="vi-panel space-y-5 p-5"
     >
       <div className="grid gap-4 md:grid-cols-2">
-        <label className="block text-sm font-medium text-gray-700">
+        <label className="vi-label">
           Title
           <input
             type="text"
             value={title}
             onChange={(event) => setTitle(event.target.value)}
             required
-            className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-[var(--color-primary)] focus:outline-none focus:ring-1 focus:ring-[var(--color-primary)]"
+            className="vi-input mt-1 text-base normal-case"
           />
         </label>
-        <div className="text-sm text-gray-500">
-          <p className="font-medium text-gray-700">File</p>
-          <p className="mt-2">{video.original_filename}</p>
-          <p>{formatBytes(video.size_bytes)}</p>
+        <div className="text-sm text-[var(--muted)]">
+          <p className="vi-label">File</p>
+          <p className="mt-2 text-[var(--ink)]">{video.original_filename}</p>
+          <p className="vi-mono text-xs">{formatBytes(video.size_bytes)}</p>
         </div>
       </div>
-      <label className="block text-sm font-medium text-gray-700">
+      <label className="vi-label">
         Description
         <textarea
           value={description}
           onChange={(event) => setDescription(event.target.value)}
           rows={3}
-          className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-[var(--color-primary)] focus:outline-none focus:ring-1 focus:ring-[var(--color-primary)]"
+          className="vi-textarea mt-1 text-base normal-case"
         />
       </label>
       <div className="flex gap-2">
         <button
           type="submit"
           disabled={!title || updateVideo.isPending}
-          className="rounded-md bg-[var(--color-primary)] px-4 py-2 text-sm text-white hover:bg-[var(--color-primary-hover)] disabled:opacity-50"
+          className="vi-button-primary disabled:opacity-50"
         >
           {updateVideo.isPending ? "Saving..." : "Save"}
         </button>
         <button
           type="button"
           onClick={onDone}
-          className="rounded-md border border-gray-300 px-4 py-2 text-sm hover:bg-gray-50"
+          className="vi-button-secondary"
         >
           Cancel
         </button>

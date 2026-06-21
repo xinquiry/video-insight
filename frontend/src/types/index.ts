@@ -1,6 +1,8 @@
 export interface User {
   id: string;
+  group_id: string;
   username: string;
+  is_admin: boolean;
   created_at: string;
 }
 
@@ -12,6 +14,7 @@ export interface AuthToken {
 
 export interface Video {
   id: string;
+  group_id: string;
   title: string;
   description: string | null;
   original_filename: string;
@@ -20,6 +23,12 @@ export interface Video {
   playback_url: string | null;
   created_at: string;
   updated_at: string | null;
+}
+
+export interface Group {
+  id: string;
+  name: string;
+  created_at: string;
 }
 
 export interface Annotation {

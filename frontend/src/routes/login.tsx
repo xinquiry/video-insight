@@ -1,7 +1,7 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
-import { LogIn, UserPlus } from "lucide-react";
+import { LogIn } from "lucide-react";
 import { useState } from "react";
-import { useLogin, useRegister } from "@/features/auth/hooks";
+import { useLogin } from "@/features/auth/hooks";
 
 export const Route = createFileRoute("/login")({
   component: LoginPage,
@@ -10,83 +10,70 @@ export const Route = createFileRoute("/login")({
 function LoginPage() {
   const navigate = useNavigate();
   const login = useLogin();
-  const register = useRegister();
-  const [mode, setMode] = useState<"login" | "register">("login");
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
 
   const submit = (event: React.FormEvent) => {
     event.preventDefault();
-    const mutation = mode === "login" ? login : register;
-    mutation.mutate(
+    login.mutate(
       { username, password },
       { onSuccess: () => navigate({ to: "/" }) },
     );
   };
 
-  const isPending = login.isPending || register.isPending;
-  const hasError = login.isError || register.isError;
+  const isPending = login.isPending;
+  const hasError = login.isError;
 
   return (
-    <main className="flex min-h-screen items-center justify-center bg-gray-100 px-4">
+    <main className="grid min-h-screen bg-[var(--paper)] text-[var(--ink)] lg:grid-cols-[1fr_420px]">
+      <section className="flex min-h-[45vh] flex-col justify-between border-b border-[var(--ink)] p-8 lg:border-r lg:border-b-0 lg:p-12">
+        <div className="flex items-center justify-between">
+          <span className="vi-display text-2xl">
+            Video <em className="text-[var(--accent)]">Insight</em>
+          </span>
+          <span className="vi-kicker">Studio</span>
+        </div>
+        <div className="max-w-3xl">
+          <p className="vi-kicker">Annotated learning archive</p>
+          <h1 className="vi-display mt-4 text-5xl md:text-7xl">
+            Make Video Feel Like A Marked-Up Text.
+          </h1>
+          <p className="mt-6 max-w-xl text-base text-[var(--muted)]">
+            Upload source material, add timestamped marginalia, and keep a
+            shared edition for learners.
+          </p>
+        </div>
+      </section>
+      <section className="flex items-center px-5 py-10 lg:px-8">
       <form
         onSubmit={submit}
-        className="w-full max-w-sm space-y-5 rounded-lg border border-gray-200 bg-white p-6 shadow-sm"
+        className="vi-panel w-full space-y-6 p-6"
       >
         <div>
-          <h1 className="text-xl font-semibold text-gray-950">
-            VideoInsight
-          </h1>
-          <p className="mt-1 text-sm text-gray-500">
-            Sign in to manage shared learning videos.
+          <p className="vi-kicker">Account</p>
+          <h2 className="vi-display mt-2 text-3xl">Welcome Back</h2>
+          <p className="mt-2 text-sm text-[var(--muted)]">
+            Sign in with the seeded admin account or a user created by an admin.
           </p>
         </div>
 
-        <div className="grid grid-cols-2 rounded-md border border-gray-300 p-1">
-          <button
-            type="button"
-            onClick={() => setMode("login")}
-            className={`inline-flex items-center justify-center gap-2 rounded px-3 py-2 text-sm ${
-              mode === "login"
-                ? "bg-[var(--color-primary)] text-white"
-                : "text-gray-600 hover:bg-gray-50"
-            }`}
-          >
-            <LogIn className="h-4 w-4" />
-            Login
-          </button>
-          <button
-            type="button"
-            onClick={() => setMode("register")}
-            className={`inline-flex items-center justify-center gap-2 rounded px-3 py-2 text-sm ${
-              mode === "register"
-                ? "bg-[var(--color-primary)] text-white"
-                : "text-gray-600 hover:bg-gray-50"
-            }`}
-          >
-            <UserPlus className="h-4 w-4" />
-            Register
-          </button>
-        </div>
-
-        <label className="block text-sm font-medium text-gray-700">
+        <label className="vi-label">
           Username
           <input
             value={username}
             onChange={(event) => setUsername(event.target.value)}
-            className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-[var(--color-primary)] focus:outline-none focus:ring-1 focus:ring-[var(--color-primary)]"
+            className="vi-input mt-1 text-base normal-case"
             minLength={3}
             required
           />
         </label>
 
-        <label className="block text-sm font-medium text-gray-700">
+        <label className="vi-label">
           Password
           <input
             value={password}
             onChange={(event) => setPassword(event.target.value)}
-            className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:border-[var(--color-primary)] focus:outline-none focus:ring-1 focus:ring-[var(--color-primary)]"
-            minLength={8}
+            className="vi-input mt-1 text-base normal-case"
             type="password"
             required
           />
@@ -95,24 +82,19 @@ function LoginPage() {
         <button
           type="submit"
           disabled={isPending}
-          className="inline-flex w-full items-center justify-center gap-2 rounded-md bg-[var(--color-primary)] px-4 py-2 text-sm font-medium text-white hover:bg-[var(--color-primary-hover)] disabled:opacity-60"
+          className="vi-button-primary w-full disabled:opacity-60"
         >
-          {mode === "login" ? (
-            <LogIn className="h-4 w-4" />
-          ) : (
-            <UserPlus className="h-4 w-4" />
-          )}
-          {isPending ? "Working..." : mode === "login" ? "Login" : "Register"}
+          <LogIn className="h-4 w-4" />
+          {isPending ? "Working..." : "Login"}
         </button>
 
         {hasError && (
-          <p className="text-sm text-red-600">
-            {mode === "login"
-              ? "Invalid username or password."
-              : "Registration failed. Try a different username."}
+          <p className="text-sm text-[var(--danger)]">
+            Invalid username or password.
           </p>
         )}
       </form>
+      </section>
     </main>
   );
 }

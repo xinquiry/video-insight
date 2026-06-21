@@ -24,7 +24,7 @@ function RootComponent() {
   }
   if (isLoading) {
     return (
-      <main className="flex min-h-screen items-center justify-center bg-gray-50 text-sm text-gray-500">
+      <main className="flex min-h-screen items-center justify-center bg-[var(--paper)] text-sm text-[var(--muted)]">
         Loading...
       </main>
     );
