@@ -20,6 +20,7 @@ class Settings(BaseSettings):
     minio_bucket: str = "videos"
     minio_secure: bool = False
     minio_public_secure: bool | None = None
+    minio_region: str = "us-east-1"
     upload_part_size_bytes: int = 5 * 1024 * 1024
     upload_url_expires_seconds: int = 60 * 60 * 6
     upload_max_parts: int = 10000

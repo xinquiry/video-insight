@@ -14,6 +14,7 @@ class StorageService:
             access_key=settings.minio_access_key,
             secret_key=settings.minio_secret_key,
             secure=settings.minio_secure,
+            region=settings.minio_region,
         )
         public_endpoint = settings.minio_public_endpoint or settings.minio_endpoint
         public_secure = (
@@ -24,7 +25,7 @@ class StorageService:
             access_key=settings.minio_access_key,
             secret_key=settings.minio_secret_key,
             secure=public_secure,
-            region="us-east-1",
+            region=settings.minio_region,
         )
 
     def ensure_bucket(self) -> None:
