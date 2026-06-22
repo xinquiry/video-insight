@@ -41,6 +41,7 @@ class UploadInitResponse(BaseModel):
     part_size: int
     parts: list[UploadPartUrl]
     expires_in: int
+    concurrency: int
 
 
 class UploadPartCompleted(BaseModel):

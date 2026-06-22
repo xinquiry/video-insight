@@ -61,6 +61,7 @@ class VideoService:
             part_size=part_size,
             parts=parts,
             expires_in=int(expires.total_seconds()),
+            concurrency=max(1, self._settings.upload_concurrency),
         )
 
     async def complete_upload(self, payload: UploadCompleteRequest, group_id: uuid.UUID) -> VideoRead:

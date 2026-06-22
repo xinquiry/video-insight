@@ -17,6 +17,7 @@ export type UploadInitResponse = {
   part_size: number;
   parts: { part_number: number; url: string }[];
   expires_in: number;
+  concurrency: number;
 };
 
 export type CompletedPart = { part_number: number; etag: string };
@@ -62,7 +63,6 @@ export async function uploadVideo(
   } = {},
 ): Promise<Video> {
   const { file } = data;
-  const concurrency = options.concurrency ?? 4;
   const contentType = file.type || "application/octet-stream";
 
   const init = await initUpload({
@@ -70,6 +70,11 @@ export async function uploadVideo(
     content_type: contentType,
     size_bytes: file.size,
   });
+
+  const concurrency = Math.max(
+    1,
+    options.concurrency ?? init.concurrency ?? 1,
+  );
 
   const total = file.size;
   const partSize = init.part_size;
