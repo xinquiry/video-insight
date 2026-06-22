@@ -22,6 +22,7 @@ compose() {
     --env-file "$DEFAULT_ENV_FILE" \
     --env-file "$PROD_ENV_FILE" \
     -f "$DOCKER_DIR/docker-compose.prod.yaml" \
+    ${COMPOSE_PROFILES:+--profile "$COMPOSE_PROFILES"} \
     "$@"
 }
 
@@ -53,9 +54,12 @@ case "${1:-up}" in
     compose pull
 
     echo "Starting stateful dependencies..."
-    compose up -d postgresql minio
+    compose up -d postgresql
     wait_for_healthy postgresql
-    wait_for_healthy minio
+    if [ "${COMPOSE_PROFILES:-}" = "selfhosted-minio" ]; then
+      compose up -d minio
+      wait_for_healthy minio
+    fi
 
     echo "Running database migrations..."
     compose run --rm backend alembic upgrade head
