@@ -1,6 +1,7 @@
 import { Link, createFileRoute, useNavigate } from "@tanstack/react-router";
 import { ArrowLeft, Clock, Edit2, Plus, Trash2 } from "lucide-react";
 import { useRef, useState } from "react";
+import { useTranslation } from "react-i18next";
 import {
   useAnnotations,
   useCreateAnnotation,
@@ -26,6 +27,7 @@ type AnnotationFormValues = {
 };
 
 function VideoDetailPage() {
+  const { t } = useTranslation();
   const { videoId } = Route.useParams();
   const navigate = useNavigate();
   const videoElement = useRef<HTMLVideoElement | null>(null);
@@ -41,9 +43,9 @@ function VideoDetailPage() {
     isAnnotationActive(annotation, currentVideoTime),
   );
 
-  if (isLoading) return <p className="text-[var(--muted)]">Loading...</p>;
+  if (isLoading) return <p className="text-[var(--muted)]">{t("common.loading")}</p>;
   if (isError || !video)
-    return <p className="text-[var(--danger)]">Video not found.</p>;
+    return <p className="text-[var(--danger)]">{t("videoDetail.notFound")}</p>;
 
   const handleDeleteVideo = () => {
     deleteVideo.mutate(videoId, {
@@ -72,15 +74,15 @@ function VideoDetailPage() {
         className="inline-flex items-center gap-1 text-sm text-[var(--muted)] hover:text-[var(--ink)]"
       >
         <ArrowLeft className="h-4 w-4" />
-        Back to videos
+        {t("videoDetail.back")}
       </Link>
 
       <div className="flex flex-wrap items-end justify-between gap-6 border-b border-[var(--ink)] pb-8">
         <div>
-          <p className="vi-kicker">Watching edition</p>
+          <p className="vi-kicker">{t("videoDetail.kicker")}</p>
           <h1 className="vi-display mt-3 max-w-4xl text-5xl">{video.title}</h1>
           <p className="mt-4 max-w-3xl text-sm text-[var(--muted)]">
-            {video.description ?? "No description"}
+            {video.description ?? t("common.noDescription")}
           </p>
         </div>
         <button
@@ -90,7 +92,7 @@ function VideoDetailPage() {
           className="vi-button-danger disabled:opacity-60"
         >
           <Trash2 className="h-4 w-4" />
-          Delete Video
+          {t("videoDetail.deleteVideo")}
         </button>
       </div>
 
@@ -112,7 +114,7 @@ function VideoDetailPage() {
               </>
             ) : (
               <div className="flex aspect-video items-center justify-center text-sm text-[var(--paper)]">
-                Video URL unavailable.
+                {t("videoDetail.videoUnavailable")}
               </div>
             )}
           </div>
@@ -120,19 +122,19 @@ function VideoDetailPage() {
           <dl className="vi-panel grid gap-0 overflow-hidden text-sm sm:grid-cols-3">
             <div>
               <div className="border-b border-[var(--rule)] p-4 sm:border-r sm:border-b-0">
-                <dt className="vi-kicker">File</dt>
+                <dt className="vi-kicker">{t("videoDetail.file")}</dt>
                 <dd className="mt-2 font-medium">{video.original_filename}</dd>
               </div>
             </div>
             <div>
               <div className="border-b border-[var(--rule)] p-4 sm:border-r sm:border-b-0">
-                <dt className="vi-kicker">Size</dt>
+                <dt className="vi-kicker">{t("videoDetail.size")}</dt>
                 <dd className="vi-mono mt-2 text-xs">{formatBytes(video.size_bytes)}</dd>
               </div>
             </div>
             <div>
               <div className="p-4">
-                <dt className="vi-kicker">Created</dt>
+                <dt className="vi-kicker">{t("videoDetail.created")}</dt>
                 <dd className="vi-mono mt-2 text-xs">{formatDate(video.created_at)}</dd>
               </div>
             </div>
@@ -151,7 +153,7 @@ function VideoDetailPage() {
 
         <aside className="space-y-4 xl:sticky xl:top-6 xl:self-start">
           <div className="flex items-baseline justify-between border-b border-[var(--ink)] pb-3">
-            <h2 className="vi-display text-2xl">Annotations</h2>
+            <h2 className="vi-display text-2xl">{t("videoDetail.annotations.title")}</h2>
             <span className="vi-mono text-xs text-[var(--muted)]">{annotations.length}</span>
           </div>
           <div className="space-y-3">
@@ -175,8 +177,8 @@ function VideoDetailPage() {
                       type="button"
                       onClick={() => setEditingAnnotation(annotation)}
                       className="vi-icon-button h-8 min-h-8 w-8"
-                      aria-label="Edit annotation"
-                      title="Edit annotation"
+                      aria-label={t("videoDetail.annotations.edit")}
+                      title={t("videoDetail.annotations.edit")}
                     >
                       <Edit2 className="h-4 w-4" />
                     </button>
@@ -190,7 +192,7 @@ function VideoDetailPage() {
                   <div className="flex flex-wrap items-center gap-2">
                     <h3 className="vi-display text-lg">{annotation.title}</h3>
                     <span className="vi-kicker rounded border border-[var(--rule)] px-2 py-0.5">
-                      {annotation.kind}
+                      {translateKind(t, annotation.kind)}
                     </span>
                   </div>
                   <p className="mt-2 whitespace-pre-wrap text-sm text-[var(--ink)]">
@@ -201,7 +203,7 @@ function VideoDetailPage() {
             ))}
             {annotations.length === 0 && (
               <p className="rounded-lg border border-dashed border-[var(--rule-strong)] bg-[var(--surface)] p-6 text-center text-sm text-[var(--muted)]">
-                No annotations yet.
+                {t("videoDetail.annotations.empty")}
               </p>
             )}
           </div>
@@ -211,7 +213,16 @@ function VideoDetailPage() {
   );
 }
 
+function translateKind(t: (key: string) => string, kind: string): string {
+  const known = ["note", "question", "resource", "highlight"];
+  if (known.includes(kind)) {
+    return t(`videoDetail.form.kinds.${kind}`);
+  }
+  return kind;
+}
+
 function AnnotationOverlay({ annotations }: { annotations: Annotation[] }) {
+  const { t } = useTranslation();
   if (annotations.length === 0) return null;
 
   return (
@@ -228,7 +239,7 @@ function AnnotationOverlay({ annotations }: { annotations: Annotation[] }) {
               style={{ backgroundColor: annotation.color }}
             />
             <span className="vi-kicker text-[rgba(250,247,242,0.72)]">
-              {annotation.kind}
+              {translateKind(t, annotation.kind)}
             </span>
             <span className="vi-mono text-xs text-[rgba(250,247,242,0.62)]">
               {formatDuration(annotation.timestamp_seconds)}
@@ -274,6 +285,7 @@ function AnnotationForm({
   videoDuration: number;
   onDone: () => void;
 }) {
+  const { t } = useTranslation();
   const createAnnotation = useCreateAnnotation(videoId);
   const updateAnnotation = useUpdateAnnotation(videoId);
   const [timestamp, setTimestamp] = useState(
@@ -301,12 +313,12 @@ function AnnotationForm({
     try {
       parsed = JSON.parse(customData) as Record<string, unknown>;
       if (!parsed || Array.isArray(parsed) || typeof parsed !== "object") {
-        setJsonError("Custom data must be a JSON object.");
+        setJsonError(t("videoDetail.form.errorJsonObject"));
         return;
       }
       setJsonError(null);
     } catch {
-      setJsonError("Custom data must be valid JSON.");
+      setJsonError(t("videoDetail.form.errorJsonInvalid"));
       return;
     }
 
@@ -347,12 +359,12 @@ function AnnotationForm({
     >
       <div className="flex items-center justify-between">
         <div>
-          <p className="vi-kicker">Studio note</p>
+          <p className="vi-kicker">{t("videoDetail.form.kicker")}</p>
           <h2 className="vi-display mt-1 text-2xl">
-            {editing ? "Edit Annotation" : "New Annotation"}
+            {editing ? t("videoDetail.form.editTitle") : t("videoDetail.form.newTitle")}
           </h2>
           <p className="vi-mono mt-1 text-xs text-[var(--muted)]">
-            Current {formatDuration(currentVideoTime)}
+            {t("videoDetail.form.current", { time: formatDuration(currentVideoTime) })}
           </p>
         </div>
         {!editing && (
@@ -362,7 +374,7 @@ function AnnotationForm({
             className="vi-button-secondary min-h-0 px-3 py-1.5 text-sm"
           >
             <Clock className="h-4 w-4" />
-            Use Current Time
+            {t("videoDetail.form.useCurrentTime")}
           </button>
         )}
       </div>
@@ -381,13 +393,13 @@ function AnnotationForm({
           onChange={(event) => setBoundedTimestamp(Number(event.target.value))}
           disabled={!hasDuration}
           className="block w-full accent-[var(--accent)] disabled:opacity-50"
-          aria-label="Annotation timestamp"
+          aria-label={t("videoDetail.form.timeSeconds")}
         />
       </div>
 
       <div className="grid gap-4 md:grid-cols-4">
         <label className="vi-label">
-          Time in seconds
+          {t("videoDetail.form.timeSeconds")}
           <input
             type="number"
             min="0"
@@ -401,7 +413,7 @@ function AnnotationForm({
           />
         </label>
         <label className="vi-label md:col-span-2">
-          Title
+          {t("videoDetail.form.title")}
           <input
             value={title}
             onChange={(event) => setTitle(event.target.value)}
@@ -410,7 +422,7 @@ function AnnotationForm({
           />
         </label>
         <label className="vi-label">
-          Color
+          {t("videoDetail.form.color")}
           <input
             type="color"
             value={color}
@@ -422,20 +434,20 @@ function AnnotationForm({
 
       <div className="grid gap-4 md:grid-cols-[180px_minmax(0,1fr)]">
         <label className="vi-label">
-          Type
+          {t("videoDetail.form.type")}
           <select
             value={kind}
             onChange={(event) => setKind(event.target.value)}
             className="vi-select mt-1 text-sm normal-case"
           >
-            <option value="note">Note</option>
-            <option value="question">Question</option>
-            <option value="resource">Resource</option>
-            <option value="highlight">Highlight</option>
+            <option value="note">{t("videoDetail.form.kinds.note")}</option>
+            <option value="question">{t("videoDetail.form.kinds.question")}</option>
+            <option value="resource">{t("videoDetail.form.kinds.resource")}</option>
+            <option value="highlight">{t("videoDetail.form.kinds.highlight")}</option>
           </select>
         </label>
         <label className="vi-label">
-          Body
+          {t("videoDetail.form.body")}
           <textarea
             value={body}
             onChange={(event) => setBody(event.target.value)}
@@ -447,7 +459,7 @@ function AnnotationForm({
       </div>
 
       <label className="vi-label">
-        Custom JSON
+        {t("videoDetail.form.customJson")}
         <textarea
           value={customData}
           onChange={(event) => setCustomData(event.target.value)}
@@ -463,7 +475,11 @@ function AnnotationForm({
           className="vi-button-primary disabled:opacity-50"
         >
           <Plus className="h-4 w-4" />
-          {isPending ? "Saving..." : editing ? "Save" : "Add Annotation"}
+          {isPending
+            ? t("common.saving")
+            : editing
+              ? t("videoDetail.form.submitEdit")
+              : t("videoDetail.form.submitNew")}
         </button>
         {editing && (
           <button
@@ -471,18 +487,18 @@ function AnnotationForm({
             onClick={onDone}
             className="vi-button-secondary"
           >
-            Cancel
+            {t("common.cancel")}
           </button>
         )}
       </div>
       {jsonError && <p className="text-sm text-[var(--danger)]">{jsonError}</p>}
       {!hasDuration && (
         <p className="text-sm text-[var(--muted)]">
-          Video duration is still loading.
+          {t("videoDetail.form.durationLoading")}
         </p>
       )}
       {(createAnnotation.isError || updateAnnotation.isError) && (
-        <p className="text-sm text-[var(--danger)]">Could not save annotation.</p>
+        <p className="text-sm text-[var(--danger)]">{t("videoDetail.form.errorSave")}</p>
       )}
     </form>
   );
@@ -505,6 +521,7 @@ function DeleteAnnotationButton({
   videoId: string;
   annotationId: string;
 }) {
+  const { t } = useTranslation();
   const deleteAnnotation = useDeleteAnnotation(videoId);
   return (
     <button
@@ -512,8 +529,8 @@ function DeleteAnnotationButton({
       onClick={() => deleteAnnotation.mutate(annotationId)}
       disabled={deleteAnnotation.isPending}
       className="vi-icon-button h-8 min-h-8 w-8 border-[rgba(159,47,36,0.35)] text-[var(--danger)] hover:bg-[rgba(159,47,36,0.07)] disabled:opacity-60"
-      aria-label="Delete annotation"
-      title="Delete annotation"
+      aria-label={t("videoDetail.annotations.delete")}
+      title={t("videoDetail.annotations.delete")}
     >
       <Trash2 className="h-4 w-4" />
     </button>

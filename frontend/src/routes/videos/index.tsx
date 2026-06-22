@@ -1,6 +1,7 @@
 import { Link, createFileRoute } from "@tanstack/react-router";
 import { Edit2, Plus, Trash2, Upload, Video as VideoIcon } from "lucide-react";
 import { useState } from "react";
+import { useTranslation } from "react-i18next";
 import {
   useDeleteVideo,
   useUpdateVideo,
@@ -15,6 +16,7 @@ export const Route = createFileRoute("/videos/")({
 });
 
 function VideosPage() {
+  const { t } = useTranslation();
   const [page, setPage] = useState(1);
   const [showForm, setShowForm] = useState(false);
   const [editing, setEditing] = useState<Video | null>(null);
@@ -25,10 +27,10 @@ function VideosPage() {
     <div className="mx-auto max-w-6xl space-y-8">
       <div className="flex flex-wrap items-end justify-between gap-6 border-b border-[var(--ink)] pb-8">
         <div>
-          <p className="vi-kicker">Archive</p>
-          <h1 className="vi-display mt-3 text-5xl">Videos</h1>
+          <p className="vi-kicker">{t("videos.kicker")}</p>
+          <h1 className="vi-display mt-3 text-5xl">{t("videos.title")}</h1>
           <p className="mt-3 max-w-2xl text-sm text-[var(--muted)]">
-            Upload source videos for shared student learning materials.
+            {t("videos.subtitle")}
           </p>
         </div>
         <button
@@ -37,7 +39,7 @@ function VideosPage() {
           className="vi-button-primary"
         >
           <Plus className="h-4 w-4" />
-          New Video
+          {t("videos.newVideo")}
         </button>
       </div>
 
@@ -46,7 +48,7 @@ function VideosPage() {
         <EditVideoForm video={editing} onDone={() => setEditing(null)} />
       )}
 
-      {isLoading && <p className="text-[var(--muted)]">Loading...</p>}
+      {isLoading && <p className="text-[var(--muted)]">{t("common.loading")}</p>}
 
       {data && (
         <>
@@ -55,16 +57,16 @@ function VideosPage() {
               <thead className="bg-[var(--paper)]">
                 <tr>
                   <th className="vi-kicker px-5 py-3 text-left">
-                    Title
+                    {t("videos.table.title")}
                   </th>
                   <th className="vi-kicker px-5 py-3 text-left">
-                    File
+                    {t("videos.table.file")}
                   </th>
                   <th className="vi-kicker px-5 py-3 text-left">
-                    Created
+                    {t("videos.table.created")}
                   </th>
                   <th className="vi-kicker px-5 py-3 text-right">
-                    Actions
+                    {t("videos.table.actions")}
                   </th>
                 </tr>
               </thead>
@@ -80,7 +82,7 @@ function VideosPage() {
                         {video.title}
                       </Link>
                       <p className="mt-1 max-w-xl text-sm text-[var(--muted)]">
-                        {video.description ?? "No description"}
+                        {video.description ?? t("common.noDescription")}
                       </p>
                     </td>
                     <td className="px-5 py-4 text-sm text-[var(--muted)]">
@@ -99,8 +101,8 @@ function VideosPage() {
                           type="button"
                           onClick={() => setEditing(video)}
                           className="vi-icon-button"
-                          aria-label="Edit video"
-                          title="Edit video"
+                          aria-label={t("videos.editVideo")}
+                          title={t("videos.editVideo")}
                         >
                           <Edit2 className="h-4 w-4" />
                         </button>
@@ -109,8 +111,8 @@ function VideosPage() {
                           onClick={() => deleteVideo.mutate(video.id)}
                           disabled={deleteVideo.isPending}
                           className="vi-icon-button border-[rgba(159,47,36,0.35)] text-[var(--danger)] hover:bg-[rgba(159,47,36,0.07)] disabled:opacity-60"
-                          aria-label="Delete video"
-                          title="Delete video"
+                          aria-label={t("videos.deleteVideo")}
+                          title={t("videos.deleteVideo")}
                         >
                           <Trash2 className="h-4 w-4" />
                         </button>
@@ -121,7 +123,7 @@ function VideosPage() {
                 {data.items.length === 0 && (
                   <tr>
                     <td className="px-5 py-12 text-center text-sm text-[var(--muted)]" colSpan={4}>
-                      No videos yet.
+                      {t("videos.empty")}
                     </td>
                   </tr>
                 )}
@@ -131,7 +133,7 @@ function VideosPage() {
 
           <div className="flex items-center justify-between">
             <p className="vi-mono text-xs text-[var(--muted)]">
-              {data.total} video{data.total !== 1 && "s"} total
+              {t("videos.totalCount", { count: data.total })}
             </p>
             <div className="flex gap-2">
               <button
@@ -140,7 +142,7 @@ function VideosPage() {
                 onClick={() => setPage((value) => value - 1)}
                 className="vi-button-secondary min-h-0 px-3 py-1 text-sm disabled:opacity-50"
               >
-                Previous
+                {t("videos.previous")}
               </button>
               <button
                 type="button"
@@ -148,7 +150,7 @@ function VideosPage() {
                 onClick={() => setPage((value) => value + 1)}
                 className="vi-button-secondary min-h-0 px-3 py-1 text-sm disabled:opacity-50"
               >
-                Next
+                {t("videos.next")}
               </button>
             </div>
           </div>
@@ -159,6 +161,7 @@ function VideosPage() {
 }
 
 function CreateVideoForm({ onDone }: { onDone: () => void }) {
+  const { t } = useTranslation();
   const { upload, cancel, progress, isUploading, error } = useUploadVideo();
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
@@ -187,7 +190,7 @@ function CreateVideoForm({ onDone }: { onDone: () => void }) {
     >
       <div className="grid gap-4 md:grid-cols-2">
         <label className="vi-label">
-          Title
+          {t("videos.form.title")}
           <input
             type="text"
             value={title}
@@ -198,7 +201,7 @@ function CreateVideoForm({ onDone }: { onDone: () => void }) {
           />
         </label>
         <label className="vi-label">
-          Video file
+          {t("videos.form.file")}
           <input
             type="file"
             accept="video/*"
@@ -210,7 +213,7 @@ function CreateVideoForm({ onDone }: { onDone: () => void }) {
         </label>
       </div>
       <label className="vi-label">
-        Description
+        {t("videos.form.description")}
         <textarea
           value={description}
           onChange={(event) => setDescription(event.target.value)}
@@ -230,7 +233,7 @@ function CreateVideoForm({ onDone }: { onDone: () => void }) {
           <p className="vi-mono text-xs text-[var(--muted)]">
             {percent}% · {formatBytes(progress.uploaded)} / {formatBytes(progress.total)}
             {progress.partsTotal > 1 &&
-              ` · part ${progress.partsCompleted}/${progress.partsTotal}`}
+              ` · ${t("videos.form.progressParts", { completed: progress.partsCompleted, total: progress.partsTotal })}`}
           </p>
         </div>
       )}
@@ -241,7 +244,7 @@ function CreateVideoForm({ onDone }: { onDone: () => void }) {
           className="vi-button-primary disabled:opacity-50"
         >
           <Upload className="h-4 w-4" />
-          {isUploading ? "Uploading..." : "Upload"}
+          {isUploading ? t("videos.form.uploading") : t("videos.form.upload")}
         </button>
         <button
           type="button"
@@ -251,12 +254,12 @@ function CreateVideoForm({ onDone }: { onDone: () => void }) {
           }}
           className="vi-button-secondary"
         >
-          {isUploading ? "Cancel upload" : "Cancel"}
+          {isUploading ? t("videos.form.cancelUpload") : t("common.cancel")}
         </button>
       </div>
       {error && (
         <p className="text-sm text-[var(--danger)]">
-          Upload failed: {error.message}
+          {t("videos.form.uploadFailed", { message: error.message })}
         </p>
       )}
     </form>
@@ -270,6 +273,7 @@ function EditVideoForm({
   video: Video;
   onDone: () => void;
 }) {
+  const { t } = useTranslation();
   const updateVideo = useUpdateVideo(video.id);
   const [title, setTitle] = useState(video.title);
   const [description, setDescription] = useState(video.description ?? "");
@@ -289,7 +293,7 @@ function EditVideoForm({
     >
       <div className="grid gap-4 md:grid-cols-2">
         <label className="vi-label">
-          Title
+          {t("videos.form.title")}
           <input
             type="text"
             value={title}
@@ -299,13 +303,13 @@ function EditVideoForm({
           />
         </label>
         <div className="text-sm text-[var(--muted)]">
-          <p className="vi-label">File</p>
+          <p className="vi-label">{t("videos.table.file")}</p>
           <p className="mt-2 text-[var(--ink)]">{video.original_filename}</p>
           <p className="vi-mono text-xs">{formatBytes(video.size_bytes)}</p>
         </div>
       </div>
       <label className="vi-label">
-        Description
+        {t("videos.form.description")}
         <textarea
           value={description}
           onChange={(event) => setDescription(event.target.value)}
@@ -319,14 +323,14 @@ function EditVideoForm({
           disabled={!title || updateVideo.isPending}
           className="vi-button-primary disabled:opacity-50"
         >
-          {updateVideo.isPending ? "Saving..." : "Save"}
+          {updateVideo.isPending ? t("common.saving") : t("common.save")}
         </button>
         <button
           type="button"
           onClick={onDone}
           className="vi-button-secondary"
         >
-          Cancel
+          {t("common.cancel")}
         </button>
       </div>
     </form>

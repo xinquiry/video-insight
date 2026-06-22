@@ -1,0 +1,150 @@
+{
+  "common": {
+    "loading": "Loading...",
+    "cancel": "Cancel",
+    "save": "Save",
+    "saving": "Saving...",
+    "creating": "Creating...",
+    "working": "Working...",
+    "noDescription": "No description"
+  },
+  "brand": {
+    "name": "Video Insight",
+    "studio": "Studio",
+    "tagline": "A reader's edition for video"
+  },
+  "nav": {
+    "dashboard": "Dashboard",
+    "videos": "Videos"
+  },
+  "settings": {
+    "title": "Settings",
+    "language": {
+      "title": "Language",
+      "system": "System default",
+      "en": "English",
+      "zh": "中文"
+    }
+  },
+  "auth": {
+    "signedIn": "Signed in",
+    "logout": "Log out",
+    "login": {
+      "kicker": "Annotated learning archive",
+      "headline": "Make Video Feel Like A Marked-Up Text.",
+      "subheadline": "Upload source material, add timestamped marginalia, and keep a shared edition for learners.",
+      "accountKicker": "Account",
+      "welcome": "Welcome Back",
+      "hint": "Sign in with the seeded admin account or a user created by an admin.",
+      "username": "Username",
+      "password": "Password",
+      "submit": "Login",
+      "invalid": "Invalid username or password."
+    }
+  },
+  "dashboard": {
+    "kicker": "Library",
+    "title": "Learning Video Library",
+    "subtitle": "Shared videos and timestamped annotations for students.",
+    "addVideo": "Add Video",
+    "stats": {
+      "totalVideos": "Total videos",
+      "recentUploads": "Recent uploads",
+      "annotationModel": "Annotation model",
+      "shared": "Shared"
+    },
+    "recent": {
+      "title": "Recent Videos",
+      "latest": "Latest 05"
+    },
+    "admin": {
+      "kicker": "Admin",
+      "createAccount": "Create Account",
+      "createAccountHint": "New accounts belong to one group and share that group's videos.",
+      "username": "Username",
+      "group": "Group",
+      "tempPassword": "Temporary password",
+      "createButton": "Create",
+      "created": "Created account for {{username}}.",
+      "createError": "Could not create that account. The username may already exist.",
+      "groupsKicker": "Groups",
+      "createGroup": "Create Group",
+      "createGroupHint": "Groups are the sharing boundary for videos and annotations.",
+      "groupName": "Group name",
+      "createGroupButton": "Create Group",
+      "createGroupSuccess": "Created group {{name}}.",
+      "createGroupError": "Could not create that group. The name may already exist.",
+      "existingGroups": "Existing groups"
+    }
+  },
+  "videos": {
+    "kicker": "Archive",
+    "title": "Videos",
+    "subtitle": "Upload source videos for shared student learning materials.",
+    "newVideo": "New Video",
+    "table": {
+      "title": "Title",
+      "file": "File",
+      "created": "Created",
+      "actions": "Actions"
+    },
+    "editVideo": "Edit video",
+    "deleteVideo": "Delete video",
+    "empty": "No videos yet.",
+    "totalCount_one": "{{count}} video total",
+    "totalCount_other": "{{count}} videos total",
+    "previous": "Previous",
+    "next": "Next",
+    "form": {
+      "title": "Title",
+      "file": "Video file",
+      "description": "Description",
+      "upload": "Upload",
+      "uploading": "Uploading...",
+      "cancelUpload": "Cancel upload",
+      "uploadFailed": "Upload failed: {{message}}",
+      "progressParts": "part {{completed}}/{{total}}"
+    }
+  },
+  "videoDetail": {
+    "back": "Back to videos",
+    "kicker": "Watching edition",
+    "deleteVideo": "Delete Video",
+    "videoUnavailable": "Video URL unavailable.",
+    "notFound": "Video not found.",
+    "file": "File",
+    "size": "Size",
+    "created": "Created",
+    "annotations": {
+      "title": "Annotations",
+      "empty": "No annotations yet.",
+      "edit": "Edit annotation",
+      "delete": "Delete annotation"
+    },
+    "form": {
+      "kicker": "Studio note",
+      "newTitle": "New Annotation",
+      "editTitle": "Edit Annotation",
+      "current": "Current {{time}}",
+      "useCurrentTime": "Use Current Time",
+      "timeSeconds": "Time in seconds",
+      "title": "Title",
+      "color": "Color",
+      "type": "Type",
+      "body": "Body",
+      "customJson": "Custom JSON",
+      "submitNew": "Add Annotation",
+      "submitEdit": "Save",
+      "errorJsonObject": "Custom data must be a JSON object.",
+      "errorJsonInvalid": "Custom data must be valid JSON.",
+      "errorSave": "Could not save annotation.",
+      "durationLoading": "Video duration is still loading.",
+      "kinds": {
+        "note": "Note",
+        "question": "Question",
+        "resource": "Resource",
+        "highlight": "Highlight"
+      }
+    }
+  }
+}

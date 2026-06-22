@@ -1,10 +1,12 @@
 import { useNavigate } from "@tanstack/react-router";
 import { LogOut } from "lucide-react";
 import type { ReactNode } from "react";
+import { useTranslation } from "react-i18next";
 import { useLogout, useMe } from "@/features/auth/hooks";
 import { Sidebar } from "./Sidebar";
 
 export function AppLayout({ children }: { children: ReactNode }) {
+  const { t } = useTranslation();
   const { data: user } = useMe();
   const logout = useLogout();
   const navigate = useNavigate();
@@ -20,19 +22,19 @@ export function AppLayout({ children }: { children: ReactNode }) {
       <div className="flex min-w-0 flex-1 flex-col">
         <header className="flex h-14 items-center justify-between border-b border-[var(--ink)] bg-[var(--paper)] px-6">
           <div className="hidden items-baseline gap-3 md:flex">
-            <span className="vi-kicker">Studio</span>
-            <span className="vi-display text-base italic">A reader's edition for video</span>
+            <span className="vi-kicker">{t("brand.studio")}</span>
+            <span className="vi-display text-base italic">{t("brand.tagline")}</span>
           </div>
           {user && (
             <div className="flex items-center gap-3 text-sm">
-              <span className="vi-mono text-xs text-[var(--muted)]">Signed in</span>
+              <span className="vi-mono text-xs text-[var(--muted)]">{t("auth.signedIn")}</span>
               <span className="vi-display text-base italic">{user.username}</span>
               <button
                 type="button"
                 onClick={handleLogout}
                 className="vi-icon-button"
-                aria-label="Log out"
-                title="Log out"
+                aria-label={t("auth.logout")}
+                title={t("auth.logout")}
               >
                 <LogOut className="h-4 w-4" />
               </button>

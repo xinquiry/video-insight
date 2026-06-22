@@ -2,6 +2,7 @@ import { createFileRoute } from "@tanstack/react-router";
 import { Link } from "@tanstack/react-router";
 import { Clock, Film, Plus, Tags, Users, UserPlus } from "lucide-react";
 import { useEffect, useState } from "react";
+import { useTranslation } from "react-i18next";
 import {
   useCreateGroup,
   useCreateUser,
@@ -16,6 +17,7 @@ export const Route = createFileRoute("/")({
 });
 
 function DashboardPage() {
+  const { t } = useTranslation();
   const { data: user } = useMe();
   const { data } = useVideos(1, 5);
   const videos = data?.items ?? [];
@@ -24,12 +26,12 @@ function DashboardPage() {
     <div className="mx-auto max-w-6xl space-y-10">
       <div className="flex flex-wrap items-end justify-between gap-6 border-b border-[var(--ink)] pb-8">
         <div>
-          <p className="vi-kicker">Library</p>
+          <p className="vi-kicker">{t("dashboard.kicker")}</p>
           <h1 className="vi-display mt-3 max-w-3xl text-5xl">
-            Learning Video Library
+            {t("dashboard.title")}
           </h1>
           <p className="mt-4 max-w-2xl text-sm text-[var(--muted)]">
-            Shared videos and timestamped annotations for students.
+            {t("dashboard.subtitle")}
           </p>
         </div>
         <Link
@@ -37,33 +39,33 @@ function DashboardPage() {
           className="vi-button-primary"
         >
           <Plus className="h-4 w-4" />
-          Add Video
+          {t("dashboard.addVideo")}
         </Link>
       </div>
       <div className="grid grid-cols-1 gap-0 border-y border-[var(--ink)] sm:grid-cols-3">
         <div className="border-b border-[var(--rule)] p-6 sm:border-r sm:border-b-0">
           <Film className="h-5 w-5 text-[var(--accent)]" />
-          <p className="vi-kicker mt-5">Total videos</p>
+          <p className="vi-kicker mt-5">{t("dashboard.stats.totalVideos")}</p>
           <p className="vi-display mt-2 text-5xl">{data?.total ?? "..."}</p>
         </div>
         <div className="border-b border-[var(--rule)] p-6 sm:border-r sm:border-b-0">
           <Clock className="h-5 w-5 text-[var(--forest)]" />
-          <p className="vi-kicker mt-5">Recent uploads</p>
+          <p className="vi-kicker mt-5">{t("dashboard.stats.recentUploads")}</p>
           <p className="vi-display mt-2 text-5xl">{videos.length}</p>
         </div>
         <div className="p-6">
           <Tags className="h-5 w-5 text-[var(--accent)]" />
-          <p className="vi-kicker mt-5">Annotation model</p>
-          <p className="vi-display mt-2 text-3xl">Shared</p>
+          <p className="vi-kicker mt-5">{t("dashboard.stats.annotationModel")}</p>
+          <p className="vi-display mt-2 text-3xl">{t("dashboard.stats.shared")}</p>
         </div>
       </div>
 
       {videos.length > 0 && (
         <div>
           <div className="mb-4 flex items-baseline justify-between border-b border-[var(--ink)] pb-3">
-            <h2 className="vi-display text-2xl">Recent Videos</h2>
+            <h2 className="vi-display text-2xl">{t("dashboard.recent.title")}</h2>
             <span className="vi-mono text-xs text-[var(--muted)]">
-              Latest 05
+              {t("dashboard.recent.latest")}
             </span>
           </div>
           <ul className="vi-panel divide-y divide-[var(--rule)] overflow-hidden">
@@ -100,6 +102,7 @@ function DashboardPage() {
 }
 
 function AdminCreateUserPanel() {
+  const { t } = useTranslation();
   const createUser = useCreateUser();
   const createGroup = useCreateGroup();
   const { data: groups = [] } = useGroups();
@@ -149,17 +152,17 @@ function AdminCreateUserPanel() {
       <div>
       <div className="flex flex-wrap items-start justify-between gap-4 border-b border-[var(--rule)] pb-4">
         <div>
-          <p className="vi-kicker">Admin</p>
-          <h2 className="vi-display mt-1 text-2xl">Create Account</h2>
+          <p className="vi-kicker">{t("dashboard.admin.kicker")}</p>
+          <h2 className="vi-display mt-1 text-2xl">{t("dashboard.admin.createAccount")}</h2>
           <p className="mt-2 max-w-xl text-sm text-[var(--muted)]">
-            New accounts belong to one group and share that group's videos.
+            {t("dashboard.admin.createAccountHint")}
           </p>
         </div>
         <UserPlus className="h-5 w-5 text-[var(--accent)]" />
       </div>
       <form onSubmit={submit} className="mt-5 grid gap-4">
         <label className="vi-label">
-          Username
+          {t("dashboard.admin.username")}
           <input
             value={username}
             onChange={(event) => setUsername(event.target.value)}
@@ -170,7 +173,7 @@ function AdminCreateUserPanel() {
           />
         </label>
         <label className="vi-label">
-          Group
+          {t("dashboard.admin.group")}
           <select
             value={groupId}
             onChange={(event) => setGroupId(event.target.value)}
@@ -185,7 +188,7 @@ function AdminCreateUserPanel() {
           </select>
         </label>
         <label className="vi-label">
-          Temporary password
+          {t("dashboard.admin.tempPassword")}
           <input
             value={password}
             onChange={(event) => setPassword(event.target.value)}
@@ -202,17 +205,17 @@ function AdminCreateUserPanel() {
           className="vi-button-primary disabled:opacity-50"
         >
           <UserPlus className="h-4 w-4" />
-          {createUser.isPending ? "Creating..." : "Create"}
+          {createUser.isPending ? t("common.creating") : t("dashboard.admin.createButton")}
         </button>
       </form>
       {createdUsername && (
         <p className="mt-4 text-sm text-[var(--forest)]">
-          Created account for {createdUsername}.
+          {t("dashboard.admin.created", { username: createdUsername })}
         </p>
       )}
       {createUser.isError && (
         <p className="mt-4 text-sm text-[var(--danger)]">
-          Could not create that account. The username may already exist.
+          {t("dashboard.admin.createError")}
         </p>
       )}
       </div>
@@ -220,17 +223,17 @@ function AdminCreateUserPanel() {
       <div>
         <div className="flex flex-wrap items-start justify-between gap-4 border-b border-[var(--rule)] pb-4">
           <div>
-            <p className="vi-kicker">Groups</p>
-            <h2 className="vi-display mt-1 text-2xl">Create Group</h2>
+            <p className="vi-kicker">{t("dashboard.admin.groupsKicker")}</p>
+            <h2 className="vi-display mt-1 text-2xl">{t("dashboard.admin.createGroup")}</h2>
             <p className="mt-2 max-w-xl text-sm text-[var(--muted)]">
-              Groups are the sharing boundary for videos and annotations.
+              {t("dashboard.admin.createGroupHint")}
             </p>
           </div>
           <Users className="h-5 w-5 text-[var(--forest)]" />
         </div>
         <form onSubmit={submitGroup} className="mt-5 grid gap-4">
           <label className="vi-label">
-            Group name
+            {t("dashboard.admin.groupName")}
             <input
               value={groupName}
               onChange={(event) => setGroupName(event.target.value)}
@@ -246,21 +249,21 @@ function AdminCreateUserPanel() {
             className="vi-button-secondary disabled:opacity-50"
           >
             <Users className="h-4 w-4" />
-            {createGroup.isPending ? "Creating..." : "Create Group"}
+            {createGroup.isPending ? t("common.creating") : t("dashboard.admin.createGroupButton")}
           </button>
         </form>
         {createdGroupName && (
           <p className="mt-4 text-sm text-[var(--forest)]">
-            Created group {createdGroupName}.
+            {t("dashboard.admin.createGroupSuccess", { name: createdGroupName })}
           </p>
         )}
         {createGroup.isError && (
           <p className="mt-4 text-sm text-[var(--danger)]">
-            Could not create that group. The name may already exist.
+            {t("dashboard.admin.createGroupError")}
           </p>
         )}
         <div className="mt-5 border-t border-[var(--rule)] pt-4">
-          <p className="vi-kicker">Existing groups</p>
+          <p className="vi-kicker">{t("dashboard.admin.existingGroups")}</p>
           <div className="mt-3 flex flex-wrap gap-2">
             {groups.map((group) => (
               <span

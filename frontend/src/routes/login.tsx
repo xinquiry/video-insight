@@ -1,6 +1,7 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { LogIn } from "lucide-react";
 import { useState } from "react";
+import { useTranslation } from "react-i18next";
 import { useLogin } from "@/features/auth/hooks";
 
 export const Route = createFileRoute("/login")({
@@ -8,6 +9,7 @@ export const Route = createFileRoute("/login")({
 });
 
 function LoginPage() {
+  const { t } = useTranslation();
   const navigate = useNavigate();
   const login = useLogin();
   const [username, setUsername] = useState("");
@@ -31,16 +33,15 @@ function LoginPage() {
           <span className="vi-display text-2xl">
             Video <em className="text-[var(--accent)]">Insight</em>
           </span>
-          <span className="vi-kicker">Studio</span>
+          <span className="vi-kicker">{t("brand.studio")}</span>
         </div>
         <div className="max-w-3xl">
-          <p className="vi-kicker">Annotated learning archive</p>
+          <p className="vi-kicker">{t("auth.login.kicker")}</p>
           <h1 className="vi-display mt-4 text-5xl md:text-7xl">
-            Make Video Feel Like A Marked-Up Text.
+            {t("auth.login.headline")}
           </h1>
           <p className="mt-6 max-w-xl text-base text-[var(--muted)]">
-            Upload source material, add timestamped marginalia, and keep a
-            shared edition for learners.
+            {t("auth.login.subheadline")}
           </p>
         </div>
       </section>
@@ -50,15 +51,15 @@ function LoginPage() {
         className="vi-panel w-full space-y-6 p-6"
       >
         <div>
-          <p className="vi-kicker">Account</p>
-          <h2 className="vi-display mt-2 text-3xl">Welcome Back</h2>
+          <p className="vi-kicker">{t("auth.login.accountKicker")}</p>
+          <h2 className="vi-display mt-2 text-3xl">{t("auth.login.welcome")}</h2>
           <p className="mt-2 text-sm text-[var(--muted)]">
-            Sign in with the seeded admin account or a user created by an admin.
+            {t("auth.login.hint")}
           </p>
         </div>
 
         <label className="vi-label">
-          Username
+          {t("auth.login.username")}
           <input
             value={username}
             onChange={(event) => setUsername(event.target.value)}
@@ -69,7 +70,7 @@ function LoginPage() {
         </label>
 
         <label className="vi-label">
-          Password
+          {t("auth.login.password")}
           <input
             value={password}
             onChange={(event) => setPassword(event.target.value)}
@@ -85,12 +86,12 @@ function LoginPage() {
           className="vi-button-primary w-full disabled:opacity-60"
         >
           <LogIn className="h-4 w-4" />
-          {isPending ? "Working..." : "Login"}
+          {isPending ? t("common.working") : t("auth.login.submit")}
         </button>
 
         {hasError && (
           <p className="text-sm text-[var(--danger)]">
-            Invalid username or password.
+            {t("auth.login.invalid")}
           </p>
         )}
       </form>
