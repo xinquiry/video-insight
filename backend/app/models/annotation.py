@@ -17,6 +17,16 @@ class Annotation(UUIDPrimaryKeyMixin, TimestampMixin, Base):
 
     video_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("videos.id", ondelete="CASCADE"), index=True)
     timestamp_seconds: Mapped[float] = mapped_column(index=True)
+    duration_seconds: Mapped[float] = mapped_column(default=6.0)
+    position_x: Mapped[float | None] = mapped_column(default=None)
+    position_y: Mapped[float | None] = mapped_column(default=None)
+    region_x: Mapped[float | None] = mapped_column(default=None)
+    region_y: Mapped[float | None] = mapped_column(default=None)
+    region_width: Mapped[float | None] = mapped_column(default=None)
+    region_height: Mapped[float | None] = mapped_column(default=None)
+    shape: Mapped[str] = mapped_column(default="marker")
+    display_mode: Mapped[str] = mapped_column(default="card")
+    interactive: Mapped[bool] = mapped_column(default=True)
     title: Mapped[str]
     body: Mapped[str]
     kind: Mapped[str] = mapped_column(default="note")
