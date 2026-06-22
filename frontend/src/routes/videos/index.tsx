@@ -2,9 +2,9 @@ import { Link, createFileRoute } from "@tanstack/react-router";
 import { Edit2, Plus, Trash2, Upload, Video as VideoIcon } from "lucide-react";
 import { useState } from "react";
 import {
-  useCreateVideo,
   useDeleteVideo,
   useUpdateVideo,
+  useUploadVideo,
   useVideos,
 } from "@/features/videos/hooks";
 import { formatBytes, formatDate } from "@/lib/utils";
@@ -159,19 +159,26 @@ function VideosPage() {
 }
 
 function CreateVideoForm({ onDone }: { onDone: () => void }) {
-  const createVideo = useCreateVideo();
+  const { upload, cancel, progress, isUploading, error } = useUploadVideo();
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
   const [file, setFile] = useState<File | null>(null);
 
-  const submit = (event: React.FormEvent) => {
+  const submit = async (event: React.FormEvent) => {
     event.preventDefault();
     if (!file) return;
-    createVideo.mutate(
-      { title, description: description || undefined, file },
-      { onSuccess: () => onDone() },
-    );
+    try {
+      await upload({ title, description: description || undefined, file });
+      onDone();
+    } catch {
+      // surfaced via `error`
+    }
   };
+
+  const percent =
+    progress && progress.total > 0
+      ? Math.min(100, Math.round((progress.uploaded / progress.total) * 100))
+      : 0;
 
   return (
     <form
@@ -186,6 +193,7 @@ function CreateVideoForm({ onDone }: { onDone: () => void }) {
             value={title}
             onChange={(event) => setTitle(event.target.value)}
             required
+            disabled={isUploading}
             className="vi-input mt-1 text-base normal-case"
           />
         </label>
@@ -196,6 +204,7 @@ function CreateVideoForm({ onDone }: { onDone: () => void }) {
             accept="video/*"
             onChange={(event) => setFile(event.target.files?.[0] ?? null)}
             required
+            disabled={isUploading}
             className="mt-3 block w-full text-sm normal-case text-[var(--muted)] file:mr-3 file:rounded-lg file:border file:border-[var(--ink)] file:bg-transparent file:px-3 file:py-2 file:text-sm file:font-semibold file:text-[var(--ink)] hover:file:bg-[var(--ink)] hover:file:text-[var(--paper)]"
           />
         </label>
@@ -206,28 +215,49 @@ function CreateVideoForm({ onDone }: { onDone: () => void }) {
           value={description}
           onChange={(event) => setDescription(event.target.value)}
           rows={3}
+          disabled={isUploading}
           className="vi-textarea mt-1 text-base normal-case"
         />
       </label>
+      {progress && (
+        <div className="space-y-1">
+          <div className="h-2 overflow-hidden rounded bg-[var(--rule)]">
+            <div
+              className="h-full bg-[var(--ink)] transition-[width] duration-200"
+              style={{ width: `${percent}%` }}
+            />
+          </div>
+          <p className="vi-mono text-xs text-[var(--muted)]">
+            {percent}% · {formatBytes(progress.uploaded)} / {formatBytes(progress.total)}
+            {progress.partsTotal > 1 &&
+              ` · part ${progress.partsCompleted}/${progress.partsTotal}`}
+          </p>
+        </div>
+      )}
       <div className="flex gap-2">
         <button
           type="submit"
-          disabled={!title || !file || createVideo.isPending}
+          disabled={!title || !file || isUploading}
           className="vi-button-primary disabled:opacity-50"
         >
           <Upload className="h-4 w-4" />
-          {createVideo.isPending ? "Uploading..." : "Upload"}
+          {isUploading ? "Uploading..." : "Upload"}
         </button>
         <button
           type="button"
-          onClick={onDone}
+          onClick={() => {
+            if (isUploading) cancel();
+            else onDone();
+          }}
           className="vi-button-secondary"
         >
-          Cancel
+          {isUploading ? "Cancel upload" : "Cancel"}
         </button>
       </div>
-      {createVideo.isError && (
-        <p className="text-sm text-[var(--danger)]">Upload failed. Please try again.</p>
+      {error && (
+        <p className="text-sm text-[var(--danger)]">
+          Upload failed: {error.message}
+        </p>
       )}
     </form>
   );

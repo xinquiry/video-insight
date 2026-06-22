@@ -1,7 +1,7 @@
 from datetime import timedelta
-from typing import BinaryIO
 
 from minio import Minio
+from minio.datatypes import Part
 
 from app.core.config import Settings
 
@@ -31,27 +31,55 @@ class StorageService:
         if not self._client.bucket_exists(self._settings.minio_bucket):
             self._client.make_bucket(self._settings.minio_bucket)
 
-    def upload_video(
-        self,
-        object_key: str,
-        file: BinaryIO,
-        size: int,
-        content_type: str,
-    ) -> None:
-        self.ensure_bucket()
-        self._client.put_object(
-            self._settings.minio_bucket,
-            object_key,
-            file,
-            length=size,
-            content_type=content_type,
-        )
-
     def get_presigned_url(self, object_key: str) -> str:
         return self._public_client.presigned_get_object(
             self._settings.minio_bucket,
             object_key,
             expires=timedelta(hours=2),
+        )
+
+    def create_multipart_upload(self, object_key: str, content_type: str) -> str:
+        self.ensure_bucket()
+        return self._client._create_multipart_upload(
+            self._settings.minio_bucket,
+            object_key,
+            {"Content-Type": content_type},
+        )
+
+    def presign_upload_part(
+        self,
+        object_key: str,
+        upload_id: str,
+        part_number: int,
+        expires: timedelta,
+    ) -> str:
+        return self._public_client.get_presigned_url(
+            "PUT",
+            self._settings.minio_bucket,
+            object_key,
+            expires=expires,
+            extra_query_params={"partNumber": str(part_number), "uploadId": upload_id},
+        )
+
+    def complete_multipart_upload(
+        self,
+        object_key: str,
+        upload_id: str,
+        parts: list[tuple[int, str]],
+    ) -> None:
+        part_objs = [Part(part_number=number, etag=etag.strip('"')) for number, etag in parts]
+        self._client._complete_multipart_upload(
+            self._settings.minio_bucket,
+            object_key,
+            upload_id,
+            part_objs,
+        )
+
+    def abort_multipart_upload(self, object_key: str, upload_id: str) -> None:
+        self._client._abort_multipart_upload(
+            self._settings.minio_bucket,
+            object_key,
+            upload_id,
         )
 
     def delete_video(self, object_key: str) -> None:

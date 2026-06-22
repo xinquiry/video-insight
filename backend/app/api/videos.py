@@ -1,11 +1,18 @@
 import uuid
 
-from fastapi import APIRouter, File, Form, Query, UploadFile
+from fastapi import APIRouter, Query
 
 from app.core.dependencies import CurrentSettings, CurrentUser, DbSession
 from app.repositories.video_repo import VideoRepository
 from app.schemas.common import PaginatedResponse
-from app.schemas.video import VideoRead, VideoUpdate
+from app.schemas.video import (
+    UploadAbortRequest,
+    UploadCompleteRequest,
+    UploadInitRequest,
+    UploadInitResponse,
+    VideoRead,
+    VideoUpdate,
+)
 from app.services.storage_service import StorageService
 from app.services.video_service import VideoService
 
@@ -13,7 +20,11 @@ router = APIRouter(prefix="/videos")
 
 
 def _build_service(session: DbSession, settings: CurrentSettings) -> VideoService:
-    return VideoService(repo=VideoRepository(session), storage=StorageService(settings))
+    return VideoService(
+        repo=VideoRepository(session),
+        storage=StorageService(settings),
+        settings=settings,
+    )
 
 
 @router.get("", response_model=PaginatedResponse[VideoRead])
@@ -28,17 +39,37 @@ async def list_videos(
     return await service.list_paginated(current_user.group_id, page, page_size)
 
 
-@router.post("", response_model=VideoRead, status_code=201)
-async def create_video(
+@router.post("/uploads", response_model=UploadInitResponse, status_code=201)
+async def init_upload(
+    payload: UploadInitRequest,
     session: DbSession,
     settings: CurrentSettings,
     current_user: CurrentUser,
-    title: str = Form(min_length=1, max_length=200),
-    description: str | None = Form(default=None),
-    file: UploadFile = File(),
 ):
     service = _build_service(session, settings)
-    return await service.create(title, description, file, current_user.group_id)
+    return await service.init_upload(payload)
+
+
+@router.post("/uploads/abort", status_code=204)
+async def abort_upload(
+    payload: UploadAbortRequest,
+    session: DbSession,
+    settings: CurrentSettings,
+    current_user: CurrentUser,
+):
+    service = _build_service(session, settings)
+    await service.abort_upload(payload.object_key, payload.upload_id)
+
+
+@router.post("", response_model=VideoRead, status_code=201)
+async def create_video(
+    payload: UploadCompleteRequest,
+    session: DbSession,
+    settings: CurrentSettings,
+    current_user: CurrentUser,
+):
+    service = _build_service(session, settings)
+    return await service.complete_upload(payload, current_user.group_id)
 
 
 @router.get("/{video_id}", response_model=VideoRead)
