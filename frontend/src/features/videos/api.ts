@@ -219,6 +219,16 @@ export function createAnnotation(
   videoId: string,
   data: {
     timestamp_seconds: number;
+    duration_seconds: number;
+    position_x: number | null;
+    position_y: number | null;
+    region_x: number | null;
+    region_y: number | null;
+    region_width: number | null;
+    region_height: number | null;
+    shape: string;
+    display_mode: string;
+    interactive: boolean;
     title: string;
     body: string;
     kind: string;
@@ -233,6 +243,16 @@ export function updateAnnotation(
   id: string,
   data: Partial<{
     timestamp_seconds: number;
+    duration_seconds: number;
+    position_x: number | null;
+    position_y: number | null;
+    region_x: number | null;
+    region_y: number | null;
+    region_width: number | null;
+    region_height: number | null;
+    shape: string;
+    display_mode: string;
+    interactive: boolean;
     title: string;
     body: string;
     kind: string;

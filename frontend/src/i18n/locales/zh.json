@@ -119,15 +119,25 @@
       "title": "批注",
       "empty": "暂无批注。",
       "edit": "编辑批注",
-      "delete": "删除批注"
+      "delete": "删除批注",
+      "addAtPoint": "添加批注",
+      "clickToEdit": "点击视频添加批注，或从时间线选择一个批注。"
     },
     "form": {
       "kicker": "工作室笔记",
       "newTitle": "新建批注",
       "editTitle": "编辑批注",
       "current": "当前 {{time}}",
-      "useCurrentTime": "使用当前时间",
       "timeSeconds": "时间(秒)",
+      "durationSeconds": "持续时间",
+      "positionX": "X",
+      "positionY": "Y",
+      "shape": "形状",
+      "displayMode": "显示",
+      "interactive": "可交互",
+      "advanced": "高级",
+      "animation": "动画",
+      "resize": "调整批注大小",
       "title": "标题",
       "color": "颜色",
       "type": "类型",
@@ -138,12 +148,26 @@
       "errorJsonObject": "自定义数据必须是 JSON 对象。",
       "errorJsonInvalid": "自定义数据必须是合法的 JSON。",
       "errorSave": "无法保存批注。",
-      "durationLoading": "视频时长仍在加载中。",
       "kinds": {
         "note": "笔记",
         "question": "问题",
         "resource": "资源",
         "highlight": "重点"
+      },
+      "shapes": {
+        "marker": "标记",
+        "spotlight": "聚焦",
+        "region": "区域"
+      },
+      "displayModes": {
+        "card": "卡片",
+        "marker": "标记"
+      },
+      "animations": {
+        "none": "无",
+        "fade": "淡入",
+        "slide": "滑入",
+        "pulse": "脉冲"
       }
     }
   }

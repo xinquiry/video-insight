@@ -119,15 +119,25 @@
       "title": "Annotations",
       "empty": "No annotations yet.",
       "edit": "Edit annotation",
-      "delete": "Delete annotation"
+      "delete": "Delete annotation",
+      "addAtPoint": "Add annotation",
+      "clickToEdit": "Click the video to add an annotation, or select one from the timeline."
     },
     "form": {
       "kicker": "Studio note",
       "newTitle": "New Annotation",
       "editTitle": "Edit Annotation",
       "current": "Current {{time}}",
-      "useCurrentTime": "Use Current Time",
       "timeSeconds": "Time in seconds",
+      "durationSeconds": "Duration",
+      "positionX": "X",
+      "positionY": "Y",
+      "shape": "Shape",
+      "displayMode": "Display",
+      "interactive": "Interactive",
+      "advanced": "Advanced",
+      "animation": "Animation",
+      "resize": "Resize annotation",
       "title": "Title",
       "color": "Color",
       "type": "Type",
@@ -138,12 +148,26 @@
       "errorJsonObject": "Custom data must be a JSON object.",
       "errorJsonInvalid": "Custom data must be valid JSON.",
       "errorSave": "Could not save annotation.",
-      "durationLoading": "Video duration is still loading.",
       "kinds": {
         "note": "Note",
         "question": "Question",
         "resource": "Resource",
         "highlight": "Highlight"
+      },
+      "shapes": {
+        "marker": "Marker",
+        "spotlight": "Spotlight",
+        "region": "Region"
+      },
+      "displayModes": {
+        "card": "Card",
+        "marker": "Marker"
+      },
+      "animations": {
+        "none": "None",
+        "fade": "Fade",
+        "slide": "Slide",
+        "pulse": "Pulse"
       }
     }
   }
