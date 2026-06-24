@@ -224,8 +224,19 @@ function VideoDetailPage() {
     const element = videoElement.current;
     if (!element) return;
     const time = toFiniteTime(element.currentTime);
-    lastPlaybackTimeRef.current = time;
+    // Only persist non-zero positions. When src changes, the browser fires
+    // timeupdate with currentTime=0 as part of the emptied sequence — guarding
+    // here prevents that from erasing the position we want to restore.
+    if (time > 0) lastPlaybackTimeRef.current = time;
     setCurrentVideoTime(time);
+  };
+
+  // Updates display state only — does NOT overwrite lastPlaybackTimeRef,
+  // so a src change (durationchange fires at currentTime=0) can't erase the saved position.
+  const syncVideoTime = () => {
+    const element = videoElement.current;
+    if (!element) return;
+    setCurrentVideoTime(toFiniteTime(element.currentTime));
   };
 
   const restoreVideoTime = () => {
@@ -284,7 +295,7 @@ function VideoDetailPage() {
                   ref={videoElement}
                   src={video.playback_url}
                   controls
-                  onDurationChange={restoreVideoTime}
+                  onDurationChange={syncVideoTime}
                   onLoadedMetadata={restoreVideoTime}
                   onTimeUpdate={updateVideoTiming}
                   className="aspect-video w-full bg-[#0f0e0c]"

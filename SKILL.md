@@ -5,7 +5,7 @@
 
 When given a GitHub issue number to work on:
 
-0. **Update the code ** using `git pull origin main` and then `git checkout main`
+0. **Update the code** using `git pull origin main` and then `git checkout main`
 1. **Read the issue** using `gh issue view {number}`
 2. **Create a branch** `git checkout -b fix/issue-{number}-short-description`
 3. **Implement the solution** — write clean, minimal changes
