@@ -38,7 +38,9 @@ function LoginPage() {
         <div className="max-w-3xl">
           <p className="vi-kicker">{t("auth.login.kicker")}</p>
           <h1 className="vi-display mt-4 text-5xl md:text-7xl">
-            {t("auth.login.headline")}
+            {t("auth.login.headline_line1")}
+            <br />
+            {t("auth.login.headline_line2")}
           </h1>
           <p className="mt-6 max-w-xl text-base text-[var(--muted)]">
             {t("auth.login.subheadline")}

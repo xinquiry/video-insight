@@ -31,7 +31,8 @@
     "logout": "退出登录",
     "login": {
       "kicker": "带批注的学习视频库",
-      "headline": "让视频如同批注过的书页。",
+      "headline_line1": "让视频如同",
+      "headline_line2": "批注过的书页。",
       "subheadline": "上传素材,添加带时间戳的批注,与学习者共享一份注释版本。",
       "accountKicker": "账号",
       "welcome": "欢迎回来",

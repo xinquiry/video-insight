@@ -31,7 +31,8 @@
     "logout": "Log out",
     "login": {
       "kicker": "Annotated learning archive",
-      "headline": "Make Video Feel Like A Marked-Up Text.",
+      "headline_line1": "Annotate Video.",
+      "headline_line2": "Share Insight.",
       "subheadline": "Upload source material, add timestamped marginalia, and keep a shared edition for learners.",
       "accountKicker": "Account",
       "welcome": "Welcome Back",
