@@ -24,6 +24,7 @@ export function useVideo(id: string) {
   return useQuery({
     queryKey: ["videos", id],
     queryFn: () => fetchVideo(id),
+    refetchOnWindowFocus: false,
   });
 }
 

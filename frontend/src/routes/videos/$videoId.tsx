@@ -122,6 +122,7 @@ function VideoDetailPage() {
   const playerFrame = useRef<HTMLDivElement | null>(null);
   const videoElement = useRef<HTMLVideoElement | null>(null);
   const annotationForm = useRef<HTMLFormElement | null>(null);
+  const lastPlaybackTimeRef = useRef(0);
   const { data: video, isLoading, isError } = useVideo(videoId);
   const { data: annotations = [] } = useAnnotations(videoId);
   const deleteVideo = useDeleteVideo();
@@ -222,7 +223,31 @@ function VideoDetailPage() {
   const updateVideoTiming = () => {
     const element = videoElement.current;
     if (!element) return;
+    const time = toFiniteTime(element.currentTime);
+    // Only persist non-zero positions. When src changes, the browser fires
+    // timeupdate with currentTime=0 as part of the emptied sequence — guarding
+    // here prevents that from erasing the position we want to restore.
+    if (time > 0) lastPlaybackTimeRef.current = time;
+    setCurrentVideoTime(time);
+  };
+
+  // Updates display state only — does NOT overwrite lastPlaybackTimeRef,
+  // so a src change (durationchange fires at currentTime=0) can't erase the saved position.
+  const syncVideoTime = () => {
+    const element = videoElement.current;
+    if (!element) return;
     setCurrentVideoTime(toFiniteTime(element.currentTime));
+  };
+
+  const restoreVideoTime = () => {
+    const element = videoElement.current;
+    if (!element) return;
+    if (lastPlaybackTimeRef.current > 0) {
+      element.currentTime = lastPlaybackTimeRef.current;
+      setCurrentVideoTime(lastPlaybackTimeRef.current);
+    } else {
+      setCurrentVideoTime(toFiniteTime(element.currentTime));
+    }
   };
 
   if (isLoading) return <p className="text-[var(--muted)]">{t("common.loading")}</p>;
@@ -270,8 +295,8 @@ function VideoDetailPage() {
                   ref={videoElement}
                   src={video.playback_url}
                   controls
-                  onDurationChange={updateVideoTiming}
-                  onLoadedMetadata={updateVideoTiming}
+                  onDurationChange={syncVideoTime}
+                  onLoadedMetadata={restoreVideoTime}
                   onTimeUpdate={updateVideoTiming}
                   className="aspect-video w-full bg-[#0f0e0c]"
                 />
