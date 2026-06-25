@@ -122,7 +122,17 @@
       "edit": "编辑批注",
       "delete": "删除批注",
       "addAtPoint": "添加批注",
-      "clickToEdit": "点击视频添加批注，或从时间线选择一个批注。"
+      "addAtCurrentTime": "在当前时间添加",
+      "clickToEdit": "使用当前视频时间添加批注。",
+      "liveKicker": "实时轴",
+      "activeNow": "正在播放",
+      "timelineMask": "批注时间线"
+    },
+    "player": {
+      "play": "播放",
+      "pause": "暂停",
+      "fullscreen": "全屏",
+      "exitFullscreen": "退出全屏"
     },
     "form": {
       "kicker": "工作室笔记",
@@ -144,6 +154,7 @@
       "type": "类型",
       "body": "内容",
       "customJson": "自定义 JSON",
+      "useCurrentTime": "使用当前 {{time}}",
       "submitNew": "添加批注",
       "submitEdit": "保存",
       "errorJsonObject": "自定义数据必须是 JSON 对象。",

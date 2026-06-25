@@ -122,7 +122,17 @@
       "edit": "Edit annotation",
       "delete": "Delete annotation",
       "addAtPoint": "Add annotation",
-      "clickToEdit": "Click the video to add an annotation, or select one from the timeline."
+      "addAtCurrentTime": "Add at current time",
+      "clickToEdit": "Use the current video time to add an annotation.",
+      "liveKicker": "Live timeline",
+      "activeNow": "Now",
+      "timelineMask": "Annotation timeline"
+    },
+    "player": {
+      "play": "Play",
+      "pause": "Pause",
+      "fullscreen": "Fullscreen",
+      "exitFullscreen": "Exit fullscreen"
     },
     "form": {
       "kicker": "Studio note",
@@ -144,6 +154,7 @@
       "type": "Type",
       "body": "Body",
       "customJson": "Custom JSON",
+      "useCurrentTime": "Use current {{time}}",
       "submitNew": "Add Annotation",
       "submitEdit": "Save",
       "errorJsonObject": "Custom data must be a JSON object.",

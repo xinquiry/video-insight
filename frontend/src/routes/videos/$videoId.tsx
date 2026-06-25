@@ -4,18 +4,20 @@ import {
   Check,
   Clock,
   Edit2,
-  GripHorizontal,
   Maximize2,
-  Settings2,
+  MessageSquare,
+  Minimize2,
+  Pause,
+  Play,
+  Plus,
   Trash2,
 } from "lucide-react";
 import {
-  type CSSProperties,
+  type FormEvent,
   type MouseEvent as ReactMouseEvent,
-  type PointerEvent as ReactPointerEvent,
   type RefObject,
   useEffect,
-  useCallback,
+  useMemo,
   useRef,
   useState,
 } from "react";
@@ -28,7 +30,7 @@ import {
   useUpdateAnnotation,
   useVideo,
 } from "@/features/videos/hooks";
-import { formatBytes, formatDate, formatDuration } from "@/lib/utils";
+import { cn, formatBytes, formatDate, formatDuration } from "@/lib/utils";
 import type { Annotation } from "@/types";
 
 export const Route = createFileRoute("/videos/$videoId")({
@@ -54,65 +56,14 @@ type AnnotationFormValues = {
   custom_data: Record<string, unknown>;
 };
 
-type AnnotationDraft = {
-  timestamp_seconds: number;
-  duration_seconds: number;
-  position_x: number;
-  position_y: number;
-  region_width: number;
-  region_height: number;
-  shape: string;
-  display_mode: string;
-  interactive: boolean;
-};
-
 type AnnotationEditorValues = {
   timestamp_seconds: number;
   duration_seconds: string;
-  position: EditorPosition;
-  size: EditorSize;
   title: string;
   body: string;
   kind: string;
   color: string;
-  shape: string;
-  display_mode: string;
-  interactive: boolean;
-  animation: string;
   custom_data: string;
-};
-
-type AnnotationOverlayItem = {
-  id: string;
-  timestamp_seconds: number;
-  duration_seconds: number;
-  position_x: number | null;
-  position_y: number | null;
-  region_x: number | null;
-  region_y: number | null;
-  region_width: number | null;
-  region_height: number | null;
-  title: string;
-  body: string;
-  kind: string;
-  color: string;
-  shape: string;
-  display_mode: string;
-  interactive: boolean;
-  isPreview?: boolean;
-};
-
-type AnnotationVisualItem = {
-  timestamp_seconds: number;
-  position: EditorPosition;
-  size: EditorSize;
-  title: string;
-  body: string;
-  kind: string;
-  color: string;
-  shape: string;
-  display_mode: string;
-  interactive: boolean;
 };
 
 function VideoDetailPage() {
@@ -126,23 +77,36 @@ function VideoDetailPage() {
   const { data: video, isLoading, isError } = useVideo(videoId);
   const { data: annotations = [] } = useAnnotations(videoId);
   const deleteVideo = useDeleteVideo();
-  const updateAnnotation = useUpdateAnnotation(videoId);
   const [currentVideoTime, setCurrentVideoTime] = useState(0);
-  const [draftAnnotation, setDraftAnnotation] = useState<AnnotationDraft | null>(
-    null,
+  const [durationSeconds, setDurationSeconds] = useState(0);
+  const [hoveredAnnotationId, setHoveredAnnotationId] = useState<string | null>(null);
+  const [isFullscreen, setIsFullscreen] = useState(false);
+  const [isPlaying, setIsPlaying] = useState(false);
+  const [editingAnnotation, setEditingAnnotation] = useState<Annotation | null>(null);
+  const [editorValues, setEditorValues] = useState<AnnotationEditorValues | null>(null);
+
+  const sortedAnnotations = useMemo(
+    () =>
+      [...annotations].sort(
+        (first, second) =>
+          first.timestamp_seconds - second.timestamp_seconds ||
+          first.created_at.localeCompare(second.created_at),
+      ),
+    [annotations],
   );
-  const [editingAnnotation, setEditingAnnotation] = useState<Annotation | null>(
-    null,
-  );
-  const [editorValues, setEditorValues] = useState<AnnotationEditorValues | null>(
-    null,
-  );
-  const activeAnnotations = annotations.filter((annotation) =>
-    isAnnotationActive(annotation, currentVideoTime),
-  );
-  const overlayAnnotations = activeAnnotations.filter(
-    (annotation) => annotation.id !== editingAnnotation?.id,
-  );
+
+  const activeAnnotationId =
+    hoveredAnnotationId ??
+    sortedAnnotations.find((annotation) => isAnnotationActive(annotation, currentVideoTime))?.id ??
+    null;
+
+  useEffect(() => {
+    const syncFullscreenState = () => {
+      setIsFullscreen(document.fullscreenElement === playerFrame.current);
+    };
+    document.addEventListener("fullscreenchange", syncFullscreenState);
+    return () => document.removeEventListener("fullscreenchange", syncFullscreenState);
+  }, []);
 
   const handleDeleteVideo = () => {
     deleteVideo.mutate(videoId, {
@@ -150,112 +114,84 @@ function VideoDetailPage() {
     });
   };
 
-  const seekTo = (seconds: number) => {
-    if (!videoElement.current) return;
-    videoElement.current.currentTime = seconds;
-    videoElement.current.play();
+  const seekTo = (seconds: number, shouldPlay = true) => {
+    const element = videoElement.current;
+    if (!element) return;
+    element.currentTime = seconds;
+    setCurrentVideoTime(seconds);
+    if (shouldPlay) void element.play();
   };
 
-  const clearAnnotationComposer = useCallback(() => {
-    setDraftAnnotation(null);
+  const clearAnnotationComposer = () => {
     setEditingAnnotation(null);
     setEditorValues(null);
-  }, []);
+  };
+
+  const beginAnnotationAtCurrentTime = () => {
+    const timestamp = getCurrentPlayerTime(videoElement.current, currentVideoTime);
+    videoElement.current?.pause();
+    setCurrentVideoTime(timestamp);
+    setEditingAnnotation(null);
+    setEditorValues(getEditorValuesFromTimestamp(timestamp));
+  };
 
   const startEditingAnnotation = (annotation: Annotation) => {
-    const element = videoElement.current;
-    if (element) {
-      element.currentTime = annotation.timestamp_seconds;
-      element.pause();
-    }
-    setCurrentVideoTime(annotation.timestamp_seconds);
-    setDraftAnnotation(null);
+    videoElement.current?.pause();
+    seekTo(annotation.timestamp_seconds, false);
     setEditingAnnotation(annotation);
     setEditorValues(getEditorValuesFromAnnotation(annotation));
   };
 
-  const selectOverlayAnnotation = (annotation: AnnotationOverlayItem) => {
-    if (annotation.isPreview) return;
-    const savedAnnotation = annotations.find((item) => item.id === annotation.id);
-    if (savedAnnotation) startEditingAnnotation(savedAnnotation);
-  };
-
-  const moveOverlayAnnotation = (annotation: AnnotationOverlayItem, position: EditorPosition) => {
-    if (annotation.isPreview) return;
-    const savedAnnotation = annotations.find((item) => item.id === annotation.id);
-    if (!savedAnnotation) return;
-    updateAnnotation.mutate({
-      id: savedAnnotation.id,
-      values: {
-        position_x: position.x,
-        position_y: position.y,
-        region_x: position.x,
-        region_y: position.y,
-      },
-    });
-  };
-
-  const beginAnnotationAtPoint = (event: ReactMouseEvent<HTMLButtonElement>) => {
+  const togglePlayback = () => {
     const element = videoElement.current;
     if (!element) return;
-    const rect = element.getBoundingClientRect();
-    const positionX = clampUnit((event.clientX - rect.left) / rect.width);
-    const positionY = clampUnit((event.clientY - rect.top) / rect.height);
-    const timestamp = toFiniteTime(element.currentTime);
+    if (element.paused) {
+      void element.play();
+      return;
+    }
     element.pause();
-    setCurrentVideoTime(timestamp);
-    setEditingAnnotation(null);
-    const draft = {
-      timestamp_seconds: timestamp,
-      duration_seconds: 6,
-      position_x: positionX,
-      position_y: positionY,
-      region_width: 0.34,
-      region_height: 0.28,
-      shape: "marker",
-      display_mode: "card",
-      interactive: true,
-    };
-    setDraftAnnotation(draft);
-    setEditorValues(getEditorValuesFromDraft(draft));
+  };
+
+  const toggleFullscreen = () => {
+    if (document.fullscreenElement === playerFrame.current) {
+      void document.exitFullscreen();
+      return;
+    }
+    void playerFrame.current?.requestFullscreen?.();
   };
 
   const updateVideoTiming = () => {
     const element = videoElement.current;
     if (!element) return;
     const time = toFiniteTime(element.currentTime);
-    // Only persist non-zero positions. When src changes, the browser fires
-    // timeupdate with currentTime=0 as part of the emptied sequence — guarding
-    // here prevents that from erasing the position we want to restore.
     if (time > 0) lastPlaybackTimeRef.current = time;
     setCurrentVideoTime(time);
   };
 
-  // Updates display state only — does NOT overwrite lastPlaybackTimeRef,
-  // so a src change (durationchange fires at currentTime=0) can't erase the saved position.
-  const syncVideoTime = () => {
+  const syncVideoMetadata = () => {
     const element = videoElement.current;
     if (!element) return;
+    setDurationSeconds(toFiniteTime(element.duration));
     setCurrentVideoTime(toFiniteTime(element.currentTime));
   };
 
   const restoreVideoTime = () => {
     const element = videoElement.current;
     if (!element) return;
+    setDurationSeconds(toFiniteTime(element.duration));
     if (lastPlaybackTimeRef.current > 0) {
       element.currentTime = lastPlaybackTimeRef.current;
       setCurrentVideoTime(lastPlaybackTimeRef.current);
-    } else {
-      setCurrentVideoTime(toFiniteTime(element.currentTime));
+      return;
     }
+    setCurrentVideoTime(toFiniteTime(element.currentTime));
   };
 
   if (isLoading) return <p className="text-[var(--muted)]">{t("common.loading")}</p>;
-  if (isError || !video)
-    return <p className="text-[var(--danger)]">{t("videoDetail.notFound")}</p>;
+  if (isError || !video) return <p className="text-[var(--danger)]">{t("videoDetail.notFound")}</p>;
 
   return (
-    <div className="mx-auto max-w-7xl space-y-8">
+    <div className="mx-auto max-w-[96rem] space-y-8">
       <Link
         to="/videos"
         className="inline-flex items-center gap-1 text-sm text-[var(--muted)] hover:text-[var(--ink)]"
@@ -283,71 +219,63 @@ function VideoDetailPage() {
         </button>
       </div>
 
-      <div className="grid gap-8 xl:grid-cols-[minmax(0,1fr)_400px]">
+      <div className="grid gap-6 2xl:grid-cols-[minmax(0,1fr)_380px] xl:grid-cols-[minmax(0,1fr)_360px]">
         <section className="space-y-5">
           <div
             ref={playerFrame}
-            className="relative overflow-hidden rounded-lg border border-[var(--rule)] bg-[#0f0e0c]"
+            className="group relative overflow-hidden rounded-lg border border-[var(--rule)] bg-[#0f0e0c] fullscreen:flex fullscreen:h-screen fullscreen:w-screen fullscreen:items-center fullscreen:justify-center fullscreen:rounded-none fullscreen:border-0"
           >
             {video.playback_url ? (
               <>
                 <video
                   ref={videoElement}
                   src={video.playback_url}
-                  controls
-                  onDurationChange={syncVideoTime}
+                  controls={false}
+                  onDurationChange={syncVideoMetadata}
+                  onEnded={() => setIsPlaying(false)}
                   onLoadedMetadata={restoreVideoTime}
+                  onPause={() => setIsPlaying(false)}
+                  onPlay={() => setIsPlaying(true)}
                   onTimeUpdate={updateVideoTiming}
-                  className="aspect-video w-full bg-[#0f0e0c]"
+                  onClick={togglePlayback}
+                  className="aspect-video w-full cursor-pointer bg-[#0f0e0c] fullscreen:max-h-screen fullscreen:w-full fullscreen:object-contain"
                 />
-                {!draftAnnotation && !editingAnnotation && (
-                  <button
-                    type="button"
-                    onClick={beginAnnotationAtPoint}
-                    className="absolute inset-x-0 top-0 bottom-14 z-[9] cursor-crosshair bg-transparent"
-                    aria-label={t("videoDetail.annotations.addAtPoint")}
-                    title={t("videoDetail.annotations.addAtPoint")}
+                <div className="pointer-events-none absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/85 via-black/42 to-transparent px-4 pt-16 pb-4 opacity-100 transition-opacity md:opacity-0 md:group-hover:opacity-100 md:group-focus-within:opacity-100">
+                  <VideoControls
+                    annotations={sortedAnnotations}
+                    currentTime={currentVideoTime}
+                    duration={durationSeconds}
+                    hoveredAnnotationId={hoveredAnnotationId}
+                    isFullscreen={isFullscreen}
+                    isPlaying={isPlaying}
+                    onFullscreen={toggleFullscreen}
+                    onHoverAnnotation={setHoveredAnnotationId}
+                    onSeek={seekTo}
+                    onTogglePlayback={togglePlayback}
                   />
-                )}
-                {editorValues && (
-                  <button
-                    type="button"
-                    onPointerDown={(event) => {
-                      event.preventDefault();
-                      event.stopPropagation();
-                      videoElement.current?.pause();
-                    }}
-                    onClick={(event) => {
-                      event.preventDefault();
-                      event.stopPropagation();
-                      annotationForm.current?.requestSubmit();
-                    }}
-                    className="absolute inset-0 z-20 cursor-default bg-transparent"
-                    aria-label={t("videoDetail.form.submitEdit")}
-                  />
-                )}
-                <AnnotationOverlay
-                  containerRef={playerFrame}
-                  videoRef={videoElement}
-                  annotations={overlayAnnotations}
-                  onSelect={selectOverlayAnnotation}
-                  onMove={moveOverlayAnnotation}
-                />
-                {editorValues && (
-                  <VisualAnnotationEditor
-                    key={editingAnnotation?.id ?? getDraftKey(draftAnnotation)}
-                    containerRef={playerFrame}
-                    videoRef={videoElement}
-                    values={editorValues}
-                    onChange={setEditorValues}
-                  />
-                )}
+                </div>
               </>
             ) : (
               <div className="flex aspect-video items-center justify-center text-sm text-[var(--paper)]">
                 {t("videoDetail.videoUnavailable")}
               </div>
             )}
+          </div>
+
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div className="vi-mono text-xs text-[var(--muted)]">
+              {formatDuration(currentVideoTime)} /{" "}
+              {durationSeconds > 0 ? formatDuration(durationSeconds) : "--:--"}
+            </div>
+            <button
+              type="button"
+              onClick={beginAnnotationAtCurrentTime}
+              disabled={!video.playback_url}
+              className="vi-button-primary disabled:opacity-50"
+            >
+              <Plus className="h-4 w-4" />
+              {t("videoDetail.annotations.addAtCurrentTime")}
+            </button>
           </div>
 
           <dl className="vi-panel grid gap-0 overflow-hidden text-sm sm:grid-cols-3">
@@ -370,23 +298,22 @@ function VideoDetailPage() {
               </div>
             </div>
           </dl>
-
-          <AnnotationTimeline
-            videoId={videoId}
-            annotations={annotations}
-            onSeek={seekTo}
-            onEdit={startEditingAnnotation}
-          />
         </section>
 
-        <aside className="space-y-4 xl:sticky xl:top-6 xl:self-start">
-          <AnnotationInspector
-            formRef={annotationForm}
-            videoId={videoId}
+        <aside className="xl:sticky xl:top-6 xl:self-start">
+          <AnnotationLivePanel
+            activeAnnotationId={activeAnnotationId}
+            annotations={sortedAnnotations}
+            currentTime={currentVideoTime}
             editing={editingAnnotation}
+            formRef={annotationForm}
+            onAdd={beginAnnotationAtCurrentTime}
+            onCancel={clearAnnotationComposer}
+            onEdit={startEditingAnnotation}
+            onSeek={seekTo}
+            setEditorValues={setEditorValues}
             values={editorValues}
-            onChange={setEditorValues}
-            onDone={clearAnnotationComposer}
+            videoId={videoId}
           />
         </aside>
       </div>
@@ -394,454 +321,359 @@ function VideoDetailPage() {
   );
 }
 
-function translateKind(t: (key: string) => string, kind: string): string {
-  const known = ["note", "question", "resource", "highlight"];
-  if (known.includes(kind)) {
-    return t(`videoDetail.form.kinds.${kind}`);
-  }
-  return kind;
-}
-
-function AnnotationTimeline({
-  videoId,
+function VideoControls({
   annotations,
+  currentTime,
+  duration,
+  hoveredAnnotationId,
+  isFullscreen,
+  isPlaying,
+  onFullscreen,
+  onHoverAnnotation,
   onSeek,
-  onEdit,
+  onTogglePlayback,
 }: {
-  videoId: string;
   annotations: Annotation[];
+  currentTime: number;
+  duration: number;
+  hoveredAnnotationId: string | null;
+  isFullscreen: boolean;
+  isPlaying: boolean;
+  onFullscreen: () => void;
+  onHoverAnnotation: (annotationId: string | null) => void;
   onSeek: (seconds: number) => void;
-  onEdit: (annotation: Annotation) => void;
+  onTogglePlayback: () => void;
 }) {
   const { t } = useTranslation();
 
   return (
-    <section className="vi-panel p-4">
-      <div className="flex items-baseline justify-between border-b border-[var(--rule)] pb-3">
-        <h2 className="vi-display text-2xl">{t("videoDetail.annotations.title")}</h2>
-        <span className="vi-mono text-xs text-[var(--muted)]">{annotations.length}</span>
-      </div>
-      {annotations.length === 0 ? (
-        <p className="mt-4 rounded-lg border border-dashed border-[var(--rule-strong)] bg-[var(--surface)] p-6 text-center text-sm text-[var(--muted)]">
-          {t("videoDetail.annotations.empty")}
-        </p>
-      ) : (
-        <div className="mt-4 flex gap-3 overflow-x-auto pb-2">
-          {annotations.map((annotation) => (
-            <article
-              key={annotation.id}
-              className="min-w-[17rem] max-w-[22rem] rounded-lg border border-[var(--rule)] bg-[var(--paper)] p-3"
-              style={{ borderTop: `3px solid ${annotation.color}` }}
-            >
-              <div className="flex items-start justify-between gap-2">
-                <button
-                  type="button"
-                  onClick={() => onSeek(annotation.timestamp_seconds)}
-                  className="inline-flex items-center gap-2 rounded-md border border-[var(--rule)] bg-[var(--surface)] px-2 py-1 text-sm font-semibold text-[var(--ink)] hover:border-[var(--ink)]"
-                >
-                  <Clock className="h-4 w-4" />
-                  {formatDuration(annotation.timestamp_seconds)}
-                </button>
-                <button
-                  type="button"
-                  onClick={() => onEdit(annotation)}
-                  className="vi-icon-button h-8 min-h-8 w-8"
-                  aria-label={t("videoDetail.annotations.edit")}
-                  title={t("videoDetail.annotations.edit")}
-                >
-                  <Edit2 className="h-4 w-4" />
-                </button>
-                <DeleteAnnotationButton
-                  videoId={videoId}
-                  annotationId={annotation.id}
-                />
-              </div>
-              <div className="mt-3">
-                <div className="flex flex-wrap items-center gap-2">
-                  <h3 className="vi-display text-lg">{annotation.title}</h3>
-                  <span className="vi-kicker rounded border border-[var(--rule)] px-2 py-0.5">
-                    {translateKind(t, annotation.kind)}
-                  </span>
-                </div>
-                <p className="mt-2 line-clamp-3 whitespace-pre-wrap text-sm text-[var(--ink)]">
-                  {annotation.body}
-                </p>
-              </div>
-            </article>
-          ))}
+    <div className="pointer-events-auto space-y-3 text-[var(--paper)]">
+      <AnnotationScrubber
+        annotations={annotations}
+        currentTime={currentTime}
+        duration={duration}
+        hoveredAnnotationId={hoveredAnnotationId}
+        onHoverAnnotation={onHoverAnnotation}
+        onSeek={onSeek}
+      />
+      <div className="flex items-center justify-between gap-3">
+        <div className="flex min-w-0 items-center gap-3">
+          <button
+            type="button"
+            onClick={onTogglePlayback}
+            className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-white/16 text-[var(--paper)] transition-colors hover:bg-white/24"
+            aria-label={isPlaying ? t("videoDetail.player.pause") : t("videoDetail.player.play")}
+            title={isPlaying ? t("videoDetail.player.pause") : t("videoDetail.player.play")}
+          >
+            {isPlaying ? <Pause className="h-4 w-4" /> : <Play className="ml-0.5 h-4 w-4" />}
+          </button>
+          <span className="vi-mono truncate text-xs text-white/78">
+            {formatDuration(currentTime)} / {duration > 0 ? formatDuration(duration) : "--:--"}
+          </span>
         </div>
-      )}
-    </section>
+
+        <div className="flex shrink-0 items-center gap-2">
+          <span className="vi-mono hidden text-xs text-white/62 sm:inline">
+            {annotations.length} {t("videoDetail.annotations.title")}
+          </span>
+          <button
+            type="button"
+            onClick={onFullscreen}
+            className="flex h-9 w-9 items-center justify-center rounded-full bg-white/12 text-[var(--paper)] transition-colors hover:bg-white/22"
+            aria-label={
+              isFullscreen
+                ? t("videoDetail.player.exitFullscreen")
+                : t("videoDetail.player.fullscreen")
+            }
+            title={
+              isFullscreen
+                ? t("videoDetail.player.exitFullscreen")
+                : t("videoDetail.player.fullscreen")
+            }
+          >
+            {isFullscreen ? <Minimize2 className="h-4 w-4" /> : <Maximize2 className="h-4 w-4" />}
+          </button>
+        </div>
+      </div>
+    </div>
   );
 }
 
-function AnnotationOverlay({
-  containerRef,
-  videoRef,
+function AnnotationScrubber({
   annotations,
-  onSelect,
-  onMove,
+  currentTime,
+  duration,
+  hoveredAnnotationId,
+  onHoverAnnotation,
+  onSeek,
 }: {
-  containerRef: RefObject<HTMLDivElement | null>;
-  videoRef: RefObject<HTMLVideoElement | null>;
-  annotations: AnnotationOverlayItem[];
-  onSelect: (annotation: AnnotationOverlayItem) => void;
-  onMove: (annotation: AnnotationOverlayItem, position: EditorPosition) => void;
+  annotations: Annotation[];
+  currentTime: number;
+  duration: number;
+  hoveredAnnotationId: string | null;
+  onHoverAnnotation: (annotationId: string | null) => void;
+  onSeek: (seconds: number) => void;
 }) {
   const { t } = useTranslation();
-  if (annotations.length === 0) return null;
-  const positionedAnnotations = annotations.filter(hasOverlayPosition);
-  const stackedAnnotations = annotations.filter(
-    (annotation) => !hasOverlayPosition(annotation),
-  );
+  const hasDuration = duration > 0;
+  const progressPercent = hasDuration ? clampRange((currentTime / duration) * 100, 0, 100) : 0;
 
-  return (
-    <div className="pointer-events-none absolute inset-0 z-10">
-      {positionedAnnotations.map((annotation) => (
-        <AnnotationVisualSurface
-          key={annotation.id}
-          item={getVisualItemFromOverlay(annotation)}
-          draggable={annotation.interactive && !annotation.isPreview}
-          onPointerDown={(event) =>
-            startSavedAnnotationPointerAction({
-              annotation,
-              containerRef,
-              event,
-              initialPosition: {
-                x: annotation.position_x,
-                y: annotation.position_y,
-              },
-              onClick: onSelect,
-              onMove,
-              videoRef,
-            })
-          }
-          t={t}
-        />
-      ))}
-
-      {stackedAnnotations.length > 0 && (
-        <div className="absolute inset-x-4 bottom-16 space-y-2">
-          {stackedAnnotations.slice(0, 3).map((annotation) => (
-            <AnnotationOverlayCard
-              key={annotation.id}
-              annotation={annotation}
-              onSelect={onSelect}
-              t={t}
-            />
-          ))}
-        </div>
-      )}
-    </div>
-  );
-}
-
-function AnnotationOverlayCard({
-  annotation,
-  onSelect,
-  t,
-}: {
-  annotation: AnnotationOverlayItem;
-  onSelect: (annotation: AnnotationOverlayItem) => void;
-  t: (key: string) => string;
-}) {
-  const className = [
-    "max-w-2xl rounded-lg border bg-[#1c1a17]/90 p-3 text-left text-[var(--paper)] shadow-lg",
-    annotation.isPreview ? "border-dashed" : "",
-    annotation.interactive && !annotation.isPreview
-      ? "pointer-events-auto cursor-pointer hover:bg-[#25211d]/95"
-      : "",
-  ].join(" ");
-  const content = (
-    <>
-      <div className="flex flex-wrap items-center gap-2">
-        <span
-          className="h-2.5 w-2.5 rounded-full"
-          style={{ backgroundColor: annotation.color }}
-        />
-        <span className="vi-kicker text-[rgba(250,247,242,0.72)]">
-          {translateKind(t, annotation.kind)}
-        </span>
-        <span className="vi-mono text-xs text-[rgba(250,247,242,0.62)]">
-          {formatDuration(annotation.timestamp_seconds)}
-        </span>
-      </div>
-      <h3 className="vi-display mt-1 text-lg leading-tight">
-        {annotation.title || t("videoDetail.form.newTitle")}
-      </h3>
-      {annotation.body && (
-        <p className="mt-1 line-clamp-3 whitespace-pre-wrap text-sm leading-relaxed text-[rgba(250,247,242,0.88)]">
-          {annotation.body}
-        </p>
-      )}
-    </>
-  );
-
-  if (annotation.interactive && !annotation.isPreview) {
-    return (
-      <button
-        type="button"
-        onClick={() => onSelect(annotation)}
-        className={className}
-        style={{ borderColor: annotation.color }}
-      >
-        {content}
-      </button>
-    );
-  }
-
-  return (
-    <div
-      className={className}
-      style={{ borderColor: annotation.color }}
-    >
-      {content}
-    </div>
-  );
-}
-
-function AnnotationVisualSurface({
-  item,
-  draggable,
-  editable = false,
-  onBodyChange,
-  onPointerDown,
-  onResizePointerDown,
-  onTitleChange,
-  t,
-}: {
-  item: AnnotationVisualItem;
-  draggable: boolean;
-  editable?: boolean;
-  onBodyChange?: (body: string) => void;
-  onPointerDown: (event: ReactPointerEvent<HTMLElement>) => void;
-  onResizePointerDown?: (event: ReactPointerEvent<HTMLButtonElement>) => void;
-  onTitleChange?: (title: string) => void;
-  t: (key: string) => string;
-}) {
-  const titleInputRef = useRef<HTMLInputElement | null>(null);
-  useEffect(() => {
-    if (!editable) return;
-    titleInputRef.current?.focus();
-  }, [editable]);
-
-  const className = [
-    "group pointer-events-auto absolute rounded-lg border bg-[#1c1a17]/90 p-3 text-left text-[var(--paper)] shadow-2xl",
-    editable ? "z-30" : "z-10",
-    draggable ? "cursor-move hover:bg-[#25211d]/95" : "",
-  ].join(" ");
-  const content = (
-    <>
-      <div className="mb-1 flex items-start gap-2">
-        <div className="min-w-0 flex-1">
-          <div className="flex flex-wrap items-center gap-2">
-            <GripHorizontal className="h-4 w-4 shrink-0 text-[rgba(250,247,242,0.62)]" />
-            <span
-              className={getInlineMarkerClassName(item.shape)}
-              style={{ backgroundColor: item.color }}
-            />
-            <span className="vi-kicker text-[rgba(250,247,242,0.72)]">
-              {translateKind(t, item.kind)}
-            </span>
-            <span className="vi-mono text-xs text-[rgba(250,247,242,0.62)]">
-              {formatDuration(item.timestamp_seconds)}
-            </span>
-          </div>
-          {editable ? (
-            <input
-              ref={titleInputRef}
-              value={item.title}
-              onPointerDown={(event) => event.stopPropagation()}
-              onChange={(event) => onTitleChange?.(event.target.value)}
-              placeholder={t("videoDetail.form.title")}
-              className="vi-display mt-1 w-full bg-transparent text-lg leading-tight text-[var(--paper)] outline-none placeholder:text-[rgba(250,247,242,0.45)]"
-            />
-          ) : (
-            <h3 className="vi-display mt-1 text-lg leading-tight">
-              {item.title || t("videoDetail.form.newTitle")}
-            </h3>
-          )}
-        </div>
-      </div>
-
-      {editable ? (
-        <textarea
-          value={item.body}
-          onPointerDown={(event) => event.stopPropagation()}
-          onChange={(event) => onBodyChange?.(event.target.value)}
-          rows={getBodyRows(item.body)}
-          placeholder={t("videoDetail.form.body")}
-          className="mt-1 line-clamp-3 w-full resize-none overflow-hidden border-0 bg-transparent p-0 text-sm leading-relaxed text-[rgba(250,247,242,0.88)] outline-none placeholder:text-[rgba(250,247,242,0.45)]"
-        />
-      ) : (
-        item.body &&
-        item.display_mode !== "marker" && (
-          <p className="mt-1 line-clamp-3 whitespace-pre-wrap text-sm leading-relaxed text-[rgba(250,247,242,0.88)]">
-            {item.body}
-          </p>
-        )
-      )}
-
-      {editable && onResizePointerDown && (
-        <button
-          type="button"
-          onPointerDown={onResizePointerDown}
-          className="absolute right-1 bottom-1 rounded bg-white/10 p-1 text-[var(--paper)] opacity-0 transition-opacity hover:bg-white/20 focus:opacity-100 group-hover:opacity-100"
-          aria-label={t("videoDetail.form.resize")}
-          title={t("videoDetail.form.resize")}
-        >
-          <Maximize2 className="h-3.5 w-3.5" />
-        </button>
-      )}
-    </>
-  );
-
-  if (editable) {
-    return (
-      <div
-        className={className}
-        onPointerDown={onPointerDown}
-        style={getVisualSurfaceStyle(item)}
-      >
-        {content}
-      </div>
-    );
-  }
+  const handleSeek = (event: ReactMouseEvent<HTMLButtonElement>) => {
+    if (!hasDuration) return;
+    const rect = event.currentTarget.getBoundingClientRect();
+    const ratio = clampRange((event.clientX - rect.left) / rect.width, 0, 1);
+    onSeek(ratio * duration);
+  };
 
   return (
     <button
       type="button"
-      className={className}
-      onPointerDown={onPointerDown}
-      style={getVisualSurfaceStyle(item)}
+      onClick={handleSeek}
+      disabled={!hasDuration}
+      className="relative block h-7 w-full cursor-pointer rounded-full py-2 disabled:cursor-not-allowed"
+      aria-label={t("videoDetail.annotations.timelineMask")}
     >
-      {content}
+      <span className="absolute inset-x-0 top-1/2 h-1 -translate-y-1/2 rounded-full bg-white/22" />
+      <span
+        className="absolute top-1/2 left-0 h-1 -translate-y-1/2 rounded-full bg-[var(--paper)]"
+        style={{ width: `${progressPercent}%` }}
+      />
+      {hasDuration &&
+        annotations.map((annotation) => {
+          const left = clampRange((annotation.timestamp_seconds / duration) * 100, 0, 100);
+          const width = Math.max((getAnnotationDuration(annotation) / duration) * 100, 0.45);
+          const previewPositionClass =
+            left > 78 ? "right-0" : left < 22 ? "left-0" : "left-1/2 -translate-x-1/2";
+          return (
+            <span
+              key={annotation.id}
+              className={cn(
+                "group/marker absolute top-1/2 h-3.5 -translate-y-1/2 rounded-full opacity-95 ring-2 ring-black/30 transition-transform hover:scale-y-125",
+                hoveredAnnotationId === annotation.id ? "scale-y-125" : "",
+              )}
+              style={{
+                left: `${left}%`,
+                width: `${Math.min(width, 100 - left)}%`,
+                backgroundColor: annotation.color,
+              }}
+              onMouseEnter={() => onHoverAnnotation(annotation.id)}
+              onMouseLeave={() => onHoverAnnotation(null)}
+              onFocus={() => onHoverAnnotation(annotation.id)}
+              onBlur={() => onHoverAnnotation(null)}
+              title={`${formatDuration(annotation.timestamp_seconds)} ${annotation.title}`}
+            >
+              <span
+                className={cn(
+                  "pointer-events-none absolute bottom-6 z-20 hidden w-64 rounded-md border border-white/12 bg-[#171411]/95 p-3 text-left text-[var(--paper)] shadow-xl group-hover/marker:block",
+                  hoveredAnnotationId === annotation.id ? "block" : "",
+                  previewPositionClass,
+                )}
+              >
+                <span className="vi-mono block text-xs text-white/58">
+                  {formatDuration(annotation.timestamp_seconds)}
+                </span>
+                <span className="vi-display mt-1 block truncate text-lg">{annotation.title}</span>
+                <span className="mt-1 line-clamp-2 block text-xs leading-relaxed text-white/78">
+                  {annotation.body}
+                </span>
+              </span>
+            </span>
+          );
+        })}
+      <span
+        className="absolute top-1/2 h-4 w-4 -translate-x-1/2 -translate-y-1/2 rounded-full border border-black/25 bg-[var(--paper)] shadow"
+        style={{ left: `${progressPercent}%` }}
+      />
     </button>
   );
 }
 
-function hasOverlayPosition(
-  annotation: AnnotationOverlayItem,
-): annotation is AnnotationOverlayItem & { position_x: number; position_y: number } {
-  return typeof annotation.position_x === "number" && typeof annotation.position_y === "number";
-}
-
-function getInlineMarkerClassName(shape: string) {
-  if (shape === "spotlight") return "h-4 w-4 rounded-full ring-4 ring-white/35";
-  if (shape === "region") return "h-3 w-3 rounded-sm";
-  return "h-2.5 w-2.5 rounded-full";
-}
-
-function getBodyRows(body: string) {
-  if (!body) return 1;
-  return clampInteger(body.split("\n").length, 1, 3);
-}
-
-function clampInteger(value: number, min: number, max: number) {
-  return Math.min(Math.max(value, min), max);
-}
-
-function isAnnotationActive(annotation: Annotation, currentTime: number) {
-  const startsAt = annotation.timestamp_seconds;
-  const endsAt = startsAt + getAnnotationDuration(annotation);
-  return currentTime >= startsAt && currentTime <= endsAt;
-}
-
-function getAnnotationDuration(annotation: Annotation) {
-  const customDuration = annotation.duration_seconds;
-  return typeof customDuration === "number" && customDuration > 0
-    ? customDuration
-    : 6;
-}
-
-function getVisualItemFromOverlay(annotation: AnnotationOverlayItem): AnnotationVisualItem {
-  return {
-    timestamp_seconds: annotation.timestamp_seconds,
-    position: {
-      x: annotation.position_x ?? 0.5,
-      y: annotation.position_y ?? 0.5,
-    },
-    size: {
-      width: annotation.region_width ?? 0.34,
-      height: annotation.region_height ?? 0.28,
-    },
-    title: annotation.title,
-    body: annotation.body,
-    kind: annotation.kind,
-    color: annotation.color,
-    shape: annotation.shape,
-    display_mode: annotation.display_mode,
-    interactive: annotation.interactive,
-  };
-}
-
-function getVisualItemFromEditor(values: AnnotationEditorValues): AnnotationVisualItem {
-  return {
-    timestamp_seconds: values.timestamp_seconds,
-    position: values.position,
-    size: values.size,
-    title: values.title,
-    body: values.body,
-    kind: values.kind,
-    color: values.color,
-    shape: values.shape,
-    display_mode: values.display_mode,
-    interactive: values.interactive,
-  };
-}
-
-function VisualAnnotationEditor({
-  containerRef,
-  videoRef,
+function AnnotationLivePanel({
+  activeAnnotationId,
+  annotations,
+  currentTime,
+  editing,
+  formRef,
+  onAdd,
+  onCancel,
+  onEdit,
+  onSeek,
+  setEditorValues,
   values,
-  onChange,
+  videoId,
 }: {
-  containerRef: RefObject<HTMLDivElement | null>;
-  videoRef: RefObject<HTMLVideoElement | null>;
-  values: AnnotationEditorValues;
-  onChange: (values: AnnotationEditorValues) => void;
+  activeAnnotationId: string | null;
+  annotations: Annotation[];
+  currentTime: number;
+  editing: Annotation | null;
+  formRef: RefObject<HTMLFormElement | null>;
+  onAdd: () => void;
+  onCancel: () => void;
+  onEdit: (annotation: Annotation) => void;
+  onSeek: (seconds: number) => void;
+  setEditorValues: (values: AnnotationEditorValues | null) => void;
+  values: AnnotationEditorValues | null;
+  videoId: string;
 }) {
   const { t } = useTranslation();
-  const updateValues = (patch: Partial<AnnotationEditorValues>) => {
-    onChange({ ...values, ...patch });
-  };
+  const activeItemRef = useRef<HTMLElement | null>(null);
+
+  useEffect(() => {
+    if (!activeAnnotationId) return;
+    activeItemRef.current?.scrollIntoView({
+      behavior: "smooth",
+      block: "nearest",
+    });
+  }, [activeAnnotationId]);
 
   return (
-    <AnnotationVisualSurface
-      item={getVisualItemFromEditor(values)}
-      draggable
-      editable
-      onPointerDown={(event) =>
-        startEditorDrag(event, containerRef, videoRef, values.position, (position) =>
-          updateValues({ position }),
-        )
-      }
-      onTitleChange={(title) => updateValues({ title })}
-      onBodyChange={(body) => updateValues({ body })}
-      onResizePointerDown={(event) =>
-        startEditorResize(event, containerRef, values.size, (size) =>
-          updateValues({ size }),
-        )
-      }
-      t={t}
-    />
+    <section className="vi-panel flex h-[min(74vh,44rem)] min-h-[34rem] flex-col overflow-hidden">
+      <div className="flex items-center justify-between gap-3 border-b border-[var(--rule)] p-4">
+        <div>
+          <p className="vi-kicker">{t("videoDetail.annotations.liveKicker")}</p>
+          <h2 className="vi-display mt-1 text-2xl">{t("videoDetail.annotations.title")}</h2>
+        </div>
+        <button
+          type="button"
+          onClick={onAdd}
+          className="vi-icon-button"
+          aria-label={t("videoDetail.annotations.addAtCurrentTime")}
+          title={t("videoDetail.annotations.addAtCurrentTime")}
+        >
+          <Plus className="h-4 w-4" />
+        </button>
+      </div>
+
+      {values && (
+        <AnnotationComposer
+          currentTime={currentTime}
+          editing={editing}
+          formRef={formRef}
+          onCancel={onCancel}
+          onChange={setEditorValues}
+          values={values}
+          videoId={videoId}
+        />
+      )}
+
+      <div className="min-h-0 flex-1 overflow-y-auto p-4">
+        {annotations.length === 0 ? (
+          <div className="rounded-lg border border-dashed border-[var(--rule-strong)] bg-[var(--paper)] p-6 text-center text-sm text-[var(--muted)]">
+            <MessageSquare className="mx-auto mb-3 h-5 w-5" />
+            {t("videoDetail.annotations.empty")}
+          </div>
+        ) : (
+          <div className="space-y-3">
+            {annotations.map((annotation) => (
+              <AnnotationMessage
+                key={annotation.id}
+                refCallback={
+                  annotation.id === activeAnnotationId
+                    ? (element) => {
+                        activeItemRef.current = element;
+                      }
+                    : undefined
+                }
+                annotation={annotation}
+                isActive={annotation.id === activeAnnotationId}
+                onEdit={onEdit}
+                onSeek={onSeek}
+                videoId={videoId}
+              />
+            ))}
+          </div>
+        )}
+      </div>
+    </section>
   );
 }
 
-function AnnotationInspector({
-  formRef,
+function AnnotationMessage({
+  annotation,
+  isActive,
+  onEdit,
+  onSeek,
+  refCallback,
   videoId,
-  editing,
-  values,
-  onChange,
-  onDone,
 }: {
-  formRef: RefObject<HTMLFormElement | null>;
+  annotation: Annotation;
+  isActive: boolean;
+  onEdit: (annotation: Annotation) => void;
+  onSeek: (seconds: number) => void;
+  refCallback?: (element: HTMLElement | null) => void;
   videoId: string;
+}) {
+  const { t } = useTranslation();
+
+  return (
+    <article
+      ref={refCallback}
+      className={cn(
+        "rounded-lg border bg-[var(--paper)] p-3 transition-colors",
+        isActive
+          ? "border-[var(--ink)] shadow-[0_0_0_3px_rgba(192,81,47,0.12)]"
+          : "border-[var(--rule)]",
+      )}
+      style={{ borderLeft: `4px solid ${annotation.color}` }}
+    >
+      <div className="flex items-start justify-between gap-2">
+        <button
+          type="button"
+          onClick={() => onSeek(annotation.timestamp_seconds)}
+          className="inline-flex items-center gap-2 rounded-md border border-[var(--rule)] bg-[var(--surface)] px-2 py-1 text-sm font-semibold text-[var(--ink)] hover:border-[var(--ink)]"
+        >
+          <Clock className="h-4 w-4" />
+          {formatDuration(annotation.timestamp_seconds)}
+        </button>
+        <div className="flex shrink-0 gap-1">
+          <button
+            type="button"
+            onClick={() => onEdit(annotation)}
+            className="vi-icon-button h-8 min-h-8 w-8"
+            aria-label={t("videoDetail.annotations.edit")}
+            title={t("videoDetail.annotations.edit")}
+          >
+            <Edit2 className="h-4 w-4" />
+          </button>
+          <DeleteAnnotationButton annotationId={annotation.id} videoId={videoId} />
+        </div>
+      </div>
+      <div className="mt-3">
+        <div className="flex flex-wrap items-center gap-2">
+          <h3 className="vi-display text-lg">
+            {annotation.title || t("videoDetail.form.newTitle")}
+          </h3>
+          <span className="vi-kicker rounded border border-[var(--rule)] px-2 py-0.5">
+            {translateKind(t, annotation.kind)}
+          </span>
+          {isActive && (
+            <span className="vi-kicker rounded bg-[rgba(192,81,47,0.12)] px-2 py-0.5 text-[var(--accent)]">
+              {t("videoDetail.annotations.activeNow")}
+            </span>
+          )}
+        </div>
+        <p className="mt-2 whitespace-pre-wrap text-sm text-[var(--ink)]">{annotation.body}</p>
+      </div>
+    </article>
+  );
+}
+
+function AnnotationComposer({
+  currentTime,
+  editing,
+  formRef,
+  onCancel,
+  onChange,
+  values,
+  videoId,
+}: {
+  currentTime: number;
   editing: Annotation | null;
-  values: AnnotationEditorValues | null;
+  formRef: RefObject<HTMLFormElement | null>;
+  onCancel: () => void;
   onChange: (values: AnnotationEditorValues | null) => void;
-  onDone: () => void;
+  values: AnnotationEditorValues;
+  videoId: string;
 }) {
   const { t } = useTranslation();
   const createAnnotation = useCreateAnnotation(videoId);
@@ -850,31 +682,17 @@ function AnnotationInspector({
   const isPending = createAnnotation.isPending || updateAnnotation.isPending;
 
   const updateValues = (patch: Partial<AnnotationEditorValues>) => {
-    if (!values) return;
     onChange({ ...values, ...patch });
   };
 
-  if (!values) {
-    return (
-      <div className="vi-panel p-5">
-        <p className="vi-kicker">{t("videoDetail.form.kicker")}</p>
-        <h2 className="vi-display mt-2 text-2xl">
-          {t("videoDetail.annotations.title")}
-        </h2>
-        <p className="mt-3 text-sm text-[var(--muted)]">
-          {t("videoDetail.annotations.clickToEdit")}
-        </p>
-      </div>
-    );
-  }
-
-  const submit = (event: React.FormEvent) => {
+  const submit = (event: FormEvent) => {
     event.preventDefault();
     if (!values.title.trim() || !values.body.trim()) return;
-    let parsed: Record<string, unknown>;
+
+    let customData: Record<string, unknown>;
     try {
-      parsed = JSON.parse(values.custom_data) as Record<string, unknown>;
-      if (!parsed || Array.isArray(parsed) || typeof parsed !== "object") {
+      customData = JSON.parse(values.custom_data) as Record<string, unknown>;
+      if (!customData || Array.isArray(customData) || typeof customData !== "object") {
         setJsonError(t("videoDetail.form.errorJsonObject"));
         return;
       }
@@ -883,165 +701,150 @@ function AnnotationInspector({
       setJsonError(t("videoDetail.form.errorJsonInvalid"));
       return;
     }
-    const customDataPayload =
-      values.animation === "none" ? parsed : { ...parsed, animation: values.animation };
 
     const payload: AnnotationFormValues = {
-      timestamp_seconds: values.timestamp_seconds,
+      timestamp_seconds: toFiniteTime(values.timestamp_seconds),
       duration_seconds: toPositiveDuration(Number(values.duration_seconds)),
-      position_x: values.position.x,
-      position_y: values.position.y,
-      region_x: values.position.x,
-      region_y: values.position.y,
-      region_width: values.size.width,
-      region_height: values.size.height,
-      shape: values.shape,
-      display_mode: values.display_mode,
-      interactive: values.interactive,
-      title: values.title,
-      body: values.body,
+      position_x: null,
+      position_y: null,
+      region_x: null,
+      region_y: null,
+      region_width: null,
+      region_height: null,
+      shape: "marker",
+      display_mode: "side-panel",
+      interactive: true,
+      title: values.title.trim(),
+      body: values.body.trim(),
       kind: values.kind,
       color: values.color,
-      custom_data: customDataPayload,
+      custom_data: customData,
     };
 
     if (editing) {
-      updateAnnotation.mutate(
-        { id: editing.id, values: payload },
-        { onSuccess: () => onDone() },
-      );
+      updateAnnotation.mutate({ id: editing.id, values: payload }, { onSuccess: onCancel });
       return;
     }
-    createAnnotation.mutate(payload, {
-      onSuccess: () => onDone(),
-    });
+    createAnnotation.mutate(payload, { onSuccess: onCancel });
   };
 
   return (
     <form
       ref={formRef}
       onSubmit={submit}
-      className="vi-panel space-y-4 p-5"
+      className="border-b border-[var(--rule)] bg-[var(--paper)] p-4"
     >
-      <div>
-        <p className="vi-kicker">{t("videoDetail.form.kicker")}</p>
-        <h2 className="vi-display mt-1 text-2xl">
-          {editing ? t("videoDetail.form.editTitle") : t("videoDetail.form.newTitle")}
-        </h2>
-        <p className="vi-mono mt-1 text-xs text-[var(--muted)]">
-          {formatDuration(values.timestamp_seconds)}
-        </p>
+      <div className="flex items-start justify-between gap-3">
+        <div>
+          <p className="vi-kicker">{t("videoDetail.form.kicker")}</p>
+          <h3 className="vi-display mt-1 text-xl">
+            {editing ? t("videoDetail.form.editTitle") : t("videoDetail.form.newTitle")}
+          </h3>
+        </div>
+        <button
+          type="button"
+          onClick={onCancel}
+          className="vi-button-secondary min-h-8 px-3 py-1 text-xs"
+        >
+          {t("common.cancel")}
+        </button>
       </div>
 
-      <div className="grid gap-3">
+      <div className="mt-4 grid gap-3">
         <label className="vi-label">
-          {t("videoDetail.form.type")}
-          <select
-            value={values.kind}
-            onChange={(event) => updateValues({ kind: event.target.value })}
-            className="vi-select mt-1 text-sm normal-case"
-          >
-            <option value="note">{t("videoDetail.form.kinds.note")}</option>
-            <option value="question">{t("videoDetail.form.kinds.question")}</option>
-            <option value="resource">{t("videoDetail.form.kinds.resource")}</option>
-            <option value="highlight">{t("videoDetail.form.kinds.highlight")}</option>
-          </select>
-        </label>
-        <label className="vi-label">
-          {t("videoDetail.form.durationSeconds")}
+          {t("videoDetail.form.title")}
           <input
-            type="number"
-            min="0.1"
-            step="0.1"
-            value={values.duration_seconds}
-            onChange={(event) => updateValues({ duration_seconds: event.target.value })}
-            onBlur={() =>
-              updateValues({
-                duration_seconds: toPositiveDuration(Number(values.duration_seconds)).toFixed(1),
-              })
-            }
-            className="vi-input vi-mono mt-1 text-sm normal-case"
+            value={values.title}
+            onChange={(event) => updateValues({ title: event.target.value })}
+            className="vi-input mt-1 text-sm normal-case"
           />
         </label>
+
         <label className="vi-label">
-          {t("videoDetail.form.color")}
-          <input
-            type="color"
-            value={values.color}
-            onChange={(event) => updateValues({ color: event.target.value })}
-            className="mt-2 h-10 w-full rounded-lg border border-[var(--rule-strong)] bg-[var(--surface)] p-1"
-          />
-        </label>
-      </div>
-
-      <div className="border-t border-[var(--rule)] pt-4">
-        <div className="flex items-center gap-2">
-          <Settings2 className="h-4 w-4" />
-          <p className="vi-kicker">{t("videoDetail.form.advanced")}</p>
-        </div>
-        <div className="mt-3 grid gap-3">
-          <label className="vi-label">
-            {t("videoDetail.form.shape")}
-            <select
-              value={values.shape}
-              onChange={(event) => updateValues({ shape: event.target.value })}
-              className="vi-select mt-1 text-sm normal-case"
-            >
-              <option value="marker">{t("videoDetail.form.shapes.marker")}</option>
-              <option value="spotlight">{t("videoDetail.form.shapes.spotlight")}</option>
-              <option value="region">{t("videoDetail.form.shapes.region")}</option>
-            </select>
-          </label>
-          <label className="vi-label">
-            {t("videoDetail.form.displayMode")}
-            <select
-              value={values.display_mode}
-              onChange={(event) => updateValues({ display_mode: event.target.value })}
-              className="vi-select mt-1 text-sm normal-case"
-            >
-              <option value="card">{t("videoDetail.form.displayModes.card")}</option>
-              <option value="marker">{t("videoDetail.form.displayModes.marker")}</option>
-            </select>
-          </label>
-          <label className="vi-label">
-            {t("videoDetail.form.animation")}
-            <select
-              value={values.animation}
-              onChange={(event) => updateValues({ animation: event.target.value })}
-              className="vi-select mt-1 text-sm normal-case"
-            >
-              <option value="none">{t("videoDetail.form.animations.none")}</option>
-              <option value="fade">{t("videoDetail.form.animations.fade")}</option>
-              <option value="slide">{t("videoDetail.form.animations.slide")}</option>
-              <option value="pulse">{t("videoDetail.form.animations.pulse")}</option>
-            </select>
-          </label>
-          <label className="vi-label flex flex-row items-center gap-2">
-            <input
-              type="checkbox"
-              checked={values.interactive}
-              onChange={(event) => updateValues({ interactive: event.target.checked })}
-              className="h-4 w-4 accent-[var(--accent)]"
-            />
-            {t("videoDetail.form.interactive")}
-          </label>
-        </div>
-
-        <label className="vi-label mt-3 block">
-          {t("videoDetail.form.customJson")}
+          {t("videoDetail.form.body")}
           <textarea
-            value={values.custom_data}
-            onChange={(event) => updateValues({ custom_data: event.target.value })}
-            rows={3}
-            className="vi-textarea vi-mono mt-1 text-xs normal-case"
+            value={values.body}
+            onChange={(event) => updateValues({ body: event.target.value })}
+            rows={4}
+            className="vi-textarea mt-1 text-sm normal-case"
           />
         </label>
+
+        <div className="grid gap-3 sm:grid-cols-2">
+          <label className="vi-label">
+            {t("videoDetail.form.timeSeconds")}
+            <input
+              type="number"
+              min="0"
+              step="0.1"
+              value={values.timestamp_seconds}
+              onChange={(event) =>
+                updateValues({
+                  timestamp_seconds: toFiniteTime(Number(event.target.value)),
+                })
+              }
+              className="vi-input vi-mono mt-1 text-sm normal-case"
+            />
+          </label>
+          <label className="vi-label">
+            {t("videoDetail.form.durationSeconds")}
+            <input
+              type="number"
+              min="0.1"
+              step="0.1"
+              value={values.duration_seconds}
+              onChange={(event) => updateValues({ duration_seconds: event.target.value })}
+              onBlur={() =>
+                updateValues({
+                  duration_seconds: toPositiveDuration(Number(values.duration_seconds)).toFixed(1),
+                })
+              }
+              className="vi-input vi-mono mt-1 text-sm normal-case"
+            />
+          </label>
+        </div>
+
+        <button
+          type="button"
+          onClick={() => updateValues({ timestamp_seconds: currentTime })}
+          className="vi-button-secondary min-h-8 px-3 py-1 text-xs"
+        >
+          <Clock className="h-3.5 w-3.5" />
+          {t("videoDetail.form.useCurrentTime", {
+            time: formatDuration(currentTime),
+          })}
+        </button>
+
+        <div className="grid gap-3 sm:grid-cols-[1fr_auto]">
+          <label className="vi-label">
+            {t("videoDetail.form.type")}
+            <select
+              value={values.kind}
+              onChange={(event) => updateValues({ kind: event.target.value })}
+              className="vi-select mt-1 text-sm normal-case"
+            >
+              <option value="note">{t("videoDetail.form.kinds.note")}</option>
+              <option value="question">{t("videoDetail.form.kinds.question")}</option>
+              <option value="resource">{t("videoDetail.form.kinds.resource")}</option>
+              <option value="highlight">{t("videoDetail.form.kinds.highlight")}</option>
+            </select>
+          </label>
+          <label className="vi-label">
+            {t("videoDetail.form.color")}
+            <input
+              type="color"
+              value={values.color}
+              onChange={(event) => updateValues({ color: event.target.value })}
+              className="mt-2 h-10 w-14 rounded-lg border border-[var(--rule-strong)] bg-[var(--surface)] p-1"
+            />
+          </label>
+        </div>
       </div>
 
-      <div className="flex gap-2">
+      <div className="mt-4 flex gap-2">
         <button
           type="submit"
-          disabled={!values.title || !values.body || isPending}
+          disabled={!values.title.trim() || !values.body.trim() || isPending}
           className="vi-button-primary disabled:opacity-50"
         >
           <Check className="h-4 w-4" />
@@ -1051,251 +854,21 @@ function AnnotationInspector({
               ? t("videoDetail.form.submitEdit")
               : t("videoDetail.form.submitNew")}
         </button>
-        <button
-          type="button"
-          onClick={onDone}
-          className="vi-button-secondary"
-        >
-          {t("common.cancel")}
-        </button>
       </div>
-      {jsonError && <p className="text-sm text-[var(--danger)]">{jsonError}</p>}
+      {jsonError && <p className="mt-3 text-sm text-[var(--danger)]">{jsonError}</p>}
       {(createAnnotation.isError || updateAnnotation.isError) && (
-        <p className="text-sm text-[var(--danger)]">{t("videoDetail.form.errorSave")}</p>
+        <p className="mt-3 text-sm text-[var(--danger)]">{t("videoDetail.form.errorSave")}</p>
       )}
     </form>
   );
 }
 
-function toFiniteTime(value: number) {
-  return Number.isFinite(value) && value > 0 ? value : 0;
-}
-
-function toPositiveDuration(value: number) {
-  return Number.isFinite(value) && value > 0 ? value : 6;
-}
-
-function getEditorValuesFromAnnotation(annotation: Annotation): AnnotationEditorValues {
-  return {
-    timestamp_seconds: annotation.timestamp_seconds,
-    duration_seconds: annotation.duration_seconds.toString(),
-    position: {
-      x: annotation.position_x ?? 0.5,
-      y: annotation.position_y ?? 0.5,
-    },
-    size: getInitialEditorSize(annotation, null),
-    title: annotation.title,
-    body: annotation.body,
-    kind: annotation.kind,
-    color: annotation.color,
-    shape: annotation.shape,
-    display_mode: annotation.display_mode,
-    interactive: annotation.interactive,
-    animation: getCustomString(annotation.custom_data.animation, "none"),
-    custom_data: JSON.stringify(annotation.custom_data, null, 2),
-  };
-}
-
-function getEditorValuesFromDraft(draft: AnnotationDraft): AnnotationEditorValues {
-  return {
-    timestamp_seconds: draft.timestamp_seconds,
-    duration_seconds: draft.duration_seconds.toString(),
-    position: {
-      x: draft.position_x,
-      y: draft.position_y,
-    },
-    size: getInitialEditorSize(null, draft),
-    title: "",
-    body: "",
-    kind: "note",
-    color: "#C0512F",
-    shape: draft.shape,
-    display_mode: draft.display_mode,
-    interactive: draft.interactive,
-    animation: "none",
-    custom_data: "{}",
-  };
-}
-
-function clampUnit(value: number) {
-  if (!Number.isFinite(value)) return 0;
-  return Math.min(Math.max(value, 0), 1);
-}
-
-type EditorPosition = {
-  x: number;
-  y: number;
-};
-
-type EditorSize = {
-  width: number;
-  height: number;
-};
-
-function getVisualSurfaceStyle(
-  item: Pick<AnnotationVisualItem, "color" | "position" | "size">,
-): CSSProperties {
-  return {
-    left: `${item.position.x * 100}%`,
-    top: `${item.position.y * 100}%`,
-    width: `clamp(17rem, ${item.size.width * 100}%, 30rem)`,
-    minHeight: `${Math.max(item.size.height * 100, 18)}%`,
-    borderColor: item.color,
-    transform: "translateX(-50%)",
-  };
-}
-
-function getInitialEditorSize(
-  editing: Annotation | null,
-  draft: AnnotationDraft | null,
-): EditorSize {
-  return {
-    width: clampUnit(editing?.region_width ?? draft?.region_width ?? 0.34),
-    height: clampUnit(editing?.region_height ?? draft?.region_height ?? 0.28),
-  };
-}
-
-function getCustomString(value: unknown, fallback: string) {
-  return typeof value === "string" && value ? value : fallback;
-}
-
-function getFrameRect(containerRef: RefObject<HTMLDivElement | null>) {
-  return containerRef.current?.getBoundingClientRect() ?? null;
-}
-
-function startEditorDrag(
-  event: ReactPointerEvent,
-  containerRef: RefObject<HTMLDivElement | null>,
-  videoRef: RefObject<HTMLVideoElement | null>,
-  initialPosition: EditorPosition,
-  setPosition: (position: EditorPosition) => void,
-) {
-  if (event.button !== 0) return;
-  const rect = getFrameRect(containerRef);
-  if (!rect) return;
-  videoRef.current?.pause();
-  event.preventDefault();
-  event.currentTarget.setPointerCapture(event.pointerId);
-  const startX = event.clientX;
-  const startY = event.clientY;
-
-  const onPointerMove = (moveEvent: PointerEvent) => {
-    setPosition({
-      x: clampUnit(initialPosition.x + (moveEvent.clientX - startX) / rect.width),
-      y: clampUnit(initialPosition.y + (moveEvent.clientY - startY) / rect.height),
-    });
-  };
-  const onPointerUp = () => {
-    window.removeEventListener("pointermove", onPointerMove);
-    window.removeEventListener("pointerup", onPointerUp);
-  };
-  window.addEventListener("pointermove", onPointerMove);
-  window.addEventListener("pointerup", onPointerUp);
-}
-
-function startSavedAnnotationPointerAction({
-  annotation,
-  containerRef,
-  event,
-  initialPosition,
-  onClick,
-  onMove,
-  videoRef,
-}: {
-  annotation: AnnotationOverlayItem;
-  containerRef: RefObject<HTMLDivElement | null>;
-  event: ReactPointerEvent<HTMLElement>;
-  initialPosition: EditorPosition;
-  onClick: (annotation: AnnotationOverlayItem) => void;
-  onMove: (annotation: AnnotationOverlayItem, position: EditorPosition) => void;
-  videoRef: RefObject<HTMLVideoElement | null>;
-}) {
-  if (event.button !== 0) return;
-  const rect = getFrameRect(containerRef);
-  if (!rect) return;
-  videoRef.current?.pause();
-  event.preventDefault();
-  event.currentTarget.setPointerCapture(event.pointerId);
-  const element = event.currentTarget;
-  const startX = event.clientX;
-  const startY = event.clientY;
-  let latestPosition = initialPosition;
-  let moved = false;
-
-  const onPointerMove = (moveEvent: PointerEvent) => {
-    const deltaX = moveEvent.clientX - startX;
-    const deltaY = moveEvent.clientY - startY;
-    if (Math.abs(deltaX) > 3 || Math.abs(deltaY) > 3) moved = true;
-    latestPosition = {
-      x: clampUnit(initialPosition.x + deltaX / rect.width),
-      y: clampUnit(initialPosition.y + deltaY / rect.height),
-    };
-    element.style.left = `${latestPosition.x * 100}%`;
-    element.style.top = `${latestPosition.y * 100}%`;
-  };
-  const onPointerUp = () => {
-    window.removeEventListener("pointermove", onPointerMove);
-    window.removeEventListener("pointerup", onPointerUp);
-    if (moved) {
-      onMove(annotation, latestPosition);
-      return;
-    }
-    onClick(annotation);
-  };
-  window.addEventListener("pointermove", onPointerMove);
-  window.addEventListener("pointerup", onPointerUp);
-}
-
-function startEditorResize(
-  event: ReactPointerEvent,
-  containerRef: RefObject<HTMLDivElement | null>,
-  initialSize: EditorSize,
-  setSize: (size: EditorSize) => void,
-) {
-  if (event.button !== 0) return;
-  const rect = getFrameRect(containerRef);
-  if (!rect) return;
-  event.preventDefault();
-  event.stopPropagation();
-  event.currentTarget.setPointerCapture(event.pointerId);
-  const startX = event.clientX;
-  const startY = event.clientY;
-
-  const onPointerMove = (moveEvent: PointerEvent) => {
-    setSize({
-      width: clampRange(initialSize.width + (moveEvent.clientX - startX) / rect.width, 0.22, 0.72),
-      height: clampRange(initialSize.height + (moveEvent.clientY - startY) / rect.height, 0.16, 0.7),
-    });
-  };
-  const onPointerUp = () => {
-    window.removeEventListener("pointermove", onPointerMove);
-    window.removeEventListener("pointerup", onPointerUp);
-  };
-  window.addEventListener("pointermove", onPointerMove);
-  window.addEventListener("pointerup", onPointerUp);
-}
-
-function clampRange(value: number, min: number, max: number) {
-  if (!Number.isFinite(value)) return min;
-  return Math.min(Math.max(value, min), max);
-}
-
-function getDraftKey(draft: AnnotationDraft | null) {
-  if (!draft) return "new";
-  return [
-    "draft",
-    draft.timestamp_seconds.toFixed(1),
-    draft.position_x.toFixed(3),
-    draft.position_y.toFixed(3),
-  ].join("-");
-}
-
 function DeleteAnnotationButton({
-  videoId,
   annotationId,
+  videoId,
 }: {
-  videoId: string;
   annotationId: string;
+  videoId: string;
 }) {
   const { t } = useTranslation();
   const deleteAnnotation = useDeleteAnnotation(videoId);
@@ -1311,4 +884,62 @@ function DeleteAnnotationButton({
       <Trash2 className="h-4 w-4" />
     </button>
   );
+}
+
+function translateKind(t: (key: string) => string, kind: string): string {
+  const known = ["note", "question", "resource", "highlight"];
+  if (known.includes(kind)) return t(`videoDetail.form.kinds.${kind}`);
+  return kind;
+}
+
+function isAnnotationActive(annotation: Annotation, currentTime: number) {
+  const startsAt = annotation.timestamp_seconds;
+  const endsAt = startsAt + getAnnotationDuration(annotation);
+  return currentTime >= startsAt && currentTime <= endsAt;
+}
+
+function getAnnotationDuration(annotation: Annotation) {
+  return toPositiveDuration(annotation.duration_seconds);
+}
+
+function getEditorValuesFromAnnotation(annotation: Annotation): AnnotationEditorValues {
+  return {
+    timestamp_seconds: annotation.timestamp_seconds,
+    duration_seconds: annotation.duration_seconds.toString(),
+    title: annotation.title,
+    body: annotation.body,
+    kind: annotation.kind,
+    color: annotation.color,
+    custom_data: JSON.stringify(annotation.custom_data, null, 2),
+  };
+}
+
+function getEditorValuesFromTimestamp(timestamp: number): AnnotationEditorValues {
+  return {
+    timestamp_seconds: timestamp,
+    duration_seconds: "6",
+    title: "",
+    body: "",
+    kind: "note",
+    color: "#C0512F",
+    custom_data: "{}",
+  };
+}
+
+function getCurrentPlayerTime(element: HTMLVideoElement | null, fallback: number) {
+  if (!element) return fallback;
+  return toFiniteTime(element.currentTime);
+}
+
+function toFiniteTime(value: number) {
+  return Number.isFinite(value) && value > 0 ? value : 0;
+}
+
+function toPositiveDuration(value: number) {
+  return Number.isFinite(value) && value > 0 ? value : 6;
+}
+
+function clampRange(value: number, min: number, max: number) {
+  if (!Number.isFinite(value)) return min;
+  return Math.min(Math.max(value, min), max);
 }
