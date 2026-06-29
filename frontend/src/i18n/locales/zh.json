@@ -123,7 +123,7 @@
       "delete": "删除批注",
       "addAtPoint": "添加批注",
       "addAtCurrentTime": "在当前时间添加",
-      "clickToEdit": "使用当前视频时间添加批注。",
+      "clickToEdit": "在下方选择批注后可在这里编辑，也可以在当前时间新建批注。",
       "liveKicker": "实时轴",
       "activeNow": "正在播放",
       "timelineMask": "批注时间线"
@@ -136,6 +136,7 @@
     },
     "form": {
       "kicker": "工作室笔记",
+      "editorTitle": "批注编辑器",
       "newTitle": "新建批注",
       "editTitle": "编辑批注",
       "current": "当前 {{time}}",

@@ -123,7 +123,7 @@
       "delete": "Delete annotation",
       "addAtPoint": "Add annotation",
       "addAtCurrentTime": "Add at current time",
-      "clickToEdit": "Use the current video time to add an annotation.",
+      "clickToEdit": "Select an annotation below to edit it here, or add a new one at the current time.",
       "liveKicker": "Live timeline",
       "activeNow": "Now",
       "timelineMask": "Annotation timeline"
@@ -136,6 +136,7 @@
     },
     "form": {
       "kicker": "Studio note",
+      "editorTitle": "Annotation Editor",
       "newTitle": "New Annotation",
       "editTitle": "Edit Annotation",
       "current": "Current {{time}}",

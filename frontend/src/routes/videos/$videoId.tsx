@@ -12,6 +12,7 @@ import {
   Plus,
   Trash2,
 } from "lucide-react";
+import { AnimatePresence, motion } from "motion/react";
 import {
   type FormEvent,
   type MouseEvent as ReactMouseEvent,
@@ -65,6 +66,12 @@ type AnnotationEditorValues = {
   color: string;
   custom_data: string;
 };
+
+const surfaceMotion = {
+  initial: { opacity: 0, y: 14 },
+  animate: { opacity: 1, y: 0 },
+  transition: { duration: 0.28, ease: "easeOut" },
+} as const;
 
 function VideoDetailPage() {
   const { t } = useTranslation();
@@ -191,7 +198,12 @@ function VideoDetailPage() {
   if (isError || !video) return <p className="text-[var(--danger)]">{t("videoDetail.notFound")}</p>;
 
   return (
-    <div className="mx-auto max-w-[96rem] space-y-8">
+    <motion.div
+      className="mx-auto max-w-[96rem] space-y-8"
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      transition={{ duration: 0.24 }}
+    >
       <Link
         to="/videos"
         className="inline-flex items-center gap-1 text-sm text-[var(--muted)] hover:text-[var(--ink)]"
@@ -221,9 +233,37 @@ function VideoDetailPage() {
 
       <div className="grid gap-6 2xl:grid-cols-[minmax(0,1fr)_380px] xl:grid-cols-[minmax(0,1fr)_360px]">
         <section className="space-y-5">
-          <div
+          <motion.dl
+            className="vi-panel grid gap-0 overflow-hidden text-sm sm:grid-cols-3"
+            {...surfaceMotion}
+          >
+            <div>
+              <div className="border-b border-[var(--rule)] p-4 sm:border-r sm:border-b-0">
+                <dt className="vi-kicker">{t("videoDetail.file")}</dt>
+                <dd className="mt-2 truncate font-medium" title={video.original_filename}>
+                  {video.original_filename}
+                </dd>
+              </div>
+            </div>
+            <div>
+              <div className="border-b border-[var(--rule)] p-4 sm:border-r sm:border-b-0">
+                <dt className="vi-kicker">{t("videoDetail.size")}</dt>
+                <dd className="vi-mono mt-2 text-xs">{formatBytes(video.size_bytes)}</dd>
+              </div>
+            </div>
+            <div>
+              <div className="p-4">
+                <dt className="vi-kicker">{t("videoDetail.created")}</dt>
+                <dd className="vi-mono mt-2 text-xs">{formatDate(video.created_at)}</dd>
+              </div>
+            </div>
+          </motion.dl>
+
+          <motion.div
             ref={playerFrame}
             className="group relative overflow-hidden rounded-lg border border-[var(--rule)] bg-[#0f0e0c] fullscreen:flex fullscreen:h-screen fullscreen:w-screen fullscreen:items-center fullscreen:justify-center fullscreen:rounded-none fullscreen:border-0"
+            {...surfaceMotion}
+            transition={{ ...surfaceMotion.transition, delay: 0.04 }}
           >
             {video.playback_url ? (
               <>
@@ -260,64 +300,36 @@ function VideoDetailPage() {
                 {t("videoDetail.videoUnavailable")}
               </div>
             )}
+          </motion.div>
+
+          <div className="vi-mono text-xs text-[var(--muted)]">
+            {formatDuration(currentVideoTime)} /{" "}
+            {durationSeconds > 0 ? formatDuration(durationSeconds) : "--:--"}
           </div>
 
-          <div className="flex flex-wrap items-center justify-between gap-3">
-            <div className="vi-mono text-xs text-[var(--muted)]">
-              {formatDuration(currentVideoTime)} /{" "}
-              {durationSeconds > 0 ? formatDuration(durationSeconds) : "--:--"}
-            </div>
-            <button
-              type="button"
-              onClick={beginAnnotationAtCurrentTime}
-              disabled={!video.playback_url}
-              className="vi-button-primary disabled:opacity-50"
-            >
-              <Plus className="h-4 w-4" />
-              {t("videoDetail.annotations.addAtCurrentTime")}
-            </button>
-          </div>
-
-          <dl className="vi-panel grid gap-0 overflow-hidden text-sm sm:grid-cols-3">
-            <div>
-              <div className="border-b border-[var(--rule)] p-4 sm:border-r sm:border-b-0">
-                <dt className="vi-kicker">{t("videoDetail.file")}</dt>
-                <dd className="mt-2 font-medium">{video.original_filename}</dd>
-              </div>
-            </div>
-            <div>
-              <div className="border-b border-[var(--rule)] p-4 sm:border-r sm:border-b-0">
-                <dt className="vi-kicker">{t("videoDetail.size")}</dt>
-                <dd className="vi-mono mt-2 text-xs">{formatBytes(video.size_bytes)}</dd>
-              </div>
-            </div>
-            <div>
-              <div className="p-4">
-                <dt className="vi-kicker">{t("videoDetail.created")}</dt>
-                <dd className="vi-mono mt-2 text-xs">{formatDate(video.created_at)}</dd>
-              </div>
-            </div>
-          </dl>
+          <AnnotationListPanel
+            activeAnnotationId={activeAnnotationId}
+            annotations={sortedAnnotations}
+            onEdit={startEditingAnnotation}
+            onSeek={seekTo}
+            videoId={videoId}
+          />
         </section>
 
         <aside className="xl:sticky xl:top-6 xl:self-start">
-          <AnnotationLivePanel
-            activeAnnotationId={activeAnnotationId}
-            annotations={sortedAnnotations}
+          <AnnotationEditorPanel
             currentTime={currentVideoTime}
             editing={editingAnnotation}
             formRef={annotationForm}
             onAdd={beginAnnotationAtCurrentTime}
             onCancel={clearAnnotationComposer}
-            onEdit={startEditingAnnotation}
-            onSeek={seekTo}
             setEditorValues={setEditorValues}
             values={editorValues}
             videoId={videoId}
           />
         </aside>
       </div>
-    </div>
+    </motion.div>
   );
 }
 
@@ -445,12 +457,13 @@ function AnnotationScrubber({
           const previewPositionClass =
             left > 78 ? "right-0" : left < 22 ? "left-0" : "left-1/2 -translate-x-1/2";
           return (
-            <span
+            <motion.span
               key={annotation.id}
               className={cn(
-                "group/marker absolute top-1/2 h-3.5 -translate-y-1/2 rounded-full opacity-95 ring-2 ring-black/30 transition-transform hover:scale-y-125",
-                hoveredAnnotationId === annotation.id ? "scale-y-125" : "",
+                "absolute top-1/2 h-3.5 origin-center -translate-y-1/2 rounded-full opacity-95 ring-2 ring-black/30",
               )}
+              animate={{ scaleY: hoveredAnnotationId === annotation.id ? 1.25 : 1 }}
+              transition={{ duration: 0.14, ease: "easeOut" }}
               style={{
                 left: `${left}%`,
                 width: `${Math.min(width, 100 - left)}%`,
@@ -462,85 +475,73 @@ function AnnotationScrubber({
               onBlur={() => onHoverAnnotation(null)}
               title={`${formatDuration(annotation.timestamp_seconds)} ${annotation.title}`}
             >
-              <span
-                className={cn(
-                  "pointer-events-none absolute bottom-6 z-20 hidden w-64 rounded-md border border-white/12 bg-[#171411]/95 p-3 text-left text-[var(--paper)] shadow-xl group-hover/marker:block",
-                  hoveredAnnotationId === annotation.id ? "block" : "",
-                  previewPositionClass,
+              <AnimatePresence>
+                {hoveredAnnotationId === annotation.id && (
+                  <motion.span
+                    className={cn(
+                      "pointer-events-none absolute bottom-5 z-20 w-56 rounded-md border border-white/12 bg-[#171411]/95 px-2.5 py-2 text-left text-[var(--paper)] shadow-xl",
+                      previewPositionClass,
+                    )}
+                    initial={{ opacity: 0, y: 5, scale: 0.96 }}
+                    animate={{ opacity: 1, y: 0, scale: 1 }}
+                    exit={{ opacity: 0, y: 4, scale: 0.98 }}
+                    transition={{ duration: 0.12, ease: "easeOut" }}
+                  >
+                    <span className="vi-mono block text-[0.68rem] leading-none text-white/58">
+                      {formatDuration(annotation.timestamp_seconds)}
+                    </span>
+                    <span className="mt-1 block truncate text-sm font-semibold leading-tight">
+                      {annotation.title}
+                    </span>
+                    <span className="mt-0.5 line-clamp-1 block text-xs leading-snug text-white/72">
+                      {annotation.body}
+                    </span>
+                  </motion.span>
                 )}
-              >
-                <span className="vi-mono block text-xs text-white/58">
-                  {formatDuration(annotation.timestamp_seconds)}
-                </span>
-                <span className="vi-display mt-1 block truncate text-lg">{annotation.title}</span>
-                <span className="mt-1 line-clamp-2 block text-xs leading-relaxed text-white/78">
-                  {annotation.body}
-                </span>
-              </span>
-            </span>
+              </AnimatePresence>
+            </motion.span>
           );
         })}
-      <span
+      <motion.span
         className="absolute top-1/2 h-4 w-4 -translate-x-1/2 -translate-y-1/2 rounded-full border border-black/25 bg-[var(--paper)] shadow"
-        style={{ left: `${progressPercent}%` }}
+        animate={{ left: `${progressPercent}%` }}
+        transition={{ duration: 0.16, ease: "easeOut" }}
       />
     </button>
   );
 }
 
-function AnnotationLivePanel({
-  activeAnnotationId,
-  annotations,
+function AnnotationEditorPanel({
   currentTime,
   editing,
   formRef,
   onAdd,
   onCancel,
-  onEdit,
-  onSeek,
   setEditorValues,
   values,
   videoId,
 }: {
-  activeAnnotationId: string | null;
-  annotations: Annotation[];
   currentTime: number;
   editing: Annotation | null;
   formRef: RefObject<HTMLFormElement | null>;
   onAdd: () => void;
   onCancel: () => void;
-  onEdit: (annotation: Annotation) => void;
-  onSeek: (seconds: number) => void;
   setEditorValues: (values: AnnotationEditorValues | null) => void;
   values: AnnotationEditorValues | null;
   videoId: string;
 }) {
   const { t } = useTranslation();
-  const activeItemRef = useRef<HTMLElement | null>(null);
-
-  useEffect(() => {
-    if (!activeAnnotationId) return;
-    activeItemRef.current?.scrollIntoView({
-      behavior: "smooth",
-      block: "nearest",
-    });
-  }, [activeAnnotationId]);
 
   return (
-    <section className="vi-panel flex h-[min(74vh,44rem)] min-h-[34rem] flex-col overflow-hidden">
+    <motion.section className="vi-panel overflow-hidden" {...surfaceMotion}>
       <div className="flex items-center justify-between gap-3 border-b border-[var(--rule)] p-4">
         <div>
-          <p className="vi-kicker">{t("videoDetail.annotations.liveKicker")}</p>
-          <h2 className="vi-display mt-1 text-2xl">{t("videoDetail.annotations.title")}</h2>
+          <p className="vi-kicker">{t("videoDetail.form.kicker")}</p>
+          <h2 className="vi-display mt-1 text-2xl">{t("videoDetail.form.editorTitle")}</h2>
         </div>
-        <button
-          type="button"
-          onClick={onAdd}
-          className="vi-icon-button"
-          aria-label={t("videoDetail.annotations.addAtCurrentTime")}
-          title={t("videoDetail.annotations.addAtCurrentTime")}
-        >
+        <button type="button" onClick={onAdd} className="vi-button-primary">
           <Plus className="h-4 w-4" />
+          {t("videoDetail.annotations.addAtCurrentTime")}
         </button>
       </div>
 
@@ -556,14 +557,57 @@ function AnnotationLivePanel({
         />
       )}
 
-      <div className="min-h-0 flex-1 overflow-y-auto p-4">
+      {!values && (
+        <div className="p-5">
+          <p className="text-sm text-[var(--muted)]">{t("videoDetail.annotations.clickToEdit")}</p>
+        </div>
+      )}
+    </motion.section>
+  );
+}
+
+function AnnotationListPanel({
+  activeAnnotationId,
+  annotations,
+  onEdit,
+  onSeek,
+  videoId,
+}: {
+  activeAnnotationId: string | null;
+  annotations: Annotation[];
+  onEdit: (annotation: Annotation) => void;
+  onSeek: (seconds: number) => void;
+  videoId: string;
+}) {
+  const { t } = useTranslation();
+  const activeItemRef = useRef<HTMLElement | null>(null);
+
+  useEffect(() => {
+    if (!activeAnnotationId) return;
+    activeItemRef.current?.scrollIntoView({
+      behavior: "smooth",
+      block: "nearest",
+    });
+  }, [activeAnnotationId]);
+
+  return (
+    <motion.section className="vi-panel flex h-[18rem] flex-col overflow-hidden" {...surfaceMotion}>
+      <div className="flex items-center justify-between gap-3 border-b border-[var(--rule)] p-4">
+        <div>
+          <p className="vi-kicker">{t("videoDetail.annotations.liveKicker")}</p>
+          <h2 className="vi-display mt-1 text-2xl">{t("videoDetail.annotations.title")}</h2>
+        </div>
+        <span className="vi-mono text-xs text-[var(--muted)]">{annotations.length}</span>
+      </div>
+
+      <div className="min-h-0 flex-1 overflow-x-auto overflow-y-hidden p-4">
         {annotations.length === 0 ? (
-          <div className="rounded-lg border border-dashed border-[var(--rule-strong)] bg-[var(--paper)] p-6 text-center text-sm text-[var(--muted)]">
+          <div className="flex h-full items-center justify-center rounded-lg border border-dashed border-[var(--rule-strong)] bg-[var(--paper)] p-6 text-center text-sm text-[var(--muted)]">
             <MessageSquare className="mx-auto mb-3 h-5 w-5" />
             {t("videoDetail.annotations.empty")}
           </div>
         ) : (
-          <div className="space-y-3">
+          <motion.div className="flex h-full gap-3 pb-1" layout>
             {annotations.map((annotation) => (
               <AnnotationMessage
                 key={annotation.id}
@@ -581,10 +625,10 @@ function AnnotationLivePanel({
                 videoId={videoId}
               />
             ))}
-          </div>
+          </motion.div>
         )}
       </div>
-    </section>
+    </motion.section>
   );
 }
 
@@ -606,15 +650,18 @@ function AnnotationMessage({
   const { t } = useTranslation();
 
   return (
-    <article
+    <motion.article
+      layout
       ref={refCallback}
       className={cn(
-        "rounded-lg border bg-[var(--paper)] p-3 transition-colors",
+        "h-full w-[20rem] shrink-0 rounded-lg border bg-[var(--paper)] p-3 transition-colors sm:w-[22rem]",
         isActive
           ? "border-[var(--ink)] shadow-[0_0_0_3px_rgba(192,81,47,0.12)]"
           : "border-[var(--rule)]",
       )}
       style={{ borderLeft: `4px solid ${annotation.color}` }}
+      whileHover={{ y: -2 }}
+      transition={{ duration: 0.16, ease: "easeOut" }}
     >
       <div className="flex items-start justify-between gap-2">
         <button
@@ -652,9 +699,11 @@ function AnnotationMessage({
             </span>
           )}
         </div>
-        <p className="mt-2 whitespace-pre-wrap text-sm text-[var(--ink)]">{annotation.body}</p>
+        <p className="mt-2 line-clamp-5 whitespace-pre-wrap text-sm text-[var(--ink)]">
+          {annotation.body}
+        </p>
       </div>
-    </article>
+    </motion.article>
   );
 }
 

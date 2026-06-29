@@ -12,6 +12,7 @@ services:
     build:
       context: ../frontend
       target: dev
+    command: sh -c "pnpm install --frozen-lockfile && pnpm dev --host 0.0.0.0"
     volumes:
       - ../frontend:/app
       - frontend-node-modules:/app/node_modules
