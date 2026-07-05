@@ -116,6 +116,11 @@
     "file": "文件",
     "size": "大小",
     "created": "创建时间",
+    "preview": {
+      "kicker": "实时批注",
+      "title": "批注",
+      "empty": "等待第一个时间点标注。"
+    },
     "annotations": {
       "title": "批注",
       "empty": "暂无批注。",
@@ -131,8 +136,8 @@
     "player": {
       "play": "播放",
       "pause": "暂停",
-      "fullscreen": "全屏",
-      "exitFullscreen": "退出全屏"
+      "fullscreen": "放大",
+      "exitFullscreen": "收起"
     },
     "form": {
       "kicker": "工作室笔记",

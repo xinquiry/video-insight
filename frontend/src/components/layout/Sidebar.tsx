@@ -2,11 +2,7 @@ import { Link, useLocation } from "@tanstack/react-router";
 import { Home, Video } from "lucide-react";
 import { motion } from "motion/react";
 import { useTranslation } from "react-i18next";
-import {
-  LANGUAGE_STORAGE_KEY,
-  type SupportedLanguage,
-  SUPPORTED_LANGUAGES,
-} from "@/i18n";
+import { LANGUAGE_STORAGE_KEY, type SupportedLanguage, SUPPORTED_LANGUAGES } from "@/i18n";
 import { cn } from "@/lib/utils";
 
 const navItems = [
@@ -46,7 +42,7 @@ export function Sidebar() {
 
   return (
     <motion.aside
-      className="flex w-full flex-col border-b border-[var(--ink)] bg-[var(--paper)] md:w-64 md:border-r md:border-b-0"
+      className="flex w-full shrink-0 flex-col border-b border-[var(--ink)] bg-[var(--paper)] md:w-64 md:border-r md:border-b-0"
       initial={{ opacity: 0, x: -10 }}
       animate={{ opacity: 1, x: 0 }}
       transition={{ duration: 0.24, ease: "easeOut" }}
@@ -64,9 +60,7 @@ export function Sidebar() {
       <nav className="flex gap-2 overflow-x-auto p-3 md:flex-1 md:flex-col md:space-y-1 md:gap-0">
         {navItems.map(({ to, labelKey, icon: Icon }, index) => {
           const isActive =
-            to === "/"
-              ? location.pathname === "/"
-              : location.pathname.startsWith(to);
+            to === "/" ? location.pathname === "/" : location.pathname.startsWith(to);
           return (
             <motion.div
               key={to}

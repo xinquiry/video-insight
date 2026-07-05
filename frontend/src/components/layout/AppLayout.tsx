@@ -17,10 +17,10 @@ export function AppLayout({ children }: { children: ReactNode }) {
   };
 
   return (
-    <div className="flex min-h-screen flex-col bg-[var(--paper)] text-[var(--ink)] md:h-screen md:flex-row">
+    <div className="flex h-screen min-h-0 flex-col bg-[var(--paper)] text-[var(--ink)] md:flex-row">
       <Sidebar />
-      <div className="flex min-w-0 flex-1 flex-col">
-        <header className="flex h-14 items-center justify-between border-b border-[var(--ink)] bg-[var(--paper)] px-6">
+      <div className="flex min-h-0 min-w-0 flex-1 flex-col">
+        <header className="flex h-14 shrink-0 items-center justify-between border-b border-[var(--ink)] bg-[var(--paper)] px-6">
           <div className="hidden items-baseline gap-3 md:flex">
             <span className="vi-kicker">{t("brand.studio")}</span>
             <span className="vi-display text-base italic">{t("brand.tagline")}</span>
@@ -41,7 +41,7 @@ export function AppLayout({ children }: { children: ReactNode }) {
             </div>
           )}
         </header>
-        <main className="flex-1 overflow-y-auto px-5 py-6 md:px-8 lg:px-10">
+        <main className="min-h-0 flex-1 overflow-y-auto px-5 py-6 md:px-8 lg:px-10">
           {children}
         </main>
       </div>

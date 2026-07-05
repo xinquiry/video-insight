@@ -116,6 +116,11 @@
     "file": "File",
     "size": "Size",
     "created": "Created",
+    "preview": {
+      "kicker": "Live annotations",
+      "title": "Annotations",
+      "empty": "Waiting for the first timed annotation."
+    },
     "annotations": {
       "title": "Annotations",
       "empty": "No annotations yet.",
@@ -131,8 +136,8 @@
     "player": {
       "play": "Play",
       "pause": "Pause",
-      "fullscreen": "Fullscreen",
-      "exitFullscreen": "Exit fullscreen"
+      "fullscreen": "Expand",
+      "exitFullscreen": "Collapse"
     },
     "form": {
       "kicker": "Studio note",

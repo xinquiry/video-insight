@@ -73,6 +73,8 @@ const surfaceMotion = {
   transition: { duration: 0.28, ease: "easeOut" },
 } as const;
 
+const KEYBOARD_SEEK_STEP_SECONDS = 5;
+
 function VideoDetailPage() {
   const { t } = useTranslation();
   const { videoId } = Route.useParams();
@@ -81,16 +83,19 @@ function VideoDetailPage() {
   const videoElement = useRef<HTMLVideoElement | null>(null);
   const annotationForm = useRef<HTMLFormElement | null>(null);
   const lastPlaybackTimeRef = useRef(0);
+  const currentVideoTimeRef = useRef(0);
+  const durationSecondsRef = useRef(0);
+  const shouldResumePlaybackRef = useRef(false);
   const { data: video, isLoading, isError } = useVideo(videoId);
   const { data: annotations = [] } = useAnnotations(videoId);
   const deleteVideo = useDeleteVideo();
   const [currentVideoTime, setCurrentVideoTime] = useState(0);
   const [durationSeconds, setDurationSeconds] = useState(0);
   const [hoveredAnnotationId, setHoveredAnnotationId] = useState<string | null>(null);
-  const [isFullscreen, setIsFullscreen] = useState(false);
   const [isPlaying, setIsPlaying] = useState(false);
   const [editingAnnotation, setEditingAnnotation] = useState<Annotation | null>(null);
   const [editorValues, setEditorValues] = useState<AnnotationEditorValues | null>(null);
+  const [isPlaybackExpanded, setIsPlaybackExpanded] = useState(false);
 
   const sortedAnnotations = useMemo(
     () =>
@@ -107,13 +112,34 @@ function VideoDetailPage() {
     sortedAnnotations.find((annotation) => isAnnotationActive(annotation, currentVideoTime))?.id ??
     null;
 
+  const currentPlaybackAnnotation = useMemo(() => {
+    const currentThreshold = currentVideoTime + 0.12;
+    for (let index = sortedAnnotations.length - 1; index >= 0; index -= 1) {
+      const annotation = sortedAnnotations[index];
+      if (!annotation) continue;
+      if (annotation.timestamp_seconds <= currentThreshold) {
+        return { annotation, index };
+      }
+    }
+    return { annotation: null, index: -1 };
+  }, [currentVideoTime, sortedAnnotations]);
+
   useEffect(() => {
-    const syncFullscreenState = () => {
-      setIsFullscreen(document.fullscreenElement === playerFrame.current);
+    if (!isPlaybackExpanded) return undefined;
+
+    const previousOverflow = document.body.style.overflow;
+    const closeOnEscape = (event: KeyboardEvent) => {
+      if (event.key === "Escape") setIsPlaybackExpanded(false);
     };
-    document.addEventListener("fullscreenchange", syncFullscreenState);
-    return () => document.removeEventListener("fullscreenchange", syncFullscreenState);
-  }, []);
+
+    document.body.style.overflow = "hidden";
+    document.addEventListener("keydown", closeOnEscape);
+
+    return () => {
+      document.body.style.overflow = previousOverflow;
+      document.removeEventListener("keydown", closeOnEscape);
+    };
+  }, [isPlaybackExpanded]);
 
   const handleDeleteVideo = () => {
     deleteVideo.mutate(videoId, {
@@ -121,12 +147,37 @@ function VideoDetailPage() {
     });
   };
 
+  useEffect(() => {
+    currentVideoTimeRef.current = currentVideoTime;
+  }, [currentVideoTime]);
+
+  useEffect(() => {
+    durationSecondsRef.current = durationSeconds;
+  }, [durationSeconds]);
+
   const seekTo = (seconds: number, shouldPlay = true) => {
     const element = videoElement.current;
     if (!element) return;
     element.currentTime = seconds;
+    currentVideoTimeRef.current = seconds;
     setCurrentVideoTime(seconds);
     if (shouldPlay) void element.play();
+  };
+
+  const seekByKeyboard = (deltaSeconds: number) => {
+    const element = videoElement.current;
+    if (!element) return;
+    const fallbackDuration = toFiniteTime(element.duration);
+    const maxTime = durationSecondsRef.current > 0 ? durationSecondsRef.current : fallbackDuration;
+    const currentTime = getCurrentPlayerTime(element, currentVideoTimeRef.current);
+    const nextTime =
+      maxTime > 0
+        ? clampRange(currentTime + deltaSeconds, 0, maxTime)
+        : Math.max(currentTime + deltaSeconds, 0);
+    element.currentTime = nextTime;
+    lastPlaybackTimeRef.current = nextTime;
+    currentVideoTimeRef.current = nextTime;
+    setCurrentVideoTime(nextTime);
   };
 
   const clearAnnotationComposer = () => {
@@ -137,6 +188,7 @@ function VideoDetailPage() {
   const beginAnnotationAtCurrentTime = () => {
     const timestamp = getCurrentPlayerTime(videoElement.current, currentVideoTime);
     videoElement.current?.pause();
+    currentVideoTimeRef.current = timestamp;
     setCurrentVideoTime(timestamp);
     setEditingAnnotation(null);
     setEditorValues(getEditorValuesFromTimestamp(timestamp));
@@ -159,12 +211,14 @@ function VideoDetailPage() {
     element.pause();
   };
 
-  const toggleFullscreen = () => {
-    if (document.fullscreenElement === playerFrame.current) {
-      void document.exitFullscreen();
-      return;
-    }
-    void playerFrame.current?.requestFullscreen?.();
+  const toggleExpandedPlayback = () => {
+    const element = videoElement.current;
+    const timestamp = getCurrentPlayerTime(element, currentVideoTime);
+    lastPlaybackTimeRef.current = timestamp;
+    shouldResumePlaybackRef.current = Boolean(element && !element.paused && !element.ended);
+    currentVideoTimeRef.current = timestamp;
+    setCurrentVideoTime(timestamp);
+    setIsPlaybackExpanded((current) => !current);
   };
 
   const updateVideoTiming = () => {
@@ -172,51 +226,165 @@ function VideoDetailPage() {
     if (!element) return;
     const time = toFiniteTime(element.currentTime);
     if (time > 0) lastPlaybackTimeRef.current = time;
+    currentVideoTimeRef.current = time;
     setCurrentVideoTime(time);
   };
 
   const syncVideoMetadata = () => {
     const element = videoElement.current;
     if (!element) return;
-    setDurationSeconds(toFiniteTime(element.duration));
-    setCurrentVideoTime(toFiniteTime(element.currentTime));
+    const duration = toFiniteTime(element.duration);
+    const time = toFiniteTime(element.currentTime);
+    durationSecondsRef.current = duration;
+    currentVideoTimeRef.current = time;
+    setDurationSeconds(duration);
+    setCurrentVideoTime(time);
   };
 
   const restoreVideoTime = () => {
     const element = videoElement.current;
     if (!element) return;
-    setDurationSeconds(toFiniteTime(element.duration));
+    const duration = toFiniteTime(element.duration);
+    durationSecondsRef.current = duration;
+    setDurationSeconds(duration);
     if (lastPlaybackTimeRef.current > 0) {
       element.currentTime = lastPlaybackTimeRef.current;
+      currentVideoTimeRef.current = lastPlaybackTimeRef.current;
       setCurrentVideoTime(lastPlaybackTimeRef.current);
-      return;
+    } else {
+      const time = toFiniteTime(element.currentTime);
+      currentVideoTimeRef.current = time;
+      setCurrentVideoTime(time);
     }
-    setCurrentVideoTime(toFiniteTime(element.currentTime));
+
+    if (shouldResumePlaybackRef.current) {
+      shouldResumePlaybackRef.current = false;
+      void element.play();
+    }
   };
+
+  useEffect(() => {
+    const handlePlayerKeyboardShortcut = (event: KeyboardEvent) => {
+      if (
+        event.defaultPrevented ||
+        event.altKey ||
+        event.ctrlKey ||
+        event.metaKey ||
+        event.shiftKey ||
+        isEditableKeyboardTarget(event.target)
+      ) {
+        return;
+      }
+
+      const isSpaceKey = event.key === " " || event.key === "Spacebar" || event.code === "Space";
+      const isSeekKey = event.key === "ArrowLeft" || event.key === "ArrowRight";
+      if (!isSeekKey && !isSpaceKey) return;
+      if (isSpaceKey && isInteractiveKeyboardTarget(event.target)) return;
+      if (!videoElement.current) return;
+
+      event.preventDefault();
+      if (isSpaceKey) {
+        togglePlayback();
+        return;
+      }
+
+      seekByKeyboard(
+        event.key === "ArrowRight" ? KEYBOARD_SEEK_STEP_SECONDS : -KEYBOARD_SEEK_STEP_SECONDS,
+      );
+    };
+
+    document.addEventListener("keydown", handlePlayerKeyboardShortcut, { capture: true });
+    return () =>
+      document.removeEventListener("keydown", handlePlayerKeyboardShortcut, { capture: true });
+  }, []);
 
   if (isLoading) return <p className="text-[var(--muted)]">{t("common.loading")}</p>;
   if (isError || !video) return <p className="text-[var(--danger)]">{t("videoDetail.notFound")}</p>;
 
+  const renderVideoPlayer = (isExpandedLayout = false) => (
+    <motion.div
+      ref={playerFrame}
+      className={cn(
+        "group relative overflow-hidden rounded-lg border border-[var(--rule)] bg-[#0f0e0c] fullscreen:flex fullscreen:h-screen fullscreen:w-screen fullscreen:items-center fullscreen:justify-center fullscreen:rounded-none fullscreen:border-0",
+        !isExpandedLayout && "flex h-full min-h-0 items-center justify-center",
+        isExpandedLayout && "flex min-h-[22rem] items-center justify-center",
+        isPlaybackExpanded && "h-full min-h-0 rounded-md border-white/10",
+      )}
+      {...surfaceMotion}
+      transition={{ ...surfaceMotion.transition, delay: 0.04 }}
+    >
+      {video.playback_url ? (
+        <>
+          <video
+            ref={videoElement}
+            src={video.playback_url}
+            controls={false}
+            onDurationChange={syncVideoMetadata}
+            onEnded={() => setIsPlaying(false)}
+            onLoadedMetadata={restoreVideoTime}
+            onPause={() => setIsPlaying(false)}
+            onPlay={() => setIsPlaying(true)}
+            onTimeUpdate={updateVideoTiming}
+            onClick={togglePlayback}
+            className={cn(
+              "aspect-video w-full cursor-pointer bg-[#0f0e0c] fullscreen:max-h-screen fullscreen:w-full fullscreen:object-contain",
+              !isExpandedLayout && "max-h-full object-contain",
+              isExpandedLayout && "max-h-full object-contain",
+              isPlaybackExpanded && "h-full min-h-0",
+            )}
+          />
+          <div className="pointer-events-none absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/85 via-black/42 to-transparent px-4 pt-16 pb-4 opacity-100 transition-opacity md:opacity-0 md:group-hover:opacity-100 md:group-focus-within:opacity-100">
+            <VideoControls
+              annotations={sortedAnnotations}
+              currentTime={currentVideoTime}
+              duration={durationSeconds}
+              hoveredAnnotationId={hoveredAnnotationId}
+              isExpanded={isPlaybackExpanded}
+              isPlaying={isPlaying}
+              onExpand={toggleExpandedPlayback}
+              onHoverAnnotation={setHoveredAnnotationId}
+              onSeek={seekTo}
+              onTogglePlayback={togglePlayback}
+              showAnnotationPreview={!isPlaybackExpanded}
+            />
+          </div>
+        </>
+      ) : (
+        <div
+          className={cn(
+            "flex aspect-video w-full items-center justify-center text-sm text-[var(--paper)]",
+            !isExpandedLayout && "h-full min-h-0",
+            isExpandedLayout && "h-full min-h-[22rem]",
+          )}
+        >
+          {t("videoDetail.videoUnavailable")}
+        </div>
+      )}
+    </motion.div>
+  );
+
   return (
     <motion.div
-      className="mx-auto max-w-[96rem] space-y-8"
+      className="mx-auto flex h-full min-h-0 max-w-[96rem] flex-col gap-3 overflow-hidden"
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
       transition={{ duration: 0.24 }}
     >
-      <Link
-        to="/videos"
-        className="inline-flex items-center gap-1 text-sm text-[var(--muted)] hover:text-[var(--ink)]"
-      >
-        <ArrowLeft className="h-4 w-4" />
-        {t("videoDetail.back")}
-      </Link>
-
-      <div className="flex flex-wrap items-end justify-between gap-6 border-b border-[var(--ink)] pb-8">
-        <div>
-          <p className="vi-kicker">{t("videoDetail.kicker")}</p>
-          <h1 className="vi-display mt-3 max-w-4xl text-5xl">{video.title}</h1>
-          <p className="mt-4 max-w-3xl text-sm text-[var(--muted)]">
+      <div className="vi-panel flex shrink-0 items-center justify-between gap-4 px-3 py-2">
+        <div className="flex min-w-0 items-center gap-3">
+          <Link
+            to="/videos"
+            className="vi-icon-button shrink-0"
+            aria-label={t("videoDetail.back")}
+            title={t("videoDetail.back")}
+          >
+            <ArrowLeft className="h-4 w-4" />
+          </Link>
+          <div className="min-w-0">
+            <p className="vi-kicker">{t("videoDetail.kicker")}</p>
+            <h1 className="vi-display mt-0.5 truncate text-2xl">{video.title}</h1>
+          </div>
+          <p className="hidden max-w-xl truncate text-sm text-[var(--muted)] 2xl:block">
             {video.description ?? t("common.noDescription")}
           </p>
         </div>
@@ -231,81 +399,35 @@ function VideoDetailPage() {
         </button>
       </div>
 
-      <div className="grid gap-6 2xl:grid-cols-[minmax(0,1fr)_380px] xl:grid-cols-[minmax(0,1fr)_360px]">
-        <section className="space-y-5">
+      <div className="grid min-h-0 flex-1 grid-rows-[minmax(0,1fr)_minmax(12rem,34vh)] gap-4 2xl:grid-cols-[minmax(0,1fr)_380px] xl:grid-cols-[minmax(0,1fr)_360px] xl:grid-rows-none">
+        <section className="flex min-h-0 flex-col gap-3">
           <motion.dl
-            className="vi-panel grid gap-0 overflow-hidden text-sm sm:grid-cols-3"
+            className="vi-panel grid shrink-0 gap-0 overflow-hidden text-sm sm:grid-cols-3"
             {...surfaceMotion}
           >
             <div>
-              <div className="border-b border-[var(--rule)] p-4 sm:border-r sm:border-b-0">
+              <div className="border-b border-[var(--rule)] px-3 py-2 sm:border-r sm:border-b-0">
                 <dt className="vi-kicker">{t("videoDetail.file")}</dt>
-                <dd className="mt-2 truncate font-medium" title={video.original_filename}>
+                <dd className="mt-1 truncate font-medium" title={video.original_filename}>
                   {video.original_filename}
                 </dd>
               </div>
             </div>
             <div>
-              <div className="border-b border-[var(--rule)] p-4 sm:border-r sm:border-b-0">
+              <div className="border-b border-[var(--rule)] px-3 py-2 sm:border-r sm:border-b-0">
                 <dt className="vi-kicker">{t("videoDetail.size")}</dt>
-                <dd className="vi-mono mt-2 text-xs">{formatBytes(video.size_bytes)}</dd>
+                <dd className="vi-mono mt-1 text-xs">{formatBytes(video.size_bytes)}</dd>
               </div>
             </div>
             <div>
-              <div className="p-4">
+              <div className="px-3 py-2">
                 <dt className="vi-kicker">{t("videoDetail.created")}</dt>
-                <dd className="vi-mono mt-2 text-xs">{formatDate(video.created_at)}</dd>
+                <dd className="vi-mono mt-1 text-xs">{formatDate(video.created_at)}</dd>
               </div>
             </div>
           </motion.dl>
 
-          <motion.div
-            ref={playerFrame}
-            className="group relative overflow-hidden rounded-lg border border-[var(--rule)] bg-[#0f0e0c] fullscreen:flex fullscreen:h-screen fullscreen:w-screen fullscreen:items-center fullscreen:justify-center fullscreen:rounded-none fullscreen:border-0"
-            {...surfaceMotion}
-            transition={{ ...surfaceMotion.transition, delay: 0.04 }}
-          >
-            {video.playback_url ? (
-              <>
-                <video
-                  ref={videoElement}
-                  src={video.playback_url}
-                  controls={false}
-                  onDurationChange={syncVideoMetadata}
-                  onEnded={() => setIsPlaying(false)}
-                  onLoadedMetadata={restoreVideoTime}
-                  onPause={() => setIsPlaying(false)}
-                  onPlay={() => setIsPlaying(true)}
-                  onTimeUpdate={updateVideoTiming}
-                  onClick={togglePlayback}
-                  className="aspect-video w-full cursor-pointer bg-[#0f0e0c] fullscreen:max-h-screen fullscreen:w-full fullscreen:object-contain"
-                />
-                <div className="pointer-events-none absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/85 via-black/42 to-transparent px-4 pt-16 pb-4 opacity-100 transition-opacity md:opacity-0 md:group-hover:opacity-100 md:group-focus-within:opacity-100">
-                  <VideoControls
-                    annotations={sortedAnnotations}
-                    currentTime={currentVideoTime}
-                    duration={durationSeconds}
-                    hoveredAnnotationId={hoveredAnnotationId}
-                    isFullscreen={isFullscreen}
-                    isPlaying={isPlaying}
-                    onFullscreen={toggleFullscreen}
-                    onHoverAnnotation={setHoveredAnnotationId}
-                    onSeek={seekTo}
-                    onTogglePlayback={togglePlayback}
-                  />
-                </div>
-              </>
-            ) : (
-              <div className="flex aspect-video items-center justify-center text-sm text-[var(--paper)]">
-                {t("videoDetail.videoUnavailable")}
-              </div>
-            )}
-          </motion.div>
-
-          <div className="vi-mono text-xs text-[var(--muted)]">
-            {formatDuration(currentVideoTime)} /{" "}
-            {durationSeconds > 0 ? formatDuration(durationSeconds) : "--:--"}
-          </div>
+          <div className="min-h-0 flex-1">{!isPlaybackExpanded && renderVideoPlayer()}</div>
 
           <AnnotationListPanel
             activeAnnotationId={activeAnnotationId}
@@ -316,7 +438,7 @@ function VideoDetailPage() {
           />
         </section>
 
-        <aside className="xl:sticky xl:top-6 xl:self-start">
+        <aside className="min-h-0 xl:self-stretch">
           <AnnotationEditorPanel
             currentTime={currentVideoTime}
             editing={editingAnnotation}
@@ -329,6 +451,20 @@ function VideoDetailPage() {
           />
         </aside>
       </div>
+
+      {isPlaybackExpanded && (
+        <section className="fixed inset-0 z-50 grid h-screen grid-rows-[minmax(0,1fr)_minmax(14rem,38vh)] gap-4 bg-[#11100e] p-3 md:p-4 lg:grid-cols-[minmax(0,1fr)_360px] lg:grid-rows-none xl:grid-cols-[minmax(0,1fr)_400px]">
+          <div className="h-full min-h-0">{renderVideoPlayer(true)}</div>
+          <LiveAnnotationPanel
+            annotation={currentPlaybackAnnotation.annotation}
+            annotationIndex={currentPlaybackAnnotation.index}
+            currentTime={currentVideoTime}
+            isExpanded={isPlaybackExpanded}
+            onSeek={seekTo}
+            totalCount={sortedAnnotations.length}
+          />
+        </section>
+      )}
     </motion.div>
   );
 }
@@ -338,23 +474,25 @@ function VideoControls({
   currentTime,
   duration,
   hoveredAnnotationId,
-  isFullscreen,
+  isExpanded,
   isPlaying,
-  onFullscreen,
+  onExpand,
   onHoverAnnotation,
   onSeek,
   onTogglePlayback,
+  showAnnotationPreview,
 }: {
   annotations: Annotation[];
   currentTime: number;
   duration: number;
   hoveredAnnotationId: string | null;
-  isFullscreen: boolean;
+  isExpanded: boolean;
   isPlaying: boolean;
-  onFullscreen: () => void;
+  onExpand: () => void;
   onHoverAnnotation: (annotationId: string | null) => void;
   onSeek: (seconds: number) => void;
   onTogglePlayback: () => void;
+  showAnnotationPreview: boolean;
 }) {
   const { t } = useTranslation();
 
@@ -367,6 +505,7 @@ function VideoControls({
         hoveredAnnotationId={hoveredAnnotationId}
         onHoverAnnotation={onHoverAnnotation}
         onSeek={onSeek}
+        showAnnotationPreview={showAnnotationPreview}
       />
       <div className="flex items-center justify-between gap-3">
         <div className="flex min-w-0 items-center gap-3">
@@ -390,20 +529,20 @@ function VideoControls({
           </span>
           <button
             type="button"
-            onClick={onFullscreen}
+            onClick={onExpand}
             className="flex h-9 w-9 items-center justify-center rounded-full bg-white/12 text-[var(--paper)] transition-colors hover:bg-white/22"
             aria-label={
-              isFullscreen
+              isExpanded
                 ? t("videoDetail.player.exitFullscreen")
                 : t("videoDetail.player.fullscreen")
             }
             title={
-              isFullscreen
+              isExpanded
                 ? t("videoDetail.player.exitFullscreen")
                 : t("videoDetail.player.fullscreen")
             }
           >
-            {isFullscreen ? <Minimize2 className="h-4 w-4" /> : <Maximize2 className="h-4 w-4" />}
+            {isExpanded ? <Minimize2 className="h-4 w-4" /> : <Maximize2 className="h-4 w-4" />}
           </button>
         </div>
       </div>
@@ -418,6 +557,7 @@ function AnnotationScrubber({
   hoveredAnnotationId,
   onHoverAnnotation,
   onSeek,
+  showAnnotationPreview,
 }: {
   annotations: Annotation[];
   currentTime: number;
@@ -425,6 +565,7 @@ function AnnotationScrubber({
   hoveredAnnotationId: string | null;
   onHoverAnnotation: (annotationId: string | null) => void;
   onSeek: (seconds: number) => void;
+  showAnnotationPreview: boolean;
 }) {
   const { t } = useTranslation();
   const hasDuration = duration > 0;
@@ -442,7 +583,8 @@ function AnnotationScrubber({
       type="button"
       onClick={handleSeek}
       disabled={!hasDuration}
-      className="relative block h-7 w-full cursor-pointer rounded-full py-2 disabled:cursor-not-allowed"
+      className="relative block h-[1.4rem] w-full cursor-pointer rounded-full py-[0.45rem] disabled:cursor-not-allowed"
+      data-video-scrubber="true"
       aria-label={t("videoDetail.annotations.timelineMask")}
     >
       <span className="absolute inset-x-0 top-1/2 h-1 -translate-y-1/2 rounded-full bg-white/22" />
@@ -460,7 +602,7 @@ function AnnotationScrubber({
             <motion.span
               key={annotation.id}
               className={cn(
-                "absolute top-1/2 h-3.5 origin-center -translate-y-1/2 rounded-full opacity-95 ring-2 ring-black/30",
+                "absolute top-1/2 h-[0.7rem] origin-center -translate-y-1/2 rounded-full opacity-95 ring-2 ring-black/30",
               )}
               animate={{ scaleY: hoveredAnnotationId === annotation.id ? 1.25 : 1 }}
               transition={{ duration: 0.14, ease: "easeOut" }}
@@ -476,10 +618,10 @@ function AnnotationScrubber({
               title={`${formatDuration(annotation.timestamp_seconds)} ${annotation.title}`}
             >
               <AnimatePresence>
-                {hoveredAnnotationId === annotation.id && (
+                {showAnnotationPreview && hoveredAnnotationId === annotation.id && (
                   <motion.span
                     className={cn(
-                      "pointer-events-none absolute bottom-5 z-20 w-56 rounded-md border border-white/12 bg-[#171411]/95 px-2.5 py-2 text-left text-[var(--paper)] shadow-xl",
+                      "pointer-events-none absolute bottom-4 z-20 w-56 rounded-md border border-white/12 bg-[#171411]/95 px-2.5 py-2 text-left text-[var(--paper)] shadow-xl",
                       previewPositionClass,
                     )}
                     initial={{ opacity: 0, y: 5, scale: 0.96 }}
@@ -503,11 +645,158 @@ function AnnotationScrubber({
           );
         })}
       <motion.span
-        className="absolute top-1/2 h-4 w-4 -translate-x-1/2 -translate-y-1/2 rounded-full border border-black/25 bg-[var(--paper)] shadow"
+        className="absolute top-1/2 h-[0.8rem] w-[0.8rem] -translate-x-1/2 -translate-y-1/2 rounded-full border border-black/25 bg-[var(--paper)] shadow"
         animate={{ left: `${progressPercent}%` }}
         transition={{ duration: 0.16, ease: "easeOut" }}
       />
     </button>
+  );
+}
+
+function LiveAnnotationPanel({
+  annotation,
+  annotationIndex,
+  currentTime,
+  isExpanded,
+  onSeek,
+  totalCount,
+}: {
+  annotation: Annotation | null;
+  annotationIndex: number;
+  currentTime: number;
+  isExpanded: boolean;
+  onSeek: (seconds: number) => void;
+  totalCount: number;
+}) {
+  const { t } = useTranslation();
+  const hasAnnotation = annotation !== null;
+
+  return (
+    <motion.aside
+      className={cn(
+        "vi-panel flex min-h-[24rem] flex-col overflow-hidden",
+        isExpanded && "h-full min-h-0 border-white/10 bg-[#faf7f2]",
+      )}
+      {...surfaceMotion}
+    >
+      <div className="flex items-center justify-between gap-3 border-b border-[var(--rule)] p-4">
+        <div>
+          <p className="vi-kicker">{t("videoDetail.preview.kicker")}</p>
+          <h2 className="vi-display mt-1 text-2xl">{t("videoDetail.preview.title")}</h2>
+        </div>
+        <span className="vi-mono text-xs text-[var(--muted)]">
+          {hasAnnotation ? annotationIndex + 1 : 0}/{totalCount}
+        </span>
+      </div>
+
+      <div className="min-h-0 flex-1 overflow-y-auto p-4">
+        {!annotation ? (
+          <div className="flex h-full flex-col items-center justify-center rounded-lg border border-dashed border-[var(--rule-strong)] bg-[var(--paper)] p-6 text-center text-sm text-[var(--muted)]">
+            <MessageSquare className="mb-3 h-5 w-5" />
+            {t("videoDetail.preview.empty")}
+          </div>
+        ) : (
+          <PlaybackAnnotationDetail
+            key={annotation.id}
+            annotation={annotation}
+            currentTime={currentTime}
+            onSeek={onSeek}
+          />
+        )}
+      </div>
+    </motion.aside>
+  );
+}
+
+function PlaybackAnnotationDetail({
+  annotation,
+  currentTime,
+  onSeek,
+}: {
+  annotation: Annotation;
+  currentTime: number;
+  onSeek: (seconds: number) => void;
+}) {
+  const { t } = useTranslation();
+  const isActive = isAnnotationActive(annotation, currentTime);
+  const customDataJson = JSON.stringify(annotation.custom_data, null, 2);
+  const hasCustomData = Object.keys(annotation.custom_data).length > 0;
+
+  return (
+    <motion.div
+      className="h-full"
+      initial={{ opacity: 0, y: 12 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.2, ease: "easeOut" }}
+    >
+      <div className="flex items-start justify-between gap-3 border-b border-[var(--rule)] pb-4">
+        <button
+          type="button"
+          onClick={() => onSeek(annotation.timestamp_seconds)}
+          className="inline-flex min-h-9 items-center gap-2 rounded-md border border-[var(--rule)] bg-[var(--paper)] px-3 text-sm font-semibold text-[var(--ink)] hover:border-[var(--ink)]"
+        >
+          <Clock className="h-4 w-4" />
+          {formatDuration(annotation.timestamp_seconds)}
+        </button>
+        <div className="flex flex-wrap justify-end gap-2">
+          <span className="vi-kicker rounded border border-[var(--rule)] px-2 py-1">
+            {translateKind(t, annotation.kind)}
+          </span>
+          {isActive && (
+            <span className="vi-kicker rounded bg-[rgba(192,81,47,0.12)] px-2 py-1 text-[var(--accent)]">
+              {t("videoDetail.annotations.activeNow")}
+            </span>
+          )}
+        </div>
+      </div>
+
+      <div className="py-5" style={{ borderLeft: `4px solid ${annotation.color}` }}>
+        <div className="pl-4">
+          <h3 className="vi-display text-3xl leading-tight">
+            {annotation.title || t("videoDetail.form.newTitle")}
+          </h3>
+          <p className="mt-4 whitespace-pre-wrap text-base leading-7 text-[var(--ink)]">
+            {annotation.body}
+          </p>
+        </div>
+      </div>
+
+      <dl className="grid gap-0 overflow-hidden rounded-lg border border-[var(--rule)] bg-[var(--paper)] text-sm sm:grid-cols-2">
+        <div className="border-b border-[var(--rule)] p-3 sm:border-r">
+          <dt className="vi-kicker">{t("videoDetail.form.timeSeconds")}</dt>
+          <dd className="vi-mono mt-2 text-xs">{formatDuration(annotation.timestamp_seconds)}</dd>
+        </div>
+        <div className="border-b border-[var(--rule)] p-3">
+          <dt className="vi-kicker">{t("videoDetail.form.durationSeconds")}</dt>
+          <dd className="vi-mono mt-2 text-xs">
+            {formatDuration(getAnnotationDuration(annotation))}
+          </dd>
+        </div>
+        <div className="border-b border-[var(--rule)] p-3 sm:border-r sm:border-b-0">
+          <dt className="vi-kicker">{t("videoDetail.form.type")}</dt>
+          <dd className="mt-2 text-sm font-semibold">{translateKind(t, annotation.kind)}</dd>
+        </div>
+        <div className="p-3">
+          <dt className="vi-kicker">{t("videoDetail.form.color")}</dt>
+          <dd className="mt-2 flex items-center gap-2">
+            <span
+              className="h-4 w-4 rounded-full border border-[var(--rule-strong)]"
+              style={{ backgroundColor: annotation.color }}
+            />
+            <span className="vi-mono text-xs">{annotation.color}</span>
+          </dd>
+        </div>
+      </dl>
+
+      {hasCustomData && (
+        <div className="mt-4 border-t border-[var(--rule)] pt-4">
+          <p className="vi-kicker">{t("videoDetail.form.customJson")}</p>
+          <pre className="vi-mono mt-2 max-h-40 overflow-auto rounded-lg bg-[var(--paper)] p-3 text-xs leading-relaxed text-[var(--ink)]">
+            {customDataJson}
+          </pre>
+        </div>
+      )}
+    </motion.div>
   );
 }
 
@@ -533,13 +822,16 @@ function AnnotationEditorPanel({
   const { t } = useTranslation();
 
   return (
-    <motion.section className="vi-panel overflow-hidden" {...surfaceMotion}>
-      <div className="flex items-center justify-between gap-3 border-b border-[var(--rule)] p-4">
-        <div>
+    <motion.section
+      className="vi-panel flex h-full min-h-0 flex-col overflow-hidden"
+      {...surfaceMotion}
+    >
+      <div className="flex shrink-0 items-center justify-between gap-3 border-b border-[var(--rule)] p-3">
+        <div className="min-w-0">
           <p className="vi-kicker">{t("videoDetail.form.kicker")}</p>
-          <h2 className="vi-display mt-1 text-2xl">{t("videoDetail.form.editorTitle")}</h2>
+          <h2 className="vi-display mt-1 truncate text-xl">{t("videoDetail.form.editorTitle")}</h2>
         </div>
-        <button type="button" onClick={onAdd} className="vi-button-primary">
+        <button type="button" onClick={onAdd} className="vi-button-primary shrink-0 px-3 py-2">
           <Plus className="h-4 w-4" />
           {t("videoDetail.annotations.addAtCurrentTime")}
         </button>
@@ -558,7 +850,7 @@ function AnnotationEditorPanel({
       )}
 
       {!values && (
-        <div className="p-5">
+        <div className="min-h-0 flex-1 p-4">
           <p className="text-sm text-[var(--muted)]">{t("videoDetail.annotations.clickToEdit")}</p>
         </div>
       )}
@@ -591,8 +883,11 @@ function AnnotationListPanel({
   }, [activeAnnotationId]);
 
   return (
-    <motion.section className="vi-panel flex h-[18rem] flex-col overflow-hidden" {...surfaceMotion}>
-      <div className="flex items-center justify-between gap-3 border-b border-[var(--rule)] p-4">
+    <motion.section
+      className="vi-panel flex h-[18rem] shrink-0 flex-col overflow-hidden"
+      {...surfaceMotion}
+    >
+      <div className="flex shrink-0 items-center justify-between gap-3 border-b border-[var(--rule)] p-4">
         <div>
           <p className="vi-kicker">{t("videoDetail.annotations.liveKicker")}</p>
           <h2 className="vi-display mt-1 text-2xl">{t("videoDetail.annotations.title")}</h2>
@@ -781,7 +1076,7 @@ function AnnotationComposer({
     <form
       ref={formRef}
       onSubmit={submit}
-      className="border-b border-[var(--rule)] bg-[var(--paper)] p-4"
+      className="min-h-0 flex-1 overflow-y-auto border-b border-[var(--rule)] bg-[var(--paper)] p-4"
     >
       <div className="flex items-start justify-between gap-3">
         <div>
@@ -978,6 +1273,20 @@ function getEditorValuesFromTimestamp(timestamp: number): AnnotationEditorValues
 function getCurrentPlayerTime(element: HTMLVideoElement | null, fallback: number) {
   if (!element) return fallback;
   return toFiniteTime(element.currentTime);
+}
+
+function isEditableKeyboardTarget(target: EventTarget | null) {
+  if (!(target instanceof HTMLElement)) return false;
+  if (target.isContentEditable) return true;
+  const tagName = target.tagName.toLowerCase();
+  return tagName === "input" || tagName === "textarea" || tagName === "select";
+}
+
+function isInteractiveKeyboardTarget(target: EventTarget | null) {
+  if (!(target instanceof HTMLElement)) return false;
+  if (target.closest("[data-video-scrubber='true']")) return false;
+  const interactiveElement = target.closest("a,button,summary,[role='button']");
+  return interactiveElement !== null;
 }
 
 function toFiniteTime(value: number) {
