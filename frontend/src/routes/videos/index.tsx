@@ -22,6 +22,8 @@ function VideosPage() {
   const [editing, setEditing] = useState<Video | null>(null);
   const { data, isLoading } = useVideos(page, 20);
   const deleteVideo = useDeleteVideo();
+  const videos = Array.isArray(data) ? data : data?.items ?? [];
+  const totalVideos = Array.isArray(data) ? data.length : data?.total ?? 0;
 
   return (
     <div className="mx-auto max-w-6xl space-y-8">
@@ -71,7 +73,7 @@ function VideosPage() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-[var(--rule)]">
-                {data.items.map((video) => (
+                {videos.map((video) => (
                   <tr key={video.id} className="hover:bg-[rgba(192,81,47,0.04)]">
                     <td className="px-5 py-4">
                       <Link
@@ -120,7 +122,7 @@ function VideosPage() {
                     </td>
                   </tr>
                 ))}
-                {data.items.length === 0 && (
+                {videos.length === 0 && (
                   <tr>
                     <td className="px-5 py-12 text-center text-sm text-[var(--muted)]" colSpan={4}>
                       {t("videos.empty")}
@@ -133,7 +135,7 @@ function VideosPage() {
 
           <div className="flex items-center justify-between">
             <p className="vi-mono text-xs text-[var(--muted)]">
-              {t("videos.totalCount", { count: data.total })}
+              {t("videos.totalCount", { count: totalVideos })}
             </p>
             <div className="flex gap-2">
               <button
@@ -146,7 +148,7 @@ function VideosPage() {
               </button>
               <button
                 type="button"
-                disabled={page * 20 >= data.total}
+                disabled={page * 20 >= totalVideos}
                 onClick={() => setPage((value) => value + 1)}
                 className="vi-button-secondary min-h-0 px-3 py-1 text-sm disabled:opacity-50"
               >
