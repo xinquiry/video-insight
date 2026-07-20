@@ -24,7 +24,7 @@ function DashboardPage() {
 
   return (
     <div className="mx-auto max-w-6xl space-y-10">
-      <div className="flex flex-wrap items-end justify-between gap-6 border-b border-[var(--ink)] pb-8">
+      <div className="flex flex-wrap items-end justify-between gap-6 pb-8">
         <div>
           <p className="vi-kicker">{t("dashboard.kicker")}</p>
           <h1 className="vi-display mt-3 max-w-3xl text-5xl">
@@ -62,7 +62,7 @@ function DashboardPage() {
 
       {videos.length > 0 && (
         <div>
-          <div className="mb-4 flex items-baseline justify-between border-b border-[var(--ink)] pb-3">
+          <div className="mb-4 flex items-baseline justify-between pb-3">
             <h2 className="vi-display text-2xl">{t("dashboard.recent.title")}</h2>
             <span className="vi-mono text-xs text-[var(--muted)]">
               {t("dashboard.recent.latest")}
