@@ -67,6 +67,8 @@ type AnnotationEditorValues = {
   custom_data: string;
 };
 
+type FullscreenTab = "preview" | "edit";
+
 const surfaceMotion = {
   initial: { opacity: 0, y: 14 },
   animate: { opacity: 1, y: 0 },
@@ -80,6 +82,7 @@ function VideoDetailPage() {
   const { videoId } = Route.useParams();
   const navigate = useNavigate();
   const playerFrame = useRef<HTMLDivElement | null>(null);
+  const fullscreenContainer = useRef<HTMLDivElement | null>(null);
   const videoElement = useRef<HTMLVideoElement | null>(null);
   const annotationForm = useRef<HTMLFormElement | null>(null);
   const lastPlaybackTimeRef = useRef(0);
@@ -96,6 +99,7 @@ function VideoDetailPage() {
   const [editingAnnotation, setEditingAnnotation] = useState<Annotation | null>(null);
   const [editorValues, setEditorValues] = useState<AnnotationEditorValues | null>(null);
   const [isPlaybackExpanded, setIsPlaybackExpanded] = useState(false);
+  const [fullscreenTab, setFullscreenTab] = useState<FullscreenTab>("preview");
 
   const sortedAnnotations = useMemo(
     () =>
@@ -129,7 +133,9 @@ function VideoDetailPage() {
 
     const previousOverflow = document.body.style.overflow;
     const closeOnEscape = (event: KeyboardEvent) => {
-      if (event.key === "Escape") setIsPlaybackExpanded(false);
+      if (event.key !== "Escape") return;
+      if (isFullscreenActive()) void exitFullscreen();
+      setIsPlaybackExpanded(false);
     };
 
     document.body.style.overflow = "hidden";
@@ -140,6 +146,22 @@ function VideoDetailPage() {
       document.removeEventListener("keydown", closeOnEscape);
     };
   }, [isPlaybackExpanded]);
+
+  useEffect(() => {
+    const syncFullscreenState = () => {
+      if (isFullscreenActive()) return;
+      setIsPlaybackExpanded(false);
+      setFullscreenTab("preview");
+    };
+
+    document.addEventListener("fullscreenchange", syncFullscreenState);
+    document.addEventListener("webkitfullscreenchange", syncFullscreenState);
+
+    return () => {
+      document.removeEventListener("fullscreenchange", syncFullscreenState);
+      document.removeEventListener("webkitfullscreenchange", syncFullscreenState);
+    };
+  }, []);
 
   const handleDeleteVideo = () => {
     deleteVideo.mutate(videoId, {
@@ -212,13 +234,26 @@ function VideoDetailPage() {
   };
 
   const toggleExpandedPlayback = () => {
+    if (isPlaybackExpanded || isFullscreenActive()) {
+      if (isFullscreenActive()) void exitFullscreen();
+      setIsPlaybackExpanded(false);
+      return;
+    }
+
     const element = videoElement.current;
     const timestamp = getCurrentPlayerTime(element, currentVideoTime);
     lastPlaybackTimeRef.current = timestamp;
     shouldResumePlaybackRef.current = Boolean(element && !element.paused && !element.ended);
     currentVideoTimeRef.current = timestamp;
     setCurrentVideoTime(timestamp);
-    setIsPlaybackExpanded((current) => !current);
+    setFullscreenTab("preview");
+
+    // Fullscreen must be requested synchronously within the user gesture, so we
+    // target the always-mounted page root rather than the not-yet-rendered overlay.
+    // If the browser rejects the request, the in-page overlay still opens as a fallback.
+    const root = fullscreenContainer.current;
+    if (root) requestFullscreen(root).catch(() => undefined);
+    setIsPlaybackExpanded(true);
   };
 
   const updateVideoTiming = () => {
@@ -305,7 +340,7 @@ function VideoDetailPage() {
     <motion.div
       ref={playerFrame}
       className={cn(
-        "group relative overflow-hidden rounded-lg border border-[var(--rule)] bg-[#0f0e0c] fullscreen:flex fullscreen:h-screen fullscreen:w-screen fullscreen:items-center fullscreen:justify-center fullscreen:rounded-none fullscreen:border-0",
+        "group relative overflow-hidden rounded-lg border border-[var(--rule)] bg-[#0f0e0c]",
         !isExpandedLayout && "flex h-full min-h-0 items-center justify-center",
         isExpandedLayout && "flex min-h-[22rem] items-center justify-center",
         isPlaybackExpanded && "h-full min-h-0 rounded-md border-white/10",
@@ -327,7 +362,7 @@ function VideoDetailPage() {
             onTimeUpdate={updateVideoTiming}
             onClick={togglePlayback}
             className={cn(
-              "aspect-video w-full cursor-pointer bg-[#0f0e0c] fullscreen:max-h-screen fullscreen:w-full fullscreen:object-contain",
+              "aspect-video w-full cursor-pointer bg-[#0f0e0c]",
               !isExpandedLayout && "max-h-full object-contain",
               isExpandedLayout && "max-h-full object-contain",
               isPlaybackExpanded && "h-full min-h-0",
@@ -365,6 +400,7 @@ function VideoDetailPage() {
 
   return (
     <motion.div
+      ref={fullscreenContainer}
       className="mx-auto flex h-full min-h-0 max-w-[96rem] flex-col gap-3 overflow-hidden"
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
@@ -439,29 +475,40 @@ function VideoDetailPage() {
         </section>
 
         <aside className="min-h-0 xl:self-stretch">
-          <AnnotationEditorPanel
-            currentTime={currentVideoTime}
-            editing={editingAnnotation}
-            formRef={annotationForm}
-            onAdd={beginAnnotationAtCurrentTime}
-            onCancel={clearAnnotationComposer}
-            setEditorValues={setEditorValues}
-            values={editorValues}
-            videoId={videoId}
-          />
+          {!isPlaybackExpanded && (
+            <AnnotationEditorPanel
+              currentTime={currentVideoTime}
+              editing={editingAnnotation}
+              formRef={annotationForm}
+              onAdd={beginAnnotationAtCurrentTime}
+              onCancel={clearAnnotationComposer}
+              setEditorValues={setEditorValues}
+              values={editorValues}
+              videoId={videoId}
+            />
+          )}
         </aside>
       </div>
 
       {isPlaybackExpanded && (
         <section className="fixed inset-0 z-50 grid h-screen grid-rows-[minmax(0,1fr)_minmax(14rem,38vh)] gap-4 bg-[#11100e] p-3 md:p-4 lg:grid-cols-[minmax(0,1fr)_360px] lg:grid-rows-none xl:grid-cols-[minmax(0,1fr)_400px]">
           <div className="h-full min-h-0">{renderVideoPlayer(true)}</div>
-          <LiveAnnotationPanel
+          <FullscreenSidePanel
+            activeTab={fullscreenTab}
             annotation={currentPlaybackAnnotation.annotation}
             annotationIndex={currentPlaybackAnnotation.index}
             currentTime={currentVideoTime}
-            isExpanded={isPlaybackExpanded}
+            editing={editingAnnotation}
+            formRef={annotationForm}
+            onAdd={beginAnnotationAtCurrentTime}
+            onCancel={clearAnnotationComposer}
+            onEdit={startEditingAnnotation}
             onSeek={seekTo}
+            onTabChange={setFullscreenTab}
+            setEditorValues={setEditorValues}
             totalCount={sortedAnnotations.length}
+            values={editorValues}
+            videoId={videoId}
           />
         </section>
       )}
@@ -653,30 +700,55 @@ function AnnotationScrubber({
   );
 }
 
-function LiveAnnotationPanel({
+function FullscreenSidePanel({
+  activeTab,
   annotation,
   annotationIndex,
   currentTime,
-  isExpanded,
+  editing,
+  formRef,
+  onAdd,
+  onCancel,
+  onEdit,
   onSeek,
+  onTabChange,
+  setEditorValues,
   totalCount,
+  values,
+  videoId,
 }: {
+  activeTab: FullscreenTab;
   annotation: Annotation | null;
   annotationIndex: number;
   currentTime: number;
-  isExpanded: boolean;
+  editing: Annotation | null;
+  formRef: RefObject<HTMLFormElement | null>;
+  onAdd: () => void;
+  onCancel: () => void;
+  onEdit: (annotation: Annotation) => void;
   onSeek: (seconds: number) => void;
+  onTabChange: (tab: FullscreenTab) => void;
+  setEditorValues: (values: AnnotationEditorValues | null) => void;
   totalCount: number;
+  values: AnnotationEditorValues | null;
+  videoId: string;
 }) {
   const { t } = useTranslation();
   const hasAnnotation = annotation !== null;
 
+  const handleEditAnnotation = (target: Annotation) => {
+    onEdit(target);
+    onTabChange("edit");
+  };
+
+  const handleAddAnnotation = () => {
+    onAdd();
+    onTabChange("edit");
+  };
+
   return (
     <motion.aside
-      className={cn(
-        "vi-panel flex min-h-[24rem] flex-col overflow-hidden",
-        isExpanded && "h-full min-h-0 border-white/10 bg-[#faf7f2]",
-      )}
+      className="vi-panel flex h-full min-h-0 flex-col overflow-hidden border-white/10 bg-[#faf7f2]"
       {...surfaceMotion}
     >
       <div className="flex items-center justify-between gap-3 border-b border-[var(--rule)] p-4">
@@ -689,18 +761,51 @@ function LiveAnnotationPanel({
         </span>
       </div>
 
+      <div className="flex shrink-0 gap-1 border-b border-[var(--rule)] p-2">
+        {(["preview", "edit"] as const).map((tab) => (
+          <button
+            key={tab}
+            type="button"
+            onClick={() => onTabChange(tab)}
+            className={cn(
+              "flex-1 rounded-md px-3 py-2 text-sm font-semibold transition-colors",
+              activeTab === tab
+                ? "bg-[var(--ink)] text-[var(--paper)]"
+                : "text-[var(--muted)] hover:bg-[var(--rule-soft)]",
+            )}
+            aria-pressed={activeTab === tab}
+          >
+            {t(`videoDetail.player.tabs.${tab}`)}
+          </button>
+        ))}
+      </div>
+
       <div className="min-h-0 flex-1 overflow-y-auto p-4">
-        {!annotation ? (
-          <div className="flex h-full flex-col items-center justify-center rounded-lg border border-dashed border-[var(--rule-strong)] bg-[var(--paper)] p-6 text-center text-sm text-[var(--muted)]">
-            <MessageSquare className="mb-3 h-5 w-5" />
-            {t("videoDetail.preview.empty")}
-          </div>
+        {activeTab === "preview" ? (
+          !annotation ? (
+            <div className="flex h-full flex-col items-center justify-center rounded-lg border border-dashed border-[var(--rule-strong)] bg-[var(--paper)] p-6 text-center text-sm text-[var(--muted)]">
+              <MessageSquare className="mb-3 h-5 w-5" />
+              {t("videoDetail.preview.empty")}
+            </div>
+          ) : (
+            <PlaybackAnnotationDetail
+              key={annotation.id}
+              annotation={annotation}
+              currentTime={currentTime}
+              onEdit={handleEditAnnotation}
+              onSeek={onSeek}
+            />
+          )
         ) : (
-          <PlaybackAnnotationDetail
-            key={annotation.id}
-            annotation={annotation}
+          <FullscreenEditTab
             currentTime={currentTime}
-            onSeek={onSeek}
+            editing={editing}
+            formRef={formRef}
+            onAdd={handleAddAnnotation}
+            onCancel={onCancel}
+            setEditorValues={setEditorValues}
+            values={values}
+            videoId={videoId}
           />
         )}
       </div>
@@ -708,13 +813,61 @@ function LiveAnnotationPanel({
   );
 }
 
+function FullscreenEditTab({
+  currentTime,
+  editing,
+  formRef,
+  onAdd,
+  onCancel,
+  setEditorValues,
+  values,
+  videoId,
+}: {
+  currentTime: number;
+  editing: Annotation | null;
+  formRef: RefObject<HTMLFormElement | null>;
+  onAdd: () => void;
+  onCancel: () => void;
+  setEditorValues: (values: AnnotationEditorValues | null) => void;
+  values: AnnotationEditorValues | null;
+  videoId: string;
+}) {
+  const { t } = useTranslation();
+
+  return (
+    <div className="flex h-full min-h-0 flex-col gap-3">
+      <button type="button" onClick={onAdd} className="vi-button-primary shrink-0 px-3 py-2">
+        <Plus className="h-4 w-4" />
+        {t("videoDetail.annotations.addAtCurrentTime")}
+      </button>
+      {values ? (
+        <div className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-lg border border-[var(--rule)]">
+          <AnnotationComposer
+            currentTime={currentTime}
+            editing={editing}
+            formRef={formRef}
+            onCancel={onCancel}
+            onChange={setEditorValues}
+            values={values}
+            videoId={videoId}
+          />
+        </div>
+      ) : (
+        <p className="text-sm text-[var(--muted)]">{t("videoDetail.annotations.clickToEdit")}</p>
+      )}
+    </div>
+  );
+}
+
 function PlaybackAnnotationDetail({
   annotation,
   currentTime,
+  onEdit,
   onSeek,
 }: {
   annotation: Annotation;
   currentTime: number;
+  onEdit: (annotation: Annotation) => void;
   onSeek: (seconds: number) => void;
 }) {
   const { t } = useTranslation();
@@ -730,14 +883,25 @@ function PlaybackAnnotationDetail({
       transition={{ duration: 0.2, ease: "easeOut" }}
     >
       <div className="flex items-start justify-between gap-3 border-b border-[var(--rule)] pb-4">
-        <button
-          type="button"
-          onClick={() => onSeek(annotation.timestamp_seconds)}
-          className="inline-flex min-h-9 items-center gap-2 rounded-md border border-[var(--rule)] bg-[var(--paper)] px-3 text-sm font-semibold text-[var(--ink)] hover:border-[var(--ink)]"
-        >
-          <Clock className="h-4 w-4" />
-          {formatDuration(annotation.timestamp_seconds)}
-        </button>
+        <div className="flex items-center gap-2">
+          <button
+            type="button"
+            onClick={() => onSeek(annotation.timestamp_seconds)}
+            className="inline-flex min-h-9 items-center gap-2 rounded-md border border-[var(--rule)] bg-[var(--paper)] px-3 text-sm font-semibold text-[var(--ink)] hover:border-[var(--ink)]"
+          >
+            <Clock className="h-4 w-4" />
+            {formatDuration(annotation.timestamp_seconds)}
+          </button>
+          <button
+            type="button"
+            onClick={() => onEdit(annotation)}
+            className="vi-icon-button h-9 min-h-9 w-9"
+            aria-label={t("videoDetail.player.editThis")}
+            title={t("videoDetail.player.editThis")}
+          >
+            <Edit2 className="h-4 w-4" />
+          </button>
+        </div>
         <div className="flex flex-wrap justify-end gap-2">
           <span className="vi-kicker rounded border border-[var(--rule)] px-2 py-1">
             {translateKind(t, annotation.kind)}
@@ -1300,4 +1464,32 @@ function toPositiveDuration(value: number) {
 function clampRange(value: number, min: number, max: number) {
   if (!Number.isFinite(value)) return min;
   return Math.min(Math.max(value, min), max);
+}
+
+type FullscreenCapableElement = HTMLElement & {
+  webkitRequestFullscreen?: () => void;
+};
+
+type FullscreenCapableDocument = Document & {
+  webkitFullscreenElement?: Element | null;
+  webkitExitFullscreen?: () => void;
+};
+
+function isFullscreenActive() {
+  const doc = document as FullscreenCapableDocument;
+  return Boolean(doc.fullscreenElement ?? doc.webkitFullscreenElement);
+}
+
+function requestFullscreen(node: HTMLElement) {
+  const element = node as FullscreenCapableElement;
+  if (element.requestFullscreen) return element.requestFullscreen();
+  element.webkitRequestFullscreen?.();
+  return Promise.resolve();
+}
+
+function exitFullscreen() {
+  const doc = document as FullscreenCapableDocument;
+  if (doc.exitFullscreen) return doc.exitFullscreen();
+  doc.webkitExitFullscreen?.();
+  return Promise.resolve();
 }

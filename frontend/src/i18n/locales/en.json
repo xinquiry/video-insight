@@ -136,8 +136,13 @@
     "player": {
       "play": "Play",
       "pause": "Pause",
-      "fullscreen": "Expand",
-      "exitFullscreen": "Collapse"
+      "fullscreen": "Fullscreen",
+      "exitFullscreen": "Exit fullscreen",
+      "editThis": "Edit this annotation",
+      "tabs": {
+        "preview": "Preview",
+        "edit": "Edit"
+      }
     },
     "form": {
       "kicker": "Studio note",

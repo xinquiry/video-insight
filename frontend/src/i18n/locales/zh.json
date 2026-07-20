@@ -136,8 +136,13 @@
     "player": {
       "play": "播放",
       "pause": "暂停",
-      "fullscreen": "放大",
-      "exitFullscreen": "收起"
+      "fullscreen": "全屏",
+      "exitFullscreen": "退出全屏",
+      "editThis": "编辑此批注",
+      "tabs": {
+        "preview": "预览",
+        "edit": "编辑"
+      }
     },
     "form": {
       "kicker": "工作室笔记",
