@@ -1211,7 +1211,7 @@ function AnnotationComposer({
     }
 
     const payload: AnnotationFormValues = {
-      timestamp_seconds: toFiniteTime(values.timestamp_seconds),
+      timestamp_seconds: toRoundedTime(values.timestamp_seconds),
       duration_seconds: toPositiveDuration(Number(values.duration_seconds)),
       position_x: null,
       position_y: null,
@@ -1288,7 +1288,7 @@ function AnnotationComposer({
               value={values.timestamp_seconds}
               onChange={(event) =>
                 updateValues({
-                  timestamp_seconds: toFiniteTime(Number(event.target.value)),
+                  timestamp_seconds: toRoundedTime(Number(event.target.value)),
                 })
               }
               className="vi-input vi-mono mt-1 text-sm normal-case"
@@ -1314,7 +1314,7 @@ function AnnotationComposer({
 
         <button
           type="button"
-          onClick={() => updateValues({ timestamp_seconds: currentTime })}
+          onClick={() => updateValues({ timestamp_seconds: toRoundedTime(currentTime) })}
           className="vi-button-secondary min-h-8 px-3 py-1 text-xs"
         >
           <Clock className="h-3.5 w-3.5" />
@@ -1412,7 +1412,7 @@ function getAnnotationDuration(annotation: Annotation) {
 
 function getEditorValuesFromAnnotation(annotation: Annotation): AnnotationEditorValues {
   return {
-    timestamp_seconds: annotation.timestamp_seconds,
+    timestamp_seconds: toRoundedTime(annotation.timestamp_seconds),
     duration_seconds: annotation.duration_seconds.toString(),
     title: annotation.title,
     body: annotation.body,
@@ -1424,7 +1424,7 @@ function getEditorValuesFromAnnotation(annotation: Annotation): AnnotationEditor
 
 function getEditorValuesFromTimestamp(timestamp: number): AnnotationEditorValues {
   return {
-    timestamp_seconds: timestamp,
+    timestamp_seconds: toRoundedTime(timestamp),
     duration_seconds: "6",
     title: "",
     body: "",
@@ -1455,6 +1455,13 @@ function isInteractiveKeyboardTarget(target: EventTarget | null) {
 
 function toFiniteTime(value: number) {
   return Number.isFinite(value) && value > 0 ? value : 0;
+}
+
+// Annotation timestamps are captured from videoElement.currentTime, a float that
+// can carry many decimal places (e.g. 12.3456789). Round to 0.1s — matching the
+// input's step — so the field never displays a long, invalid-looking time.
+function toRoundedTime(value: number) {
+  return Number(toFiniteTime(value).toFixed(1));
 }
 
 function toPositiveDuration(value: number) {
