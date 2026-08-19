@@ -19,8 +19,12 @@ Pushing to `main` runs `.github/workflows/build-images.yaml` and publishes:
 
 ```text
 ghcr.io/OWNER/video-insight-backend:latest
+ghcr.io/OWNER/video-insight-backend-go:latest
 ghcr.io/OWNER/video-insight-frontend:latest
 ```
+
+The `backend` image is retained temporarily for Alembic migrations and Python
+rollback. Production application traffic runs through `backend-go`.
 
 The workflow also publishes immutable `sha-...` tags. Pull requests build both
 production images but do not push them.
@@ -72,5 +76,41 @@ just prod-up
 ```
 
 The script pulls the latest GHCR images, starts Postgres and MinIO, runs Alembic
-migrations, then starts the backend and frontend. The frontend container serves
-the React app and proxies `/api` to the backend inside Docker.
+migrations through the transitional Python tools service, then starts the Go
+backend and frontend. The frontend container serves the React app and proxies
+`/api` to the backend inside Docker.
+
+## Go Backend Candidate And Rollback
+
+Before the first Go cutover, set this in `docker/.env.prod` so starting a
+candidate does not rewrite the existing administrator password hash:
+
+```text
+GO_SEED_ADMIN_ON_STARTUP=false
+```
+
+Start the Go image beside the live backend on localhost port 8001:
+
+```sh
+docker compose -p videoinsight \
+  --env-file docker/.env.example \
+  --env-file docker/.env.prod \
+  -f docker/docker-compose.prod.yaml \
+  --profile candidate up -d backend-go-candidate
+curl --fail http://127.0.0.1:8001/api/health
+```
+
+After candidate verification, `just prod-up` replaces only the application
+backend, waits for health, and then recreates the frontend. PostgreSQL and R2
+remain unchanged.
+
+For immediate rollback, run:
+
+```sh
+just prod-rollback-python
+```
+
+This removes only the Go application container, starts the Python fallback with
+the stable Docker network alias `backend`, and restarts the frontend so Nginx
+resolves the fallback address. PostgreSQL and R2 are not changed. A later
+`just prod-up` removes the fallback and returns traffic to Go.

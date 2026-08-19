@@ -12,8 +12,34 @@ permissions:
   packages: write
 
 jobs:
+  go-check:
+    name: Check Go backend
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: backend-go
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      - name: Set up Go
+        uses: actions/setup-go@v6
+        with:
+          go-version-file: backend-go/go.mod
+          cache-dependency-path: backend-go/go.sum
+
+      - name: Format
+        run: test -z "$(gofmt -l .)"
+
+      - name: Vet
+        run: go vet ./...
+
+      - name: Test
+        run: go test -race ./...
+
   docker:
     name: Build ${{ matrix.service }}
+    needs: go-check
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
@@ -23,6 +49,10 @@ jobs:
             context: ./backend
             dockerfile: ./backend/Dockerfile
             image_suffix: backend
+          - service: backend-go
+            context: ./backend-go
+            dockerfile: ./backend-go/Dockerfile
+            image_suffix: backend-go
           - service: frontend
             context: ./frontend
             dockerfile: ./frontend/Dockerfile

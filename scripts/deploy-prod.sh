@@ -26,6 +26,17 @@ compose() {
     "$@"
 }
 
+compose_with_profile() {
+  profile="$1"
+  shift
+  docker compose -p "$PROJECT_NAME" \
+    --env-file "$DEFAULT_ENV_FILE" \
+    --env-file "$PROD_ENV_FILE" \
+    -f "$DOCKER_DIR/docker-compose.prod.yaml" \
+    --profile "$profile" \
+    "$@"
+}
+
 wait_for_healthy() {
   service="$1"
   timeout="${2:-120}"
@@ -48,10 +59,35 @@ wait_for_healthy() {
   return 1
 }
 
+wait_for_profile_service() {
+  profile="$1"
+  service="$2"
+  timeout="${3:-120}"
+  elapsed=0
+
+  while [ "$elapsed" -lt "$timeout" ]; do
+    container_id="$(compose_with_profile "$profile" ps -q "$service")"
+    if [ -n "$container_id" ]; then
+      status="$(docker inspect --format '{{if .State.Health}}{{.State.Health.Status}}{{else}}{{.State.Status}}{{end}}' "$container_id")"
+      if [ "$status" = "healthy" ] || [ "$status" = "running" ]; then
+        return 0
+      fi
+    fi
+    sleep 2
+    elapsed=$((elapsed + 2))
+  done
+
+  echo "Timed out waiting for $service to become healthy." >&2
+  compose_with_profile "$profile" ps
+  return 1
+}
+
 case "${1:-up}" in
   up)
     echo "Pulling production images..."
-    compose pull
+    compose pull postgresql backend frontend
+    compose_with_profile python-tools pull backend-python
+    compose_with_profile python-fallback pull backend-python-fallback
 
     echo "Starting stateful dependencies..."
     compose up -d postgresql
@@ -62,17 +98,36 @@ case "${1:-up}" in
     fi
 
     echo "Running database migrations..."
-    compose run --rm backend alembic upgrade head
+    compose_with_profile python-tools run --rm backend-python alembic upgrade head
 
     echo "Starting application services..."
-    compose up -d --remove-orphans
+    compose_with_profile python-fallback stop backend-python-fallback >/dev/null 2>&1 || true
+    compose_with_profile python-fallback rm -f backend-python-fallback >/dev/null 2>&1 || true
+    compose up -d --remove-orphans backend
+    wait_for_healthy backend
+    compose up -d --remove-orphans frontend
+    wait_for_healthy frontend
     compose ps
+    ;;
+  rollback-python)
+    echo "Pulling Python fallback image..."
+    compose_with_profile python-fallback pull backend-python-fallback
+
+    echo "Stopping Go backend..."
+    compose stop backend || true
+    compose rm -f backend || true
+
+    echo "Starting Python fallback..."
+    compose_with_profile python-fallback up -d backend-python-fallback
+    wait_for_profile_service python-fallback backend-python-fallback
+    compose_with_profile python-fallback restart frontend
+    compose_with_profile python-fallback ps
     ;;
   down)
     compose down
     ;;
   *)
-    echo "Usage: $0 [up|down]" >&2
+    echo "Usage: $0 [up|down|rollback-python]" >&2
     exit 1
     ;;
 esac

@@ -1,0 +1,39 @@
+services:
+  postgresql:
+    volumes:
+      - ../backend-go/db/schema.sql:/docker-entrypoint-initdb.d/001-videoinsight-schema.sql:ro
+
+  backend:
+    build:
+      context: ../backend-go
+      target: dev
+    image: videoinsight-backend-go:dev
+    command: go run ./cmd/api
+    environment:
+      GO_DATABASE_URL: postgres://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgresql:5432/${POSTGRES_DB}
+    volumes:
+      - ../backend-go:/src
+      - backend-go-modules:/go/pkg/mod
+      - backend-go-build-cache:/root/.cache/go-build
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:8000/api/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  frontend:
+    build:
+      context: ../frontend
+      target: dev
+    command: sh -c "pnpm install --frozen-lockfile && pnpm dev --host 0.0.0.0"
+    environment:
+      BACKEND_URL: http://backend:8000
+      CI: "true"
+    volumes:
+      - ../frontend:/app
+      - frontend-go-node-modules:/app/node_modules
+
+volumes:
+  backend-go-modules:
+  backend-go-build-cache:
+  frontend-go-node-modules:

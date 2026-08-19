@@ -68,6 +68,32 @@ type-backend:
 test-backend:
     cd backend && uv run pytest tests/ -v
 
+# ── Go backend migration ────────────────────────────────
+
+go-up service="":
+    ./scripts/dev-go.sh up {{service}}
+
+go-down:
+    ./scripts/dev-go.sh down
+
+go-restart service="":
+    ./scripts/dev-go.sh restart {{service}}
+
+go-logs service="backend":
+    ./scripts/dev-go.sh logs {{service}}
+
+go-run:
+    cd backend-go && go run ./cmd/api
+
+go-generate:
+    cd backend-go && go run github.com/sqlc-dev/sqlc/cmd/sqlc@v1.31.1 generate
+
+go-test:
+    cd backend-go && go test ./...
+
+go-check:
+    cd backend-go && gofmt -d . && go vet ./... && go test ./...
+
 # ── Frontend ────────────────────────────────────────────
 
 lint-frontend:
@@ -104,3 +130,6 @@ prod-up:
 # Stop and remove production containers/networks, keep volumes
 prod-down:
     ./scripts/deploy-prod.sh down
+
+prod-rollback-python:
+    ./scripts/deploy-prod.sh rollback-python
