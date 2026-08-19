@@ -15,7 +15,7 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/s3/types"
 	"github.com/aws/smithy-go"
 
-	"github.com/xinquiry/video-insight/backend-go/internal/videos"
+	"github.com/xinquiry/video-insight/backend/internal/videos"
 )
 
 type S3 struct {

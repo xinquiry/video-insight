@@ -7,9 +7,9 @@ import (
 
 	"github.com/google/uuid"
 
-	"github.com/xinquiry/video-insight/backend-go/internal/model"
-	"github.com/xinquiry/video-insight/backend-go/internal/shared/apperror"
-	"github.com/xinquiry/video-insight/backend-go/internal/shared/optional"
+	"github.com/xinquiry/video-insight/backend/internal/model"
+	"github.com/xinquiry/video-insight/backend/internal/shared/apperror"
+	"github.com/xinquiry/video-insight/backend/internal/shared/optional"
 )
 
 var colorPattern = regexp.MustCompile(`^#[0-9a-fA-F]{6}$`)

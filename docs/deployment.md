@@ -2,34 +2,44 @@
 
 ## Local Development
 
-Run the local stack with hot reload:
+Run the complete stack with the Go backend and frontend hot reload:
 
 ```sh
 just up
 ```
 
-This uses `docker/docker-compose.base.yaml` plus `docker/docker-compose.dev.yaml`.
-The backend and frontend are built from their `dev` Docker targets and bind-mount
-local source code. `docker/.env.example` contains the full default config list,
-and `docker/.env.dev` contains only lightweight development overrides.
+This uses `docker/docker-compose.base.yaml` plus
+`docker/docker-compose.dev.yaml`. PostgreSQL and MinIO persist in Docker
+volumes, while `backend/` and `frontend/` are bind-mounted into their dev
+containers. Defaults live in `docker/.env.example`; optional local overrides
+live in the ignored `docker/.env.dev`.
+
+Useful backend commands:
+
+```sh
+just run-backend
+just generate-backend
+just test-backend
+just check-backend
+```
 
 ## Image Publishing
 
-Pushing to `main` runs `.github/workflows/build-images.yaml` and publishes:
+Pushing to `main` runs `.github/workflows/build-images.yaml`. Go formatting,
+vet, and race-enabled tests must pass before the workflow publishes:
 
 ```text
 ghcr.io/OWNER/video-insight-backend:latest
-ghcr.io/OWNER/video-insight-backend-go:latest
 ghcr.io/OWNER/video-insight-frontend:latest
 ```
 
-The `backend` image is retained temporarily for Alembic migrations and Python
-rollback. Production application traffic runs through `backend-go`.
+Every image also receives an immutable `sha-...` tag. Production should pin an
+immutable tag with `IMAGE_TAG`; pull requests build images without publishing
+them.
 
-The workflow also publishes immutable `sha-...` tags. Pull requests build both
-production images but do not push them.
+Deprecated: `backend-legacy/` and its `video-insight-backend-legacy` image are retained only for existing Alembic history and emergency rollback.
 
-If the GHCR packages are not public, log in on the VPS before deploying:
+If the GHCR packages are private, authenticate on the server before deploying:
 
 ```sh
 docker login ghcr.io
@@ -37,80 +47,63 @@ docker login ghcr.io
 
 ## VPS Setup
 
-Keep Cloudflared on the host. Point your public app hostname to the frontend
-service, for example:
+Keep Cloudflared on the host and route the public application hostname to the
+frontend container:
 
 ```text
 https://app.example.com -> http://localhost:8080
 ```
 
-This app returns MinIO presigned playback URLs, so MinIO also needs a browser
-reachable hostname:
+The API returns browser-facing presigned object URLs. When using self-hosted
+MinIO, route a second public hostname to MinIO; Cloudflare R2 needs no local
+storage service.
 
-```text
-https://media.example.com -> http://localhost:9000
-```
-
-Create `docker/.env.prod` on the VPS from `docker/.env.example` and override production values:
+Create the ignored `docker/.env.prod` from `docker/.env.example` and override
+the production values:
 
 ```text
 IMAGE_REPOSITORY=ghcr.io/OWNER/video-insight
+IMAGE_TAG=sha-0123456
 CORS_ORIGINS=["https://app.example.com"]
-MINIO_PUBLIC_ENDPOINT=media.example.com
-MINIO_SECURE=false
+GO_SEED_ADMIN_ON_STARTUP=false
+MINIO_ENDPOINT=<account_id>.r2.cloudflarestorage.com
+MINIO_PUBLIC_ENDPOINT=<account_id>.r2.cloudflarestorage.com
+MINIO_ACCESS_KEY=<R2 access key>
+MINIO_SECRET_KEY=<R2 secret>
+MINIO_BUCKET=video-insight
+MINIO_SECURE=true
 MINIO_PUBLIC_SECURE=true
+MINIO_REGION=auto
 ```
 
 Use strong production values for `POSTGRES_PASSWORD`, `SECRET_KEY`, and
-`MINIO_ROOT_PASSWORD`. The API seeds an admin account on startup from
-`ADMIN_USERNAME` and `ADMIN_PASSWORD`; set both before the first production
-deploy and rotate `ADMIN_PASSWORD` from the VPS environment when needed.
+`ADMIN_PASSWORD`. A fresh environment can leave
+`GO_SEED_ADMIN_ON_STARTUP=true` for its first start; established environments
+should keep it disabled so restarts do not rotate administrator credentials.
 
-## Deploy Latest
+## Deploy
 
-From the repo on the VPS:
+From the repository on the server:
 
 ```sh
 git pull --ff-only
 just prod-up
 ```
 
-The script pulls the latest GHCR images, starts Postgres and MinIO, runs Alembic
-migrations through the transitional Python tools service, then starts the Go
-backend and frontend. The frontend container serves the React app and proxies
-`/api` to the backend inside Docker.
+The deployment script pulls the pinned images, starts PostgreSQL, applies
+pending database migrations, starts the Go API, waits for readiness, and then
+starts the frontend. PostgreSQL data and R2 objects remain in place during an
+application release.
 
-## Go Backend Candidate And Rollback
-
-Before the first Go cutover, set this in `docker/.env.prod` so starting a
-candidate does not rewrite the existing administrator password hash:
-
-```text
-GO_SEED_ADMIN_ON_STARTUP=false
-```
-
-Start the Go image beside the live backend on localhost port 8001:
+Verify the deployment:
 
 ```sh
-docker compose -p videoinsight \
-  --env-file docker/.env.example \
-  --env-file docker/.env.prod \
-  -f docker/docker-compose.prod.yaml \
-  --profile candidate up -d backend-go-candidate
-curl --fail http://127.0.0.1:8001/api/health
+curl --fail http://127.0.0.1:8080/api/health
+curl --fail http://127.0.0.1:8080/api/health/ready
 ```
 
-After candidate verification, `just prod-up` replaces only the application
-backend, waits for health, and then recreates the frontend. PostgreSQL and R2
-remain unchanged.
-
-For immediate rollback, run:
+For an emergency application rollback without changing PostgreSQL or R2:
 
 ```sh
-just prod-rollback-python
+just prod-rollback-legacy
 ```
-
-This removes only the Go application container, starts the Python fallback with
-the stable Docker network alias `backend`, and restarts the frontend so Nginx
-resolves the fallback address. PostgreSQL and R2 are not changed. A later
-`just prod-up` removes the fallback and returns traffic to Go.

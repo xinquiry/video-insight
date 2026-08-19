@@ -17,7 +17,7 @@ services:
       retries: 10
 
   backend:
-    image: ${IMAGE_REPOSITORY:?set IMAGE_REPOSITORY in docker/.env.prod}-backend-go:${IMAGE_TAG:-latest}
+    image: ${IMAGE_REPOSITORY:?set IMAGE_REPOSITORY in docker/.env.prod}-backend:${IMAGE_TAG:-latest}
     restart: unless-stopped
     env_file:
       - .env.example
@@ -37,9 +37,9 @@ services:
       timeout: 5s
       retries: 3
 
-  backend-python:
-    image: ${IMAGE_REPOSITORY:?set IMAGE_REPOSITORY in docker/.env.prod}-backend:${IMAGE_TAG:-latest}
-    profiles: ["python-tools"]
+  backend-legacy-tools:
+    image: ${IMAGE_REPOSITORY:?set IMAGE_REPOSITORY in docker/.env.prod}-backend-legacy:${IMAGE_TAG:-latest}
+    profiles: ["legacy-tools"]
     env_file:
       - .env.example
       - .env.prod
@@ -47,9 +47,9 @@ services:
       postgresql:
         condition: service_healthy
 
-  backend-python-fallback:
-    image: ${IMAGE_REPOSITORY:?set IMAGE_REPOSITORY in docker/.env.prod}-backend:${IMAGE_TAG:-latest}
-    profiles: ["python-fallback"]
+  backend-legacy-fallback:
+    image: ${IMAGE_REPOSITORY:?set IMAGE_REPOSITORY in docker/.env.prod}-backend-legacy:${IMAGE_TAG:-latest}
+    profiles: ["legacy-fallback"]
     restart: unless-stopped
     env_file:
       - .env.example
@@ -69,23 +69,6 @@ services:
           "-c",
           "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/api/health', timeout=5)",
         ]
-      interval: 10s
-      timeout: 5s
-      retries: 6
-
-  backend-go-candidate:
-    image: ${IMAGE_REPOSITORY:?set IMAGE_REPOSITORY in docker/.env.prod}-backend-go:${IMAGE_TAG:-latest}
-    profiles: ["candidate"]
-    env_file:
-      - .env.example
-      - .env.prod
-    ports:
-      - "127.0.0.1:${GO_CANDIDATE_PORT:-8001}:8000"
-    depends_on:
-      postgresql:
-        condition: service_healthy
-    healthcheck:
-      test: ["CMD", "wget", "-qO-", "http://127.0.0.1:8000/api/health"]
       interval: 10s
       timeout: 5s
       retries: 6

@@ -8,8 +8,8 @@ import (
 
 	"github.com/google/uuid"
 
-	"github.com/xinquiry/video-insight/backend-go/internal/model"
-	"github.com/xinquiry/video-insight/backend-go/internal/shared/optional"
+	"github.com/xinquiry/video-insight/backend/internal/model"
+	"github.com/xinquiry/video-insight/backend/internal/shared/optional"
 )
 
 type fakeStore struct {

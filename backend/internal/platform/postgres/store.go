@@ -14,9 +14,9 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 	"github.com/jackc/pgx/v5/pgxpool"
 
-	"github.com/xinquiry/video-insight/backend-go/internal/model"
-	"github.com/xinquiry/video-insight/backend-go/internal/platform/postgres/db"
-	"github.com/xinquiry/video-insight/backend-go/internal/shared/storeerr"
+	"github.com/xinquiry/video-insight/backend/internal/model"
+	"github.com/xinquiry/video-insight/backend/internal/platform/postgres/db"
+	"github.com/xinquiry/video-insight/backend/internal/shared/storeerr"
 )
 
 type Store struct {

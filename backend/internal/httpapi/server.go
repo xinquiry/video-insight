@@ -15,12 +15,12 @@ import (
 	"github.com/go-chi/chi/v5/middleware"
 	"github.com/google/uuid"
 
-	"github.com/xinquiry/video-insight/backend-go/internal/annotations"
-	"github.com/xinquiry/video-insight/backend-go/internal/auth"
-	"github.com/xinquiry/video-insight/backend-go/internal/groups"
-	"github.com/xinquiry/video-insight/backend-go/internal/model"
-	"github.com/xinquiry/video-insight/backend-go/internal/shared/apperror"
-	"github.com/xinquiry/video-insight/backend-go/internal/videos"
+	"github.com/xinquiry/video-insight/backend/internal/annotations"
+	"github.com/xinquiry/video-insight/backend/internal/auth"
+	"github.com/xinquiry/video-insight/backend/internal/groups"
+	"github.com/xinquiry/video-insight/backend/internal/model"
+	"github.com/xinquiry/video-insight/backend/internal/shared/apperror"
+	"github.com/xinquiry/video-insight/backend/internal/videos"
 )
 
 type Pinger interface{ Ping(context.Context) error }

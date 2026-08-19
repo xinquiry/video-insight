@@ -17,7 +17,7 @@ jobs:
     runs-on: ubuntu-latest
     defaults:
       run:
-        working-directory: backend-go
+        working-directory: backend
     steps:
       - name: Checkout
         uses: actions/checkout@v5
@@ -25,8 +25,8 @@ jobs:
       - name: Set up Go
         uses: actions/setup-go@v6
         with:
-          go-version-file: backend-go/go.mod
-          cache-dependency-path: backend-go/go.sum
+          go-version-file: backend/go.mod
+          cache-dependency-path: backend/go.sum
 
       - name: Format
         run: test -z "$(gofmt -l .)"
@@ -49,10 +49,10 @@ jobs:
             context: ./backend
             dockerfile: ./backend/Dockerfile
             image_suffix: backend
-          - service: backend-go
-            context: ./backend-go
-            dockerfile: ./backend-go/Dockerfile
-            image_suffix: backend-go
+          - service: backend-legacy
+            context: ./backend-legacy
+            dockerfile: ./backend-legacy/Dockerfile
+            image_suffix: backend-legacy
           - service: frontend
             context: ./frontend
             dockerfile: ./frontend/Dockerfile

@@ -1,75 +1,78 @@
-# CLAUDE.md
-
-This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+# Repository guidance
 
 ## Stack
 
-- Backend: FastAPI (Python 3.12+) on async SQLAlchemy + asyncpg, managed with `uv`. Linted with `ruff`, type-checked with `ty`, tested with `pytest` (asyncio_mode=auto).
-- Frontend: React 19 + TanStack Router + TanStack Query + TailwindCSS 4, built with Vite, package-managed with `pnpm`. Linted with `oxlint`, formatted with `oxfmt`.
-- Storage: Postgres 16 + MinIO (S3-compatible) for video objects. Prod can swap MinIO for Cloudflare R2.
-- Orchestration: docker-compose with a layered config (`base.yaml` + `dev.yaml` or `prod.yaml`), driven by `scripts/dev.sh` / `scripts/deploy-prod.sh`.
+- Backend: Go 1.26 with Chi, pgx/sqlc, AWS SDK v2, JWT, and PBKDF2 password compatibility. Formatted with `gofmt`, checked with `go vet`, and tested with the race detector.
+- Frontend: React 19 + TanStack Router + TanStack Query + TailwindCSS 4, built with Vite and managed with `pnpm`.
+- Storage: PostgreSQL 16 plus MinIO locally or Cloudflare R2 in production.
+- Orchestration: layered Docker Compose driven by `scripts/dev.sh` and `scripts/deploy-prod.sh`.
 
 ## Common commands
 
-Run from the repo root via `just`:
+Run from the repository root:
 
 ```sh
-just up                  # start dev stack (postgres + minio + backend + frontend, hot reload)
-just down                # stop & remove containers, keep volumes
-just nuke                # also remove volumes
-just logs-f backend      # follow logs for one service
-just shell-db            # psql into the dev database
-just rebuild frontend    # rebuild a single image and restart
-just restart backend     # restart one service
+just up                    # start Postgres, MinIO, Go API, and frontend
+just down                  # remove containers and keep volumes
+just nuke                  # also remove development volumes
+just logs-f backend        # follow the Go API logs
+just shell-db              # open psql
+just rebuild backend       # rebuild one service
 
-just migrate "msg"       # alembic autogenerate revision
-just migrate-up          # apply pending migrations
-just migrate-down        # roll back one
+just run-backend           # run the Go API directly
+just generate-backend      # regenerate sqlc code
+just test-backend          # race-enabled Go tests
+just check-backend         # gofmt, vet, and tests
 
-just lint                # backend + frontend lint
-just type                # backend (ty) + frontend (tsc -b --noEmit)
-just test                # backend pytest + frontend (currently a no-op script)
-just check               # lint + type
-just fix                 # auto-fix lint/format on both sides
+just lint                  # backend + frontend lint
+just type                  # Go vet + frontend TypeScript
+just test                  # backend + frontend tests
+just check                 # lint + type
+just fix                   # format/fix both sides
 
-just prod-up             # pull GHCR images, migrate, start prod stack
+just prod-up               # pull pinned images and deploy
 ```
 
-Run a single backend test: `cd backend && uv run pytest tests/test_auth_service.py::test_name -v`.
-
-The dev stack expects `docker/.env.example` (always loaded) and optionally `docker/.env.dev` for local overrides; prod uses `docker/.env.prod`. The justfile delegates to `scripts/dev.sh`, which composes both env files into `docker compose -p videoinsight`.
+The dev stack always loads `docker/.env.example` and optionally loads the ignored `docker/.env.dev`. Production additionally uses the ignored `docker/.env.prod`.
 
 ## Architecture
 
-### Backend (`backend/app/`)
+### Backend (`backend/`)
 
-Layered, dependency-injected via FastAPI `Depends`:
+The Go API is split into domain services and platform adapters:
 
-- `api/` — HTTP routers, one per resource (`auth`, `groups`, `videos`, `annotations`, `health`). Aggregated in `api/router.py` under `/api`.
-- `services/` — business logic. `storage_service.py` mediates all MinIO interaction (presigned multipart upload URLs, playback URLs). `admin_seed.py` ensures an admin user/group on startup via the lifespan handler in `main.py`.
-- `repositories/` — SQLAlchemy data access; services depend on repositories, never on the session directly.
-- `models/` — SQLAlchemy ORM models on `models/base.py`'s `DeclarativeBase`.
-- `schemas/` — Pydantic request/response models.
-- `core/` — `config.py` (pydantic-settings, env-driven), `database.py` (async engine + `async_session_factory`), `dependencies.py` (FastAPI deps), `security.py`.
+- `cmd/api/` — process startup, signals, structured logging, and graceful shutdown.
+- `internal/app/` — dependency construction and service wiring.
+- `internal/httpapi/` — Chi routes, middleware, authentication, validation, and DTO mapping.
+- `internal/auth/`, `groups/`, `videos/`, `annotations/` — domain services and their repository contracts.
+- `internal/platform/config/` — environment-backed runtime configuration.
+- `internal/platform/postgres/` — pgx pool, sqlc-backed repositories, and generated query code.
+- `internal/platform/storage/` — S3-compatible multipart upload, playback URL, and object lifecycle adapter.
+- `internal/shared/` — small cross-domain error and optional-value types.
+- `db/queries/` — sqlc source queries; regenerate after edits.
+- `db/schema.sql` — schema snapshot for new local databases.
+- `api/openapi.json` — compatibility contract snapshot.
 
-Migrations live in `backend/alembic/`. Settings are cached via `@lru_cache` on `get_settings()` and read from env (see `core/config.py` for the full list — DB URL, CORS origins, MinIO endpoints, upload tunables, admin seed creds, etc.).
+Services depend on narrow interfaces rather than pgx or S3 clients directly. Keep transport types in `httpapi`, persistence details in `platform/postgres`, and object storage details in `platform/storage`.
 
-Notable upload flow: clients upload directly to MinIO via presigned multipart URLs the backend mints; `upload_concurrency=1` is intentional — uploads are serialized to fit Cloudflared throughput in prod.
+Clients upload directly to MinIO/R2 through presigned multipart URLs. Upload concurrency remains intentionally serialized by default for constrained production tunnels.
+
+Deprecated: `backend-legacy/` contains the former FastAPI implementation only for schema-history compatibility and emergency rollback.
 
 ### Frontend (`frontend/src/`)
 
-- `routes/` — TanStack Router file-based routes; `routeTree.gen.ts` is generated by `@tanstack/router-plugin` (Vite plugin) — don't edit by hand.
-- `features/<domain>/` — `api.ts` (typed fetchers using `lib/api-client.ts`) + `hooks.ts` (TanStack Query wrappers). One folder per backend resource.
+- `routes/` — TanStack Router file routes; do not edit generated `routeTree.gen.ts`.
+- `features/<domain>/` — typed API calls and TanStack Query hooks.
 - `components/layout/` — shared layout chrome.
-- `i18n/` — `i18next` with `en` and `zh` locales; initialized in `main.tsx`.
+- `i18n/` — English and Chinese resources.
 
-`main.tsx` wires `QueryClientProvider` → `RouterProvider`. The TanStack Query default is `staleTime: 30s, retry: 1`.
+Production nginx serves the bundle and proxies `/api` to the Go service.
 
-In dev the frontend runs on Vite at `:5173`; in prod the frontend container is nginx serving the built bundle and proxying `/api` to the backend (see `frontend/nginx.conf`).
+## Deployment
 
-### Deployment topology
+- Local: `just up` builds the Go dev image and starts bundled MinIO.
+- Production: `just prod-up` pulls immutable `video-insight-backend` and `video-insight-frontend` images.
+- Only frontend port 8080 is bound to the host. Cloudflared publishes the app; R2 or browser-reachable MinIO serves object URLs.
+- Preserve `GO_SEED_ADMIN_ON_STARTUP=false` after the first production bootstrap.
 
-- Local: `just up` builds dev images and runs the bundled MinIO.
-- Prod: `just prod-up` pulls `ghcr.io/OWNER/video-insight-{backend,frontend}` images published by `.github/workflows/build-images.yaml` on push to `main`. Only the frontend is exposed publicly via Cloudflared; MinIO needs its own browser-reachable hostname because the backend hands out presigned playback URLs (`MINIO_PUBLIC_ENDPOINT`). Storage can be swapped to Cloudflare R2 via `MINIO_*` env vars (`MINIO_REGION` is configurable for that).
-
-See `docs/deployment.md` for the full prod runbook.
+See `docs/deployment.md` for the runbook.

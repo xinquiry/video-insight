@@ -1,4 +1,4 @@
-module github.com/xinquiry/video-insight/backend-go
+module github.com/xinquiry/video-insight/backend
 
 go 1.26.0
 

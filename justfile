@@ -40,59 +40,41 @@ logs-f service="":
 shell-db:
     ./scripts/dev.sh shell-db
 
-# ── Database migrations ─────────────────────────────────
+# ── Legacy database migrations ──────────────────────────
 
-# Create an Alembic migration
-migrate message:
-    cd backend && uv run alembic revision --autogenerate -m "{{message}}"
+# Create a transitional Alembic migration
+legacy-migrate message:
+    cd backend-legacy && uv run alembic revision --autogenerate -m "{{message}}"
 
 # Apply all pending migrations
-migrate-up:
-    cd backend && uv run alembic upgrade head
+legacy-migrate-up:
+    cd backend-legacy && uv run alembic upgrade head
 
 # Roll back one migration
-migrate-down:
-    cd backend && uv run alembic downgrade -1
+legacy-migrate-down:
+    cd backend-legacy && uv run alembic downgrade -1
 
 # ── Backend ─────────────────────────────────────────────
 
 lint-backend:
-    cd backend && uv run ruff check . && uv run ruff format --check .
+    cd backend && test -z "$(gofmt -l .)"
 
 fix-backend:
-    cd backend && uv run ruff check --fix . && uv run ruff format .
+    cd backend && gofmt -w .
 
 type-backend:
-    cd backend && uv run ty check
+    cd backend && go vet ./...
 
 test-backend:
-    cd backend && uv run pytest tests/ -v
+    cd backend && go test -race ./...
 
-# ── Go backend migration ────────────────────────────────
+run-backend:
+    cd backend && go run ./cmd/api
 
-go-up service="":
-    ./scripts/dev-go.sh up {{service}}
+generate-backend:
+    cd backend && go run github.com/sqlc-dev/sqlc/cmd/sqlc@v1.31.1 generate
 
-go-down:
-    ./scripts/dev-go.sh down
-
-go-restart service="":
-    ./scripts/dev-go.sh restart {{service}}
-
-go-logs service="backend":
-    ./scripts/dev-go.sh logs {{service}}
-
-go-run:
-    cd backend-go && go run ./cmd/api
-
-go-generate:
-    cd backend-go && go run github.com/sqlc-dev/sqlc/cmd/sqlc@v1.31.1 generate
-
-go-test:
-    cd backend-go && go test ./...
-
-go-check:
-    cd backend-go && gofmt -d . && go vet ./... && go test ./...
+check-backend: lint-backend type-backend test-backend
 
 # ── Frontend ────────────────────────────────────────────
 
@@ -131,5 +113,6 @@ prod-up:
 prod-down:
     ./scripts/deploy-prod.sh down
 
-prod-rollback-python:
-    ./scripts/deploy-prod.sh rollback-python
+# Emergency rollback to the deprecated backend
+prod-rollback-legacy:
+    ./scripts/deploy-prod.sh rollback-legacy

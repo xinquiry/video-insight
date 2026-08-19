@@ -1,27 +1,20 @@
-FROM python:3.12-slim AS base
-
-ENV PYTHONUNBUFFERED=1 \
-    PYTHONDONTWRITEBYTECODE=1 \
-    UV_COMPILE_BYTECODE=1 \
-    UV_LINK_MODE=copy \
-    PATH="/app/.venv/bin:$PATH"
-
-WORKDIR /app
-COPY --from=ghcr.io/astral-sh/uv:0.9.17 /uv /uvx /bin/
+FROM golang:1.26.6-alpine AS base
+WORKDIR /src
+COPY go.mod go.sum* ./
+RUN go mod download
 
 FROM base AS dev
-COPY pyproject.toml uv.lock* ./
-RUN uv sync --no-install-project
 COPY . .
 EXPOSE 8000
-CMD ["uv", "run", "uvicorn", "app.main:create_app", "--factory", "--host", "0.0.0.0", "--port", "8000", "--reload"]
+CMD ["go", "run", "./cmd/api"]
 
-FROM base AS production
-RUN groupadd --system app && useradd --system --gid app --home-dir /app --shell /usr/sbin/nologin app
-COPY pyproject.toml uv.lock ./
-RUN uv sync --frozen --no-dev --no-install-project
-COPY --chown=app:app . .
-RUN uv sync --frozen --no-dev && chown -R app:app /app
+FROM base AS build
+COPY . .
+RUN CGO_ENABLED=0 GOOS=linux go build -trimpath -ldflags="-s -w" -o /out/videoinsight-api ./cmd/api
+
+FROM alpine:3.23 AS production
+RUN apk add --no-cache ca-certificates wget && addgroup -S app && adduser -S -G app app
+COPY --from=build /out/videoinsight-api /usr/local/bin/videoinsight-api
 USER app
 EXPOSE 8000
-CMD ["uvicorn", "app.main:create_app", "--factory", "--host", "0.0.0.0", "--port", "8000", "--workers", "4"]
+CMD ["videoinsight-api"]

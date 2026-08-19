@@ -6,14 +6,14 @@ import (
 	"log/slog"
 	"net/http"
 
-	"github.com/xinquiry/video-insight/backend-go/internal/annotations"
-	"github.com/xinquiry/video-insight/backend-go/internal/auth"
-	"github.com/xinquiry/video-insight/backend-go/internal/groups"
-	"github.com/xinquiry/video-insight/backend-go/internal/httpapi"
-	"github.com/xinquiry/video-insight/backend-go/internal/platform/config"
-	"github.com/xinquiry/video-insight/backend-go/internal/platform/postgres"
-	"github.com/xinquiry/video-insight/backend-go/internal/platform/storage"
-	"github.com/xinquiry/video-insight/backend-go/internal/videos"
+	"github.com/xinquiry/video-insight/backend/internal/annotations"
+	"github.com/xinquiry/video-insight/backend/internal/auth"
+	"github.com/xinquiry/video-insight/backend/internal/groups"
+	"github.com/xinquiry/video-insight/backend/internal/httpapi"
+	"github.com/xinquiry/video-insight/backend/internal/platform/config"
+	"github.com/xinquiry/video-insight/backend/internal/platform/postgres"
+	"github.com/xinquiry/video-insight/backend/internal/platform/storage"
+	"github.com/xinquiry/video-insight/backend/internal/videos"
 )
 
 type App struct {

@@ -1,22 +1,37 @@
 services:
+  postgresql:
+    volumes:
+      - ../backend/db/schema.sql:/docker-entrypoint-initdb.d/001-videoinsight-schema.sql:ro
+
   backend:
     build:
       context: ../backend
       target: dev
-    command: ./scripts/start-dev.sh
+    image: videoinsight-backend:dev
+    pull_policy: build
+    command: go run ./cmd/api
+    environment:
+      GO_DATABASE_URL: postgres://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgresql:5432/${POSTGRES_DB}
     volumes:
-      - ../backend:/app
-      - backend-venv:/app/.venv
+      - ../backend:/src
+      - backend-modules:/go/pkg/mod
+      - backend-build-cache:/root/.cache/go-build
 
   frontend:
     build:
       context: ../frontend
       target: dev
+    image: videoinsight-frontend:dev
+    pull_policy: build
     command: sh -c "pnpm install --frozen-lockfile && pnpm dev --host 0.0.0.0"
+    environment:
+      BACKEND_URL: http://backend:8000
+      CI: "true"
     volumes:
       - ../frontend:/app
       - frontend-node-modules:/app/node_modules
 
 volumes:
-  backend-venv:
+  backend-modules:
+  backend-build-cache:
   frontend-node-modules:

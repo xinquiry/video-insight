@@ -10,8 +10,8 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/xinquiry/video-insight/backend-go/internal/app"
-	"github.com/xinquiry/video-insight/backend-go/internal/platform/config"
+	"github.com/xinquiry/video-insight/backend/internal/app"
+	"github.com/xinquiry/video-insight/backend/internal/platform/config"
 )
 
 func main() {

@@ -3,10 +3,10 @@ package httpapi
 import (
 	"time"
 
-	"github.com/xinquiry/video-insight/backend-go/internal/annotations"
-	"github.com/xinquiry/video-insight/backend-go/internal/model"
-	"github.com/xinquiry/video-insight/backend-go/internal/shared/optional"
-	"github.com/xinquiry/video-insight/backend-go/internal/videos"
+	"github.com/xinquiry/video-insight/backend/internal/annotations"
+	"github.com/xinquiry/video-insight/backend/internal/model"
+	"github.com/xinquiry/video-insight/backend/internal/shared/optional"
+	"github.com/xinquiry/video-insight/backend/internal/videos"
 )
 
 type detailResponse struct {
