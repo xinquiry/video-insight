@@ -13,6 +13,7 @@ import (
 type Querier interface {
 	CountVideosForGroup(ctx context.Context, groupID uuid.UUID) (int64, error)
 	CreateAnnotation(ctx context.Context, arg CreateAnnotationParams) (Annotation, error)
+	CreateAnnotationComment(ctx context.Context, arg CreateAnnotationCommentParams) (CreateAnnotationCommentRow, error)
 	CreateGroup(ctx context.Context, name string) (Group, error)
 	CreateUser(ctx context.Context, arg CreateUserParams) (User, error)
 	CreateVideo(ctx context.Context, arg CreateVideoParams) (Video, error)
@@ -24,6 +25,7 @@ type Querier interface {
 	GetUserByID(ctx context.Context, id uuid.UUID) (User, error)
 	GetUserByUsername(ctx context.Context, username string) (User, error)
 	GetVideoByIDForGroup(ctx context.Context, arg GetVideoByIDForGroupParams) (Video, error)
+	ListAnnotationComments(ctx context.Context, annotationID uuid.UUID) ([]ListAnnotationCommentsRow, error)
 	ListAnnotationsForVideo(ctx context.Context, videoID uuid.UUID) ([]Annotation, error)
 	ListGroups(ctx context.Context) ([]Group, error)
 	ListVideosForGroup(ctx context.Context, arg ListVideosForGroupParams) ([]Video, error)

@@ -29,7 +29,9 @@ just test
 - `scripts/` — development and deployment entry points.
 - `docs/deployment.md` — production runbook.
 
-Deprecated: `backend-legacy/` retains the former Python backend only for schema-history compatibility and emergency rollback.
+The former Python service is preserved only as a frozen, non-operational
+[archive](backend-legacy/README.md). It is not built, tested, deployed, or used
+for database migrations.
 
 See [the backend guide](backend/README.md) for API development and
 [the deployment guide](docs/deployment.md) for production operations.

@@ -31,6 +31,18 @@ export interface Group {
   created_at: string;
 }
 
+export interface RichTextNode {
+  type: string;
+  attrs?: Record<string, unknown>;
+  content?: RichTextNode[];
+  marks?: Array<{ type: string; attrs?: Record<string, unknown> }>;
+  text?: string;
+}
+
+export interface RichTextDocument extends RichTextNode {
+  type: "doc";
+}
+
 export interface Annotation {
   id: string;
   video_id: string;
@@ -45,11 +57,20 @@ export interface Annotation {
   shape: string;
   display_mode: string;
   interactive: boolean;
-  title: string;
-  body: string;
+  content: RichTextDocument;
   kind: string;
   color: string;
   custom_data: Record<string, unknown>;
+  created_at: string;
+  updated_at: string | null;
+}
+
+export interface AnnotationComment {
+  id: string;
+  annotation_id: string;
+  user_id: string;
+  author_username: string;
+  body: string;
   created_at: string;
   updated_at: string | null;
 }

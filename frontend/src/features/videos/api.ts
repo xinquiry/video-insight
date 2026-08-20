@@ -1,10 +1,14 @@
 import { apiClient } from "@/lib/api-client";
-import type { Annotation, PaginatedResponse, Video } from "@/types";
+import type {
+  Annotation,
+  AnnotationComment,
+  PaginatedResponse,
+  RichTextDocument,
+  Video,
+} from "@/types";
 
 export function fetchVideos(page = 1, pageSize = 20) {
-  return apiClient.get<PaginatedResponse<Video>>(
-    `/api/videos?page=${page}&page_size=${pageSize}`,
-  );
+  return apiClient.get<PaginatedResponse<Video>>(`/api/videos?page=${page}&page_size=${pageSize}`);
 }
 
 export function fetchVideo(id: string) {
@@ -71,10 +75,7 @@ export async function uploadVideo(
     size_bytes: file.size,
   });
 
-  const concurrency = Math.max(
-    1,
-    options.concurrency ?? init.concurrency ?? 1,
-  );
+  const concurrency = Math.max(1, options.concurrency ?? init.concurrency ?? 1);
 
   const total = file.size;
   const partSize = init.part_size;
@@ -100,9 +101,7 @@ export async function uploadVideo(
   let aborted = false;
 
   const abortServerSide = () => {
-    abortUpload({ object_key: init.object_key, upload_id: init.upload_id }).catch(
-      () => {},
-    );
+    abortUpload({ object_key: init.object_key, upload_id: init.upload_id }).catch(() => {});
   };
 
   const onAbort = () => {
@@ -139,15 +138,10 @@ export async function uploadVideo(
           emit();
           resolve({ part_number: entry.part_number, etag: etag.replaceAll('"', "") });
         } else {
-          reject(
-            new Error(
-              `Part ${entry.part_number} failed: ${xhr.status} ${xhr.statusText}`,
-            ),
-          );
+          reject(new Error(`Part ${entry.part_number} failed: ${xhr.status} ${xhr.statusText}`));
         }
       };
-      xhr.onerror = () =>
-        reject(new Error(`Part ${entry.part_number}: network error`));
+      xhr.onerror = () => reject(new Error(`Part ${entry.part_number}: network error`));
       xhr.onabort = () => reject(new Error(`Part ${entry.part_number}: aborted`));
 
       if (options.signal) {
@@ -174,9 +168,7 @@ export async function uploadVideo(
   };
 
   try {
-    await Promise.all(
-      Array.from({ length: Math.min(concurrency, init.parts.length) }, worker),
-    );
+    await Promise.all(Array.from({ length: Math.min(concurrency, init.parts.length) }, worker));
   } catch (error) {
     options.signal?.removeEventListener("abort", onAbort);
     if (!aborted) abortServerSide();
@@ -200,10 +192,7 @@ export async function uploadVideo(
   });
 }
 
-export function updateVideo(
-  id: string,
-  data: { title?: string; description?: string | null },
-) {
+export function updateVideo(id: string, data: { title?: string; description?: string | null }) {
   return apiClient.patch<Video>(`/api/videos/${id}`, data);
 }
 
@@ -229,8 +218,7 @@ export function createAnnotation(
     shape: string;
     display_mode: string;
     interactive: boolean;
-    title: string;
-    body: string;
+    content: RichTextDocument;
     kind: string;
     color: string;
     custom_data: Record<string, unknown>;
@@ -253,8 +241,7 @@ export function updateAnnotation(
     shape: string;
     display_mode: string;
     interactive: boolean;
-    title: string;
-    body: string;
+    content: RichTextDocument;
     kind: string;
     color: string;
     custom_data: Record<string, unknown>;
@@ -265,4 +252,14 @@ export function updateAnnotation(
 
 export function deleteAnnotation(id: string) {
   return apiClient.delete<void>(`/api/annotations/${id}`);
+}
+
+export function fetchAnnotationComments(annotationId: string) {
+  return apiClient.get<AnnotationComment[]>(`/api/annotations/${annotationId}/comments`);
+}
+
+export function createAnnotationComment(annotationId: string, body: string) {
+  return apiClient.post<AnnotationComment>(`/api/annotations/${annotationId}/comments`, {
+    body,
+  });
 }

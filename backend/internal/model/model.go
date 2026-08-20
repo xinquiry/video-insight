@@ -51,13 +51,22 @@ type Annotation struct {
 	Shape            string
 	DisplayMode      string
 	Interactive      bool
-	Title            string
-	Body             string
+	Content          map[string]any
 	Kind             string
 	Color            string
 	CustomData       map[string]any
 	CreatedAt        time.Time
 	UpdatedAt        *time.Time
+}
+
+type AnnotationComment struct {
+	ID             uuid.UUID
+	AnnotationID   uuid.UUID
+	UserID         uuid.UUID
+	AuthorUsername string
+	Body           string
+	CreatedAt      time.Time
+	UpdatedAt      *time.Time
 }
 
 func NormalizeJSONMap(value map[string]any) map[string]any {

@@ -3,9 +3,11 @@ import { useCallback, useRef, useState } from "react";
 import {
   type UploadProgress,
   createAnnotation,
+  createAnnotationComment,
   deleteAnnotation,
   deleteVideo,
   fetchAnnotations,
+  fetchAnnotationComments,
   fetchVideo,
   fetchVideos,
   updateAnnotation,
@@ -83,8 +85,7 @@ export function useUploadVideo() {
 export function useUpdateVideo(id: string) {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: (data: { title?: string; description?: string | null }) =>
-      updateVideo(id, data),
+    mutationFn: (data: { title?: string; description?: string | null }) => updateVideo(id, data),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ["videos"] }),
   });
 }
@@ -107,10 +108,8 @@ export function useAnnotations(videoId: string) {
 export function useCreateAnnotation(videoId: string) {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: (data: Parameters<typeof createAnnotation>[1]) =>
-      createAnnotation(videoId, data),
-    onSuccess: () =>
-      queryClient.invalidateQueries({ queryKey: ["annotations", videoId] }),
+    mutationFn: (data: Parameters<typeof createAnnotation>[1]) => createAnnotation(videoId, data),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["annotations", videoId] }),
   });
 }
 
@@ -119,8 +118,7 @@ export function useUpdateAnnotation(videoId: string) {
   return useMutation({
     mutationFn: (data: { id: string; values: Parameters<typeof updateAnnotation>[1] }) =>
       updateAnnotation(data.id, data.values),
-    onSuccess: () =>
-      queryClient.invalidateQueries({ queryKey: ["annotations", videoId] }),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["annotations", videoId] }),
   });
 }
 
@@ -128,7 +126,22 @@ export function useDeleteAnnotation(videoId: string) {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: deleteAnnotation,
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["annotations", videoId] }),
+  });
+}
+
+export function useAnnotationComments(annotationId: string) {
+  return useQuery({
+    queryKey: ["annotation-comments", annotationId],
+    queryFn: () => fetchAnnotationComments(annotationId),
+  });
+}
+
+export function useCreateAnnotationComment(annotationId: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (body: string) => createAnnotationComment(annotationId, body),
     onSuccess: () =>
-      queryClient.invalidateQueries({ queryKey: ["annotations", videoId] }),
+      queryClient.invalidateQueries({ queryKey: ["annotation-comments", annotationId] }),
   });
 }

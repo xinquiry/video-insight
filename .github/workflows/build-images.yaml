@@ -49,10 +49,6 @@ jobs:
             context: ./backend
             dockerfile: ./backend/Dockerfile
             image_suffix: backend
-          - service: backend-legacy
-            context: ./backend-legacy
-            dockerfile: ./backend-legacy/Dockerfile
-            image_suffix: backend-legacy
           - service: frontend
             context: ./frontend
             dockerfile: ./frontend/Dockerfile

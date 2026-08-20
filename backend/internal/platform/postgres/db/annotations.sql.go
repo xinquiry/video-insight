@@ -9,17 +9,18 @@ import (
 	"context"
 
 	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5/pgtype"
 )
 
 const createAnnotation = `-- name: CreateAnnotation :one
 INSERT INTO annotations (
     video_id, timestamp_seconds, duration_seconds, position_x, position_y,
     region_x, region_y, region_width, region_height, shape, display_mode,
-    interactive, title, body, kind, color, custom_data
+    interactive, content, kind, color, custom_data
 ) VALUES (
-    $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17
+    $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16
 )
-RETURNING video_id, timestamp_seconds, title, body, kind, color, custom_data, id, created_at, updated_at, duration_seconds, position_x, position_y, region_x, region_y, region_width, region_height, shape, display_mode, interactive
+RETURNING video_id, timestamp_seconds, content, kind, color, custom_data, id, created_at, updated_at, duration_seconds, position_x, position_y, region_x, region_y, region_width, region_height, shape, display_mode, interactive
 `
 
 type CreateAnnotationParams struct {
@@ -35,8 +36,7 @@ type CreateAnnotationParams struct {
 	Shape            string    `json:"shape"`
 	DisplayMode      string    `json:"display_mode"`
 	Interactive      bool      `json:"interactive"`
-	Title            string    `json:"title"`
-	Body             string    `json:"body"`
+	Content          []byte    `json:"content"`
 	Kind             string    `json:"kind"`
 	Color            string    `json:"color"`
 	CustomData       []byte    `json:"custom_data"`
@@ -56,8 +56,7 @@ func (q *Queries) CreateAnnotation(ctx context.Context, arg CreateAnnotationPara
 		arg.Shape,
 		arg.DisplayMode,
 		arg.Interactive,
-		arg.Title,
-		arg.Body,
+		arg.Content,
 		arg.Kind,
 		arg.Color,
 		arg.CustomData,
@@ -66,8 +65,7 @@ func (q *Queries) CreateAnnotation(ctx context.Context, arg CreateAnnotationPara
 	err := row.Scan(
 		&i.VideoID,
 		&i.TimestampSeconds,
-		&i.Title,
-		&i.Body,
+		&i.Content,
 		&i.Kind,
 		&i.Color,
 		&i.CustomData,
@@ -84,6 +82,48 @@ func (q *Queries) CreateAnnotation(ctx context.Context, arg CreateAnnotationPara
 		&i.Shape,
 		&i.DisplayMode,
 		&i.Interactive,
+	)
+	return i, err
+}
+
+const createAnnotationComment = `-- name: CreateAnnotationComment :one
+WITH inserted AS (
+    INSERT INTO annotation_comments (annotation_id, user_id, body)
+    VALUES ($1, $2, $3)
+    RETURNING annotation_id, user_id, body, id, created_at, updated_at
+)
+SELECT inserted.annotation_id, inserted.user_id, inserted.body, inserted.id, inserted.created_at, inserted.updated_at, users.username AS author_username
+FROM inserted
+JOIN users ON users.id = inserted.user_id
+`
+
+type CreateAnnotationCommentParams struct {
+	AnnotationID uuid.UUID `json:"annotation_id"`
+	UserID       uuid.UUID `json:"user_id"`
+	Body         string    `json:"body"`
+}
+
+type CreateAnnotationCommentRow struct {
+	AnnotationID   uuid.UUID        `json:"annotation_id"`
+	UserID         uuid.UUID        `json:"user_id"`
+	Body           string           `json:"body"`
+	ID             uuid.UUID        `json:"id"`
+	CreatedAt      pgtype.Timestamp `json:"created_at"`
+	UpdatedAt      pgtype.Timestamp `json:"updated_at"`
+	AuthorUsername string           `json:"author_username"`
+}
+
+func (q *Queries) CreateAnnotationComment(ctx context.Context, arg CreateAnnotationCommentParams) (CreateAnnotationCommentRow, error) {
+	row := q.db.QueryRow(ctx, createAnnotationComment, arg.AnnotationID, arg.UserID, arg.Body)
+	var i CreateAnnotationCommentRow
+	err := row.Scan(
+		&i.AnnotationID,
+		&i.UserID,
+		&i.Body,
+		&i.ID,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+		&i.AuthorUsername,
 	)
 	return i, err
 }
@@ -101,7 +141,7 @@ func (q *Queries) DeleteAnnotation(ctx context.Context, id uuid.UUID) (int64, er
 }
 
 const getAnnotationByID = `-- name: GetAnnotationByID :one
-SELECT video_id, timestamp_seconds, title, body, kind, color, custom_data, id, created_at, updated_at, duration_seconds, position_x, position_y, region_x, region_y, region_width, region_height, shape, display_mode, interactive FROM annotations WHERE id = $1
+SELECT video_id, timestamp_seconds, content, kind, color, custom_data, id, created_at, updated_at, duration_seconds, position_x, position_y, region_x, region_y, region_width, region_height, shape, display_mode, interactive FROM annotations WHERE id = $1
 `
 
 func (q *Queries) GetAnnotationByID(ctx context.Context, id uuid.UUID) (Annotation, error) {
@@ -110,8 +150,7 @@ func (q *Queries) GetAnnotationByID(ctx context.Context, id uuid.UUID) (Annotati
 	err := row.Scan(
 		&i.VideoID,
 		&i.TimestampSeconds,
-		&i.Title,
-		&i.Body,
+		&i.Content,
 		&i.Kind,
 		&i.Color,
 		&i.CustomData,
@@ -132,8 +171,54 @@ func (q *Queries) GetAnnotationByID(ctx context.Context, id uuid.UUID) (Annotati
 	return i, err
 }
 
+const listAnnotationComments = `-- name: ListAnnotationComments :many
+SELECT annotation_comments.annotation_id, annotation_comments.user_id, annotation_comments.body, annotation_comments.id, annotation_comments.created_at, annotation_comments.updated_at, users.username AS author_username
+FROM annotation_comments
+JOIN users ON users.id = annotation_comments.user_id
+WHERE annotation_comments.annotation_id = $1
+ORDER BY annotation_comments.created_at ASC
+`
+
+type ListAnnotationCommentsRow struct {
+	AnnotationID   uuid.UUID        `json:"annotation_id"`
+	UserID         uuid.UUID        `json:"user_id"`
+	Body           string           `json:"body"`
+	ID             uuid.UUID        `json:"id"`
+	CreatedAt      pgtype.Timestamp `json:"created_at"`
+	UpdatedAt      pgtype.Timestamp `json:"updated_at"`
+	AuthorUsername string           `json:"author_username"`
+}
+
+func (q *Queries) ListAnnotationComments(ctx context.Context, annotationID uuid.UUID) ([]ListAnnotationCommentsRow, error) {
+	rows, err := q.db.Query(ctx, listAnnotationComments, annotationID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []ListAnnotationCommentsRow{}
+	for rows.Next() {
+		var i ListAnnotationCommentsRow
+		if err := rows.Scan(
+			&i.AnnotationID,
+			&i.UserID,
+			&i.Body,
+			&i.ID,
+			&i.CreatedAt,
+			&i.UpdatedAt,
+			&i.AuthorUsername,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const listAnnotationsForVideo = `-- name: ListAnnotationsForVideo :many
-SELECT video_id, timestamp_seconds, title, body, kind, color, custom_data, id, created_at, updated_at, duration_seconds, position_x, position_y, region_x, region_y, region_width, region_height, shape, display_mode, interactive FROM annotations
+SELECT video_id, timestamp_seconds, content, kind, color, custom_data, id, created_at, updated_at, duration_seconds, position_x, position_y, region_x, region_y, region_width, region_height, shape, display_mode, interactive FROM annotations
 WHERE video_id = $1
 ORDER BY timestamp_seconds ASC, created_at ASC
 `
@@ -150,8 +235,7 @@ func (q *Queries) ListAnnotationsForVideo(ctx context.Context, videoID uuid.UUID
 		if err := rows.Scan(
 			&i.VideoID,
 			&i.TimestampSeconds,
-			&i.Title,
-			&i.Body,
+			&i.Content,
 			&i.Kind,
 			&i.Color,
 			&i.CustomData,
@@ -192,14 +276,13 @@ UPDATE annotations SET
     shape = $10,
     display_mode = $11,
     interactive = $12,
-    title = $13,
-    body = $14,
-    kind = $15,
-    color = $16,
-    custom_data = $17,
+    content = $13,
+    kind = $14,
+    color = $15,
+    custom_data = $16,
     updated_at = now()
 WHERE id = $1
-RETURNING video_id, timestamp_seconds, title, body, kind, color, custom_data, id, created_at, updated_at, duration_seconds, position_x, position_y, region_x, region_y, region_width, region_height, shape, display_mode, interactive
+RETURNING video_id, timestamp_seconds, content, kind, color, custom_data, id, created_at, updated_at, duration_seconds, position_x, position_y, region_x, region_y, region_width, region_height, shape, display_mode, interactive
 `
 
 type UpdateAnnotationParams struct {
@@ -215,8 +298,7 @@ type UpdateAnnotationParams struct {
 	Shape            string    `json:"shape"`
 	DisplayMode      string    `json:"display_mode"`
 	Interactive      bool      `json:"interactive"`
-	Title            string    `json:"title"`
-	Body             string    `json:"body"`
+	Content          []byte    `json:"content"`
 	Kind             string    `json:"kind"`
 	Color            string    `json:"color"`
 	CustomData       []byte    `json:"custom_data"`
@@ -236,8 +318,7 @@ func (q *Queries) UpdateAnnotation(ctx context.Context, arg UpdateAnnotationPara
 		arg.Shape,
 		arg.DisplayMode,
 		arg.Interactive,
-		arg.Title,
-		arg.Body,
+		arg.Content,
 		arg.Kind,
 		arg.Color,
 		arg.CustomData,
@@ -246,8 +327,7 @@ func (q *Queries) UpdateAnnotation(ctx context.Context, arg UpdateAnnotationPara
 	err := row.Scan(
 		&i.VideoID,
 		&i.TimestampSeconds,
-		&i.Title,
-		&i.Body,
+		&i.Content,
 		&i.Kind,
 		&i.Color,
 		&i.CustomData,

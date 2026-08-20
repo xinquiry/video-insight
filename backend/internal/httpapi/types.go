@@ -64,13 +64,22 @@ type annotationResponse struct {
 	Shape            string         `json:"shape"`
 	DisplayMode      string         `json:"display_mode"`
 	Interactive      bool           `json:"interactive"`
-	Title            string         `json:"title"`
-	Body             string         `json:"body"`
+	Content          map[string]any `json:"content"`
 	Kind             string         `json:"kind"`
 	Color            string         `json:"color"`
 	CustomData       map[string]any `json:"custom_data"`
 	CreatedAt        string         `json:"created_at"`
 	UpdatedAt        *string        `json:"updated_at"`
+}
+
+type annotationCommentResponse struct {
+	ID             string  `json:"id"`
+	AnnotationID   string  `json:"annotation_id"`
+	UserID         string  `json:"user_id"`
+	AuthorUsername string  `json:"author_username"`
+	Body           string  `json:"body"`
+	CreatedAt      string  `json:"created_at"`
+	UpdatedAt      *string `json:"updated_at"`
 }
 
 type paginatedVideosResponse struct {
@@ -153,8 +162,7 @@ type createAnnotationRequest struct {
 	Shape            *string        `json:"shape"`
 	DisplayMode      *string        `json:"display_mode"`
 	Interactive      *bool          `json:"interactive"`
-	Title            string         `json:"title"`
-	Body             string         `json:"body"`
+	Content          map[string]any `json:"content"`
 	Kind             *string        `json:"kind"`
 	Color            *string        `json:"color"`
 	CustomData       map[string]any `json:"custom_data"`
@@ -172,11 +180,14 @@ type updateAnnotationRequest struct {
 	Shape            optional.Value[string]         `json:"shape"`
 	DisplayMode      optional.Value[string]         `json:"display_mode"`
 	Interactive      optional.Value[bool]           `json:"interactive"`
-	Title            optional.Value[string]         `json:"title"`
-	Body             optional.Value[string]         `json:"body"`
+	Content          optional.Value[map[string]any] `json:"content"`
 	Kind             optional.Value[string]         `json:"kind"`
 	Color            optional.Value[string]         `json:"color"`
 	CustomData       optional.Value[map[string]any] `json:"custom_data"`
+}
+
+type createAnnotationCommentRequest struct {
+	Body string `json:"body"`
 }
 
 func userDTO(user model.User) userResponse {
@@ -203,9 +214,17 @@ func annotationDTO(annotation model.Annotation) annotationResponse {
 		DurationSeconds: annotation.DurationSeconds, PositionX: annotation.PositionX, PositionY: annotation.PositionY,
 		RegionX: annotation.RegionX, RegionY: annotation.RegionY, RegionWidth: annotation.RegionWidth,
 		RegionHeight: annotation.RegionHeight, Shape: annotation.Shape, DisplayMode: annotation.DisplayMode,
-		Interactive: annotation.Interactive, Title: annotation.Title, Body: annotation.Body, Kind: annotation.Kind,
+		Interactive: annotation.Interactive, Content: annotation.Content, Kind: annotation.Kind,
 		Color: annotation.Color, CustomData: model.NormalizeJSONMap(annotation.CustomData),
 		CreatedAt: formatTime(annotation.CreatedAt), UpdatedAt: formatOptionalTime(annotation.UpdatedAt),
+	}
+}
+
+func annotationCommentDTO(comment model.AnnotationComment) annotationCommentResponse {
+	return annotationCommentResponse{
+		ID: comment.ID.String(), AnnotationID: comment.AnnotationID.String(), UserID: comment.UserID.String(),
+		AuthorUsername: comment.AuthorUsername, Body: comment.Body, CreatedAt: formatTime(comment.CreatedAt),
+		UpdatedAt: formatOptionalTime(comment.UpdatedAt),
 	}
 }
 
@@ -241,8 +260,8 @@ func annotationCreateInput(request createAnnotationRequest) (annotations.CreateI
 		TimestampSeconds: *request.TimestampSeconds, DurationSeconds: duration,
 		PositionX: request.PositionX, PositionY: request.PositionY, RegionX: request.RegionX,
 		RegionY: request.RegionY, RegionWidth: request.RegionWidth, RegionHeight: request.RegionHeight,
-		Shape: shape, DisplayMode: displayMode, Interactive: interactive, Title: request.Title,
-		Body: request.Body, Kind: kind, Color: color, CustomData: request.CustomData,
+		Shape: shape, DisplayMode: displayMode, Interactive: interactive, Content: request.Content,
+		Kind: kind, Color: color, CustomData: request.CustomData,
 	}, true
 }
 

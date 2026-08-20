@@ -38,8 +38,7 @@ CREATE INDEX ix_videos_group_id ON videos (group_id);
 CREATE TABLE annotations (
     video_id uuid NOT NULL REFERENCES videos(id) ON DELETE CASCADE,
     timestamp_seconds double precision NOT NULL,
-    title varchar NOT NULL,
-    body varchar NOT NULL,
+    content jsonb NOT NULL,
     kind varchar NOT NULL,
     color varchar NOT NULL,
     custom_data json NOT NULL,
@@ -59,3 +58,13 @@ CREATE TABLE annotations (
 );
 CREATE INDEX ix_annotations_timestamp_seconds ON annotations (timestamp_seconds);
 CREATE INDEX ix_annotations_video_id ON annotations (video_id);
+
+CREATE TABLE annotation_comments (
+    annotation_id uuid NOT NULL REFERENCES annotations(id) ON DELETE CASCADE,
+    user_id uuid NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    body varchar NOT NULL,
+    id uuid DEFAULT gen_random_uuid() NOT NULL PRIMARY KEY,
+    created_at timestamp without time zone DEFAULT now() NOT NULL,
+    updated_at timestamp without time zone DEFAULT now()
+);
+CREATE INDEX ix_annotation_comments_annotation_id ON annotation_comments (annotation_id);

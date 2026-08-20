@@ -51,13 +51,12 @@ The Go API is split into domain services and platform adapters:
 - `internal/shared/` — small cross-domain error and optional-value types.
 - `db/queries/` — sqlc source queries; regenerate after edits.
 - `db/schema.sql` — schema snapshot for new local databases.
+- `internal/platform/postgres/migrations.go` — ordered Go migrations applied at API startup.
 - `api/openapi.json` — compatibility contract snapshot.
 
 Services depend on narrow interfaces rather than pgx or S3 clients directly. Keep transport types in `httpapi`, persistence details in `platform/postgres`, and object storage details in `platform/storage`.
 
 Clients upload directly to MinIO/R2 through presigned multipart URLs. Upload concurrency remains intentionally serialized by default for constrained production tunnels.
-
-Deprecated: `backend-legacy/` contains the former FastAPI implementation only for schema-history compatibility and emergency rollback.
 
 ### Frontend (`frontend/src/`)
 

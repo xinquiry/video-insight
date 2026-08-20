@@ -12,8 +12,7 @@ import (
 type Annotation struct {
 	VideoID          uuid.UUID        `json:"video_id"`
 	TimestampSeconds float64          `json:"timestamp_seconds"`
-	Title            string           `json:"title"`
-	Body             string           `json:"body"`
+	Content          []byte           `json:"content"`
 	Kind             string           `json:"kind"`
 	Color            string           `json:"color"`
 	CustomData       []byte           `json:"custom_data"`
@@ -30,6 +29,15 @@ type Annotation struct {
 	Shape            string           `json:"shape"`
 	DisplayMode      string           `json:"display_mode"`
 	Interactive      bool             `json:"interactive"`
+}
+
+type AnnotationComment struct {
+	AnnotationID uuid.UUID        `json:"annotation_id"`
+	UserID       uuid.UUID        `json:"user_id"`
+	Body         string           `json:"body"`
+	ID           uuid.UUID        `json:"id"`
+	CreatedAt    pgtype.Timestamp `json:"created_at"`
+	UpdatedAt    pgtype.Timestamp `json:"updated_at"`
 }
 
 type Group struct {

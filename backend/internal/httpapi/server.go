@@ -85,6 +85,8 @@ func New(
 			protected.Post("/videos/{videoID}/annotations", server.createAnnotation)
 			protected.Patch("/annotations/{annotationID}", server.updateAnnotation)
 			protected.Delete("/annotations/{annotationID}", server.deleteAnnotation)
+			protected.Get("/annotations/{annotationID}/comments", server.listAnnotationComments)
+			protected.Post("/annotations/{annotationID}/comments", server.createAnnotationComment)
 		})
 	})
 	return router
@@ -338,14 +340,49 @@ func (s *Server) updateAnnotation(w http.ResponseWriter, r *http.Request) {
 		TimestampSeconds: request.TimestampSeconds, DurationSeconds: request.DurationSeconds,
 		PositionX: request.PositionX, PositionY: request.PositionY, RegionX: request.RegionX, RegionY: request.RegionY,
 		RegionWidth: request.RegionWidth, RegionHeight: request.RegionHeight, Shape: request.Shape,
-		DisplayMode: request.DisplayMode, Interactive: request.Interactive, Title: request.Title,
-		Body: request.Body, Kind: request.Kind, Color: request.Color, CustomData: request.CustomData,
+		DisplayMode: request.DisplayMode, Interactive: request.Interactive, Content: request.Content,
+		Kind: request.Kind, Color: request.Color, CustomData: request.CustomData,
 	})
 	if err != nil {
 		s.writeError(w, r, err)
 		return
 	}
 	writeJSON(w, http.StatusOK, annotationDTO(annotation))
+}
+
+func (s *Server) listAnnotationComments(w http.ResponseWriter, r *http.Request) {
+	annotationID, ok := pathUUID(w, r, "annotationID")
+	if !ok {
+		return
+	}
+	items, err := s.annotations.ListComments(r.Context(), annotationID, currentUser(r).GroupID)
+	if err != nil {
+		s.writeError(w, r, err)
+		return
+	}
+	response := make([]annotationCommentResponse, 0, len(items))
+	for _, item := range items {
+		response = append(response, annotationCommentDTO(item))
+	}
+	writeJSON(w, http.StatusOK, response)
+}
+
+func (s *Server) createAnnotationComment(w http.ResponseWriter, r *http.Request) {
+	annotationID, ok := pathUUID(w, r, "annotationID")
+	if !ok {
+		return
+	}
+	var request createAnnotationCommentRequest
+	if !decodeJSON(w, r, &request) {
+		return
+	}
+	user := currentUser(r)
+	comment, err := s.annotations.CreateComment(r.Context(), annotationID, user.GroupID, user.ID, request.Body)
+	if err != nil {
+		s.writeError(w, r, err)
+		return
+	}
+	writeJSON(w, http.StatusCreated, annotationCommentDTO(comment))
 }
 
 func (s *Server) deleteAnnotation(w http.ResponseWriter, r *http.Request) {
@@ -441,7 +478,8 @@ func (s *Server) writeError(w http.ResponseWriter, r *http.Request, err error) {
 func currentUser(r *http.Request) model.User { return r.Context().Value(currentUserKey).(model.User) }
 
 func decodeJSON(w http.ResponseWriter, r *http.Request, target any) bool {
-	r.Body = http.MaxBytesReader(w, r.Body, 2<<20)
+	// Rich-text annotations may include a validated, size-limited embedded image.
+	r.Body = http.MaxBytesReader(w, r.Body, 5<<20)
 	decoder := json.NewDecoder(r.Body)
 	if err := decoder.Decode(target); err != nil {
 		writeValidation(w, "Invalid request body")

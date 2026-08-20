@@ -37,42 +37,6 @@ services:
       timeout: 5s
       retries: 3
 
-  backend-legacy-tools:
-    image: ${IMAGE_REPOSITORY:?set IMAGE_REPOSITORY in docker/.env.prod}-backend-legacy:${IMAGE_TAG:-latest}
-    profiles: ["legacy-tools"]
-    env_file:
-      - .env.example
-      - .env.prod
-    depends_on:
-      postgresql:
-        condition: service_healthy
-
-  backend-legacy-fallback:
-    image: ${IMAGE_REPOSITORY:?set IMAGE_REPOSITORY in docker/.env.prod}-backend-legacy:${IMAGE_TAG:-latest}
-    profiles: ["legacy-fallback"]
-    restart: unless-stopped
-    env_file:
-      - .env.example
-      - .env.prod
-    depends_on:
-      postgresql:
-        condition: service_healthy
-    networks:
-      default:
-        aliases:
-          - backend
-    healthcheck:
-      test:
-        [
-          "CMD",
-          "python",
-          "-c",
-          "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/api/health', timeout=5)",
-        ]
-      interval: 10s
-      timeout: 5s
-      retries: 6
-
   frontend:
     image: ${IMAGE_REPOSITORY:?set IMAGE_REPOSITORY in docker/.env.prod}-frontend:${IMAGE_TAG:-latest}
     restart: unless-stopped

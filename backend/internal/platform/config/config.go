@@ -35,9 +35,6 @@ type Config struct {
 }
 
 func Load() (Config, error) {
-	databaseURL := firstNonEmpty(os.Getenv("GO_DATABASE_URL"), os.Getenv("DATABASE_URL"), "postgres://videoinsight:videoinsight@localhost:5432/videoinsight")
-	databaseURL = strings.Replace(databaseURL, "postgresql+asyncpg://", "postgres://", 1)
-
 	secure, err := envBool("MINIO_SECURE", false)
 	if err != nil {
 		return Config{}, err
@@ -75,7 +72,7 @@ func Load() (Config, error) {
 	publicEndpoint := env("MINIO_PUBLIC_ENDPOINT", endpoint)
 	cfg := Config{
 		Address:            env("GO_BACKEND_ADDRESS", ":8000"),
-		DatabaseURL:        databaseURL,
+		DatabaseURL:        env("GO_DATABASE_URL", "postgres://videoinsight:videoinsight@localhost:5432/videoinsight"),
 		CORSOrigins:        parseOrigins(env("CORS_ORIGINS", `["http://localhost:5173"]`)),
 		SecretKey:          env("SECRET_KEY", "dev-secret-change-me"),
 		AccessTokenTTL:     time.Duration(tokenMinutes) * time.Minute,
@@ -104,7 +101,7 @@ func Load() (Config, error) {
 
 func (c Config) Validate() error {
 	if c.DatabaseURL == "" || c.SecretKey == "" {
-		return errors.New("DATABASE_URL and SECRET_KEY must not be empty")
+		return errors.New("GO_DATABASE_URL and SECRET_KEY must not be empty")
 	}
 	if c.UploadPartSize < 5*1024*1024 {
 		return errors.New("UPLOAD_PART_SIZE_BYTES must be at least 5 MiB")
@@ -144,15 +141,6 @@ func env(key, fallback string) string {
 		return value
 	}
 	return fallback
-}
-
-func firstNonEmpty(values ...string) string {
-	for _, value := range values {
-		if value != "" {
-			return value
-		}
-	}
-	return ""
 }
 
 func envBool(key string, fallback bool) (bool, error) {

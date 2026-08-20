@@ -2,9 +2,8 @@ package config
 
 import "testing"
 
-func TestLoadConvertsPythonDatabaseURL(t *testing.T) {
-	t.Setenv("DATABASE_URL", "postgresql+asyncpg://user:pass@db:5432/app")
-	t.Setenv("GO_DATABASE_URL", "")
+func TestLoadUsesGoDatabaseURL(t *testing.T) {
+	t.Setenv("GO_DATABASE_URL", "postgres://user:pass@db:5432/app")
 	cfg, err := Load()
 	if err != nil {
 		t.Fatal(err)

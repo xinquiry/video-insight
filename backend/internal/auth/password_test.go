@@ -7,11 +7,11 @@ import (
 	"github.com/google/uuid"
 )
 
-func TestVerifyPasswordAcceptsPythonHash(t *testing.T) {
+func TestVerifyPasswordAcceptsLegacyPBKDF2Hash(t *testing.T) {
 	t.Parallel()
 	hash := "pbkdf2_sha256$260000$00112233445566778899aabbccddeeff$1c1e47ef165c7cff8845f3f5a71f00c3b5aa5d2ba0518564477284427df40fe8"
 	if !VerifyPassword("password123", hash) {
-		t.Fatal("expected Python-compatible hash to verify")
+		t.Fatal("expected legacy PBKDF2 hash to verify")
 	}
 	if VerifyPassword("wrong", hash) {
 		t.Fatal("wrong password unexpectedly verified")

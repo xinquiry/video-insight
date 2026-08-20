@@ -40,20 +40,6 @@ logs-f service="":
 shell-db:
     ./scripts/dev.sh shell-db
 
-# ── Legacy database migrations ──────────────────────────
-
-# Create a transitional Alembic migration
-legacy-migrate message:
-    cd backend-legacy && uv run alembic revision --autogenerate -m "{{message}}"
-
-# Apply all pending migrations
-legacy-migrate-up:
-    cd backend-legacy && uv run alembic upgrade head
-
-# Roll back one migration
-legacy-migrate-down:
-    cd backend-legacy && uv run alembic downgrade -1
-
 # ── Backend ─────────────────────────────────────────────
 
 lint-backend:
@@ -105,14 +91,10 @@ check: lint type
 
 # ── Production stack ────────────────────────────────────
 
-# Pull images, migrate, and start production services
+# Pull images and start production services; the Go backend migrates on startup
 prod-up:
     ./scripts/deploy-prod.sh up
 
 # Stop and remove production containers/networks, keep volumes
 prod-down:
     ./scripts/deploy-prod.sh down
-
-# Emergency rollback to the deprecated backend
-prod-rollback-legacy:
-    ./scripts/deploy-prod.sh rollback-legacy

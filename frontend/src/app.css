@@ -11,10 +11,9 @@
   --rule-strong: rgba(28, 26, 23, 0.22);
   --rule-soft: rgba(28, 26, 23, 0.06);
   --danger: #9f2f24;
-  --font-display: "GT Sectra", "Source Serif Pro", "Iowan Old Style",
-    "Times New Roman", serif;
-  --font-body: "Sohne", "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI",
-    system-ui, sans-serif;
+  --font-display: "GT Sectra", "Source Serif Pro", "Iowan Old Style", "Times New Roman", serif;
+  --font-body:
+    "Sohne", "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
   --font-mono: "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
   --color-primary: var(--accent);
   --color-primary-hover: #9f3f25;
@@ -196,4 +195,111 @@ select {
 
 .vi-soft-shadow:hover {
   box-shadow: 0 2px 16px rgba(28, 26, 23, 0.06);
+}
+
+.vi-rich-tool {
+  align-items: center;
+  border-radius: 6px;
+  color: var(--muted);
+  display: inline-flex;
+  height: 2rem;
+  justify-content: center;
+  width: 2rem;
+}
+
+.vi-rich-tool:hover {
+  background: var(--rule-soft);
+  color: var(--ink);
+}
+
+.vi-rich-text .tiptap {
+  color: var(--ink);
+  line-height: 1.65;
+  outline: none;
+}
+
+.vi-rich-editor .tiptap {
+  min-height: 10rem;
+  padding: 0.875rem;
+}
+
+.vi-rich-text .tiptap > * + * {
+  margin-top: 0.75rem;
+}
+
+.vi-rich-text .tiptap h1,
+.vi-rich-text .tiptap h2,
+.vi-rich-text .tiptap h3 {
+  font-family: var(--font-display);
+  font-weight: 500;
+  line-height: 1.15;
+}
+
+.vi-rich-text .tiptap h1 {
+  font-size: 1.8rem;
+}
+
+.vi-rich-text .tiptap h2 {
+  font-size: 1.45rem;
+}
+
+.vi-rich-text .tiptap h3 {
+  font-size: 1.2rem;
+}
+
+.vi-rich-text .tiptap ul,
+.vi-rich-text .tiptap ol {
+  padding-left: 1.5rem;
+}
+
+.vi-rich-text .tiptap ul {
+  list-style: disc;
+}
+
+.vi-rich-text .tiptap ol {
+  list-style: decimal;
+}
+
+.vi-rich-text .tiptap blockquote {
+  border-left: 3px solid var(--accent);
+  color: var(--muted);
+  padding-left: 0.875rem;
+}
+
+.vi-rich-text .tiptap pre {
+  background: var(--ink);
+  border-radius: 6px;
+  color: var(--paper);
+  font-family: var(--font-mono);
+  overflow-x: auto;
+  padding: 0.75rem;
+}
+
+.vi-rich-text .tiptap img {
+  border-radius: 8px;
+  display: block;
+  height: auto;
+  max-width: 100%;
+}
+
+.vi-rich-text .tiptap p.is-editor-empty:first-child::before {
+  color: var(--muted);
+  content: attr(data-placeholder);
+  float: left;
+  height: 0;
+  pointer-events: none;
+}
+
+.vi-rich-compact .tiptap {
+  display: -webkit-box;
+  font-size: 0.875rem;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 5;
+  overflow: hidden;
+}
+
+.vi-rich-compact .tiptap img {
+  max-height: 8rem;
+  object-fit: contain;
+  object-position: left;
 }

@@ -38,6 +38,10 @@ func Open(ctx context.Context, databaseURL string) (*Store, error) {
 		pool.Close()
 		return nil, fmt.Errorf("ping database: %w", err)
 	}
+	if err := runMigrations(ctx, pool); err != nil {
+		pool.Close()
+		return nil, fmt.Errorf("migrate database: %w", err)
+	}
 	return &Store{pool: pool, queries: db.New(pool)}, nil
 }
 
@@ -184,6 +188,10 @@ func (s *Store) ListAnnotationsForVideo(ctx context.Context, videoID uuid.UUID) 
 }
 
 func (s *Store) CreateAnnotation(ctx context.Context, annotation model.Annotation) (model.Annotation, error) {
+	content, err := json.Marshal(annotation.Content)
+	if err != nil {
+		return model.Annotation{}, err
+	}
 	customData, err := json.Marshal(model.NormalizeJSONMap(annotation.CustomData))
 	if err != nil {
 		return model.Annotation{}, err
@@ -193,7 +201,7 @@ func (s *Store) CreateAnnotation(ctx context.Context, annotation model.Annotatio
 		DurationSeconds: annotation.DurationSeconds, PositionX: annotation.PositionX, PositionY: annotation.PositionY,
 		RegionX: annotation.RegionX, RegionY: annotation.RegionY, RegionWidth: annotation.RegionWidth,
 		RegionHeight: annotation.RegionHeight, Shape: annotation.Shape, DisplayMode: annotation.DisplayMode,
-		Interactive: annotation.Interactive, Title: annotation.Title, Body: annotation.Body,
+		Interactive: annotation.Interactive, Content: content,
 		Kind: annotation.Kind, Color: annotation.Color, CustomData: customData,
 	})
 	if err != nil {
@@ -203,6 +211,10 @@ func (s *Store) CreateAnnotation(ctx context.Context, annotation model.Annotatio
 }
 
 func (s *Store) UpdateAnnotation(ctx context.Context, annotation model.Annotation) (model.Annotation, error) {
+	content, err := json.Marshal(annotation.Content)
+	if err != nil {
+		return model.Annotation{}, err
+	}
 	customData, err := json.Marshal(model.NormalizeJSONMap(annotation.CustomData))
 	if err != nil {
 		return model.Annotation{}, err
@@ -212,7 +224,7 @@ func (s *Store) UpdateAnnotation(ctx context.Context, annotation model.Annotatio
 		PositionX: annotation.PositionX, PositionY: annotation.PositionY, RegionX: annotation.RegionX,
 		RegionY: annotation.RegionY, RegionWidth: annotation.RegionWidth, RegionHeight: annotation.RegionHeight,
 		Shape: annotation.Shape, DisplayMode: annotation.DisplayMode, Interactive: annotation.Interactive,
-		Title: annotation.Title, Body: annotation.Body, Kind: annotation.Kind, Color: annotation.Color,
+		Content: content, Kind: annotation.Kind, Color: annotation.Color,
 		CustomData: customData,
 	})
 	if err != nil {
@@ -224,6 +236,32 @@ func (s *Store) UpdateAnnotation(ctx context.Context, annotation model.Annotatio
 func (s *Store) DeleteAnnotation(ctx context.Context, id uuid.UUID) (bool, error) {
 	rows, err := s.queries.DeleteAnnotation(ctx, id)
 	return rows > 0, err
+}
+
+func (s *Store) ListAnnotationComments(ctx context.Context, annotationID uuid.UUID) ([]model.AnnotationComment, error) {
+	values, err := s.queries.ListAnnotationComments(ctx, annotationID)
+	if err != nil {
+		return nil, err
+	}
+	result := make([]model.AnnotationComment, 0, len(values))
+	for _, value := range values {
+		result = append(result, annotationCommentModel(
+			value.ID, value.AnnotationID, value.UserID, value.AuthorUsername, value.Body, value.CreatedAt, value.UpdatedAt,
+		))
+	}
+	return result, nil
+}
+
+func (s *Store) CreateAnnotationComment(ctx context.Context, comment model.AnnotationComment) (model.AnnotationComment, error) {
+	value, err := s.queries.CreateAnnotationComment(ctx, db.CreateAnnotationCommentParams{
+		AnnotationID: comment.AnnotationID, UserID: comment.UserID, Body: comment.Body,
+	})
+	if err != nil {
+		return model.AnnotationComment{}, err
+	}
+	return annotationCommentModel(
+		value.ID, value.AnnotationID, value.UserID, value.AuthorUsername, value.Body, value.CreatedAt, value.UpdatedAt,
+	), nil
 }
 
 func found(err error) (bool, error) {
@@ -255,6 +293,10 @@ func videoModel(value db.Video) model.Video {
 }
 
 func annotationModel(value db.Annotation) (model.Annotation, error) {
+	content, err := model.DecodeJSONMap(value.Content)
+	if err != nil {
+		return model.Annotation{}, err
+	}
 	customData, err := model.DecodeJSONMap(value.CustomData)
 	if err != nil {
 		return model.Annotation{}, err
@@ -264,10 +306,26 @@ func annotationModel(value db.Annotation) (model.Annotation, error) {
 		DurationSeconds: value.DurationSeconds, PositionX: value.PositionX, PositionY: value.PositionY,
 		RegionX: value.RegionX, RegionY: value.RegionY, RegionWidth: value.RegionWidth,
 		RegionHeight: value.RegionHeight, Shape: value.Shape, DisplayMode: value.DisplayMode,
-		Interactive: value.Interactive, Title: value.Title, Body: value.Body, Kind: value.Kind,
+		Interactive: value.Interactive, Content: content, Kind: value.Kind,
 		Color: value.Color, CustomData: customData, CreatedAt: value.CreatedAt.Time,
 		UpdatedAt: optionalTime(value.UpdatedAt),
 	}, nil
+}
+
+func annotationCommentModel(
+	id uuid.UUID,
+	annotationID uuid.UUID,
+	userID uuid.UUID,
+	authorUsername string,
+	body string,
+	createdAt pgtype.Timestamp,
+	updatedAt pgtype.Timestamp,
+) model.AnnotationComment {
+	return model.AnnotationComment{
+		ID: id, AnnotationID: annotationID, UserID: userID,
+		AuthorUsername: authorUsername, Body: body,
+		CreatedAt: createdAt.Time, UpdatedAt: optionalTime(updatedAt),
+	}
 }
 
 func optionalTime(value pgtype.Timestamp) *time.Time {

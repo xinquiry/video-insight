@@ -37,8 +37,6 @@ Every image also receives an immutable `sha-...` tag. Production should pin an
 immutable tag with `IMAGE_TAG`; pull requests build images without publishing
 them.
 
-Deprecated: `backend-legacy/` and its `video-insight-backend-legacy` image are retained only for existing Alembic history and emergency rollback.
-
 If the GHCR packages are private, authenticate on the server before deploying:
 
 ```sh
@@ -90,20 +88,14 @@ git pull --ff-only
 just prod-up
 ```
 
-The deployment script pulls the pinned images, starts PostgreSQL, applies
-pending database migrations, starts the Go API, waits for readiness, and then
-starts the frontend. PostgreSQL data and R2 objects remain in place during an
-application release.
+The deployment script pulls the pinned images and starts PostgreSQL. The Go API
+then applies pending migrations under a PostgreSQL advisory lock before it
+serves requests. After the API becomes healthy, the script starts the frontend.
+PostgreSQL data and R2 objects remain in place during a release.
 
 Verify the deployment:
 
 ```sh
 curl --fail http://127.0.0.1:8080/api/health
 curl --fail http://127.0.0.1:8080/api/health/ready
-```
-
-For an emergency application rollback without changing PostgreSQL or R2:
-
-```sh
-just prod-rollback-legacy
 ```

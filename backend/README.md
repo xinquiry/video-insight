@@ -39,5 +39,6 @@ just check-backend
 ```
 
 `db/schema.sql` is the schema snapshot used to initialize a new development
-database. Existing production databases retain their Alembic history while
-migration ownership is transferred to Go.
+database. The Go service applies idempotent forward migrations at startup for
+existing databases. Add future migrations to the ordered, append-only list in
+`internal/platform/postgres/migrations.go` and update `db/schema.sql` to match.

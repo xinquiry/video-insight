@@ -10,6 +10,7 @@ import {
   Pause,
   Play,
   Plus,
+  Send,
   Trash2,
 } from "lucide-react";
 import { AnimatePresence, motion } from "motion/react";
@@ -18,21 +19,25 @@ import {
   type MouseEvent as ReactMouseEvent,
   type RefObject,
   useEffect,
+  useId,
   useMemo,
   useRef,
   useState,
 } from "react";
 import { useTranslation } from "react-i18next";
 import {
+  useAnnotationComments,
   useAnnotations,
   useCreateAnnotation,
+  useCreateAnnotationComment,
   useDeleteAnnotation,
   useDeleteVideo,
   useUpdateAnnotation,
   useVideo,
 } from "@/features/videos/hooks";
+import { isRichTextEmpty, RichTextContent, RichTextEditor } from "@/components/RichTextEditor";
 import { cn, formatBytes, formatDate, formatDuration } from "@/lib/utils";
-import type { Annotation } from "@/types";
+import type { Annotation, RichTextDocument } from "@/types";
 
 export const Route = createFileRoute("/videos/$videoId")({
   component: VideoDetailPage,
@@ -50,8 +55,7 @@ type AnnotationFormValues = {
   shape: string;
   display_mode: string;
   interactive: boolean;
-  title: string;
-  body: string;
+  content: RichTextDocument;
   kind: string;
   color: string;
   custom_data: Record<string, unknown>;
@@ -60,8 +64,7 @@ type AnnotationFormValues = {
 type AnnotationEditorValues = {
   timestamp_seconds: number;
   duration_seconds: string;
-  title: string;
-  body: string;
+  content: RichTextDocument;
   kind: string;
   color: string;
   custom_data: string;
@@ -662,7 +665,7 @@ function AnnotationScrubber({
               onMouseLeave={() => onHoverAnnotation(null)}
               onFocus={() => onHoverAnnotation(annotation.id)}
               onBlur={() => onHoverAnnotation(null)}
-              title={`${formatDuration(annotation.timestamp_seconds)} ${annotation.title}`}
+              title={`${formatDuration(annotation.timestamp_seconds)} ${getRichTextPreview(annotation.content)}`}
             >
               <AnimatePresence>
                 {showAnnotationPreview && hoveredAnnotationId === annotation.id && (
@@ -679,11 +682,8 @@ function AnnotationScrubber({
                     <span className="vi-mono block text-[0.68rem] leading-none text-white/58">
                       {formatDuration(annotation.timestamp_seconds)}
                     </span>
-                    <span className="mt-1 block truncate text-sm font-semibold leading-tight">
-                      {annotation.title}
-                    </span>
-                    <span className="mt-0.5 line-clamp-1 block text-xs leading-snug text-white/72">
-                      {annotation.body}
+                    <span className="mt-1 line-clamp-2 block text-sm font-semibold leading-tight">
+                      {getRichTextPreview(annotation.content)}
                     </span>
                   </motion.span>
                 )}
@@ -916,12 +916,7 @@ function PlaybackAnnotationDetail({
 
       <div className="py-5" style={{ borderLeft: `4px solid ${annotation.color}` }}>
         <div className="pl-4">
-          <h3 className="vi-display text-3xl leading-tight">
-            {annotation.title || t("videoDetail.form.newTitle")}
-          </h3>
-          <p className="mt-4 whitespace-pre-wrap text-base leading-7 text-[var(--ink)]">
-            {annotation.body}
-          </p>
+          <RichTextContent content={annotation.content} />
         </div>
       </div>
 
@@ -960,6 +955,7 @@ function PlaybackAnnotationDetail({
           </pre>
         </div>
       )}
+      <AnnotationComments annotationId={annotation.id} />
     </motion.div>
   );
 }
@@ -1113,7 +1109,7 @@ function AnnotationMessage({
       layout
       ref={refCallback}
       className={cn(
-        "h-full w-[20rem] shrink-0 rounded-lg border bg-[var(--paper)] p-3 transition-colors sm:w-[22rem]",
+        "h-full w-[20rem] shrink-0 overflow-y-auto rounded-lg border bg-[var(--paper)] p-3 transition-colors sm:w-[22rem]",
         isActive
           ? "border-[var(--ink)] shadow-[0_0_0_3px_rgba(192,81,47,0.12)]"
           : "border-[var(--rule)]",
@@ -1146,9 +1142,6 @@ function AnnotationMessage({
       </div>
       <div className="mt-3">
         <div className="flex flex-wrap items-center gap-2">
-          <h3 className="vi-display text-lg">
-            {annotation.title || t("videoDetail.form.newTitle")}
-          </h3>
           <span className="vi-kicker rounded border border-[var(--rule)] px-2 py-0.5">
             {translateKind(t, annotation.kind)}
           </span>
@@ -1158,11 +1151,71 @@ function AnnotationMessage({
             </span>
           )}
         </div>
-        <p className="mt-2 line-clamp-5 whitespace-pre-wrap text-sm text-[var(--ink)]">
-          {annotation.body}
-        </p>
+        <div className="mt-2">
+          <RichTextContent content={annotation.content} compact />
+        </div>
       </div>
+      <AnnotationComments annotationId={annotation.id} />
     </motion.article>
+  );
+}
+
+function AnnotationComments({ annotationId }: { annotationId: string }) {
+  const { t } = useTranslation();
+  const { data: comments = [], isLoading } = useAnnotationComments(annotationId);
+  const createComment = useCreateAnnotationComment(annotationId);
+  const [body, setBody] = useState("");
+
+  const submit = (event: FormEvent) => {
+    event.preventDefault();
+    const trimmed = body.trim();
+    if (!trimmed) return;
+    createComment.mutate(trimmed, { onSuccess: () => setBody("") });
+  };
+
+  return (
+    <div className="mt-3 border-t border-[var(--rule)] pt-3">
+      <p className="vi-kicker">
+        {t("videoDetail.comments.title")} · {comments.length}
+      </p>
+      <div className="mt-2 space-y-2">
+        {isLoading && <p className="text-xs text-[var(--muted)]">{t("common.loading")}</p>}
+        {comments.map((comment) => (
+          <div key={comment.id} className="rounded-md bg-[var(--surface)] p-2 text-xs">
+            <div className="flex items-center justify-between gap-2 text-[var(--muted)]">
+              <strong className="text-[var(--ink)]">{comment.author_username}</strong>
+              <span>{formatDate(comment.created_at)}</span>
+            </div>
+            <p className="mt-1 whitespace-pre-wrap text-sm text-[var(--ink)]">{comment.body}</p>
+          </div>
+        ))}
+      </div>
+      <form onSubmit={submit} className="mt-2 flex items-end gap-2">
+        <label className="min-w-0 flex-1">
+          <span className="sr-only">{t("videoDetail.comments.add")}</span>
+          <textarea
+            value={body}
+            maxLength={2000}
+            rows={2}
+            onChange={(event) => setBody(event.target.value)}
+            placeholder={t("videoDetail.comments.placeholder")}
+            className="vi-textarea resize-none text-sm normal-case"
+          />
+        </label>
+        <button
+          type="submit"
+          disabled={!body.trim() || createComment.isPending}
+          className="vi-icon-button shrink-0 disabled:opacity-50"
+          aria-label={t("videoDetail.comments.add")}
+          title={t("videoDetail.comments.add")}
+        >
+          <Send className="h-4 w-4" />
+        </button>
+      </form>
+      {createComment.isError && (
+        <p className="mt-2 text-xs text-[var(--danger)]">{t("videoDetail.comments.error")}</p>
+      )}
+    </div>
   );
 }
 
@@ -1186,6 +1239,7 @@ function AnnotationComposer({
   const { t } = useTranslation();
   const createAnnotation = useCreateAnnotation(videoId);
   const updateAnnotation = useUpdateAnnotation(videoId);
+  const contentLabelId = useId();
   const [jsonError, setJsonError] = useState<string | null>(null);
   const isPending = createAnnotation.isPending || updateAnnotation.isPending;
 
@@ -1195,7 +1249,7 @@ function AnnotationComposer({
 
   const submit = (event: FormEvent) => {
     event.preventDefault();
-    if (!values.title.trim() || !values.body.trim()) return;
+    if (isRichTextEmpty(values.content)) return;
 
     let customData: Record<string, unknown>;
     try {
@@ -1222,8 +1276,7 @@ function AnnotationComposer({
       shape: "marker",
       display_mode: "side-panel",
       interactive: true,
-      title: values.title.trim(),
-      body: values.body.trim(),
+      content: values.content,
       kind: values.kind,
       color: values.color,
       custom_data: customData,
@@ -1259,24 +1312,16 @@ function AnnotationComposer({
       </div>
 
       <div className="mt-4 grid gap-3">
-        <label className="vi-label">
-          {t("videoDetail.form.title")}
-          <input
-            value={values.title}
-            onChange={(event) => updateValues({ title: event.target.value })}
-            className="vi-input mt-1 text-sm normal-case"
+        <div>
+          <p id={contentLabelId} className="vi-label mb-1">
+            {t("videoDetail.form.content")}
+          </p>
+          <RichTextEditor
+            labelledBy={contentLabelId}
+            value={values.content}
+            onChange={(content) => updateValues({ content })}
           />
-        </label>
-
-        <label className="vi-label">
-          {t("videoDetail.form.body")}
-          <textarea
-            value={values.body}
-            onChange={(event) => updateValues({ body: event.target.value })}
-            rows={4}
-            className="vi-textarea mt-1 text-sm normal-case"
-          />
-        </label>
+        </div>
 
         <div className="grid gap-3 sm:grid-cols-2">
           <label className="vi-label">
@@ -1352,7 +1397,7 @@ function AnnotationComposer({
       <div className="mt-4 flex gap-2">
         <button
           type="submit"
-          disabled={!values.title.trim() || !values.body.trim() || isPending}
+          disabled={isRichTextEmpty(values.content) || isPending}
           className="vi-button-primary disabled:opacity-50"
         >
           <Check className="h-4 w-4" />
@@ -1414,8 +1459,7 @@ function getEditorValuesFromAnnotation(annotation: Annotation): AnnotationEditor
   return {
     timestamp_seconds: toRoundedTime(annotation.timestamp_seconds),
     duration_seconds: annotation.duration_seconds.toString(),
-    title: annotation.title,
-    body: annotation.body,
+    content: annotation.content,
     kind: annotation.kind,
     color: annotation.color,
     custom_data: JSON.stringify(annotation.custom_data, null, 2),
@@ -1426,12 +1470,28 @@ function getEditorValuesFromTimestamp(timestamp: number): AnnotationEditorValues
   return {
     timestamp_seconds: toRoundedTime(timestamp),
     duration_seconds: "6",
-    title: "",
-    body: "",
+    content: emptyRichTextDocument(),
     kind: "note",
     color: "#C0512F",
     custom_data: "{}",
   };
+}
+
+function emptyRichTextDocument(): RichTextDocument {
+  return { type: "doc", content: [{ type: "paragraph" }] };
+}
+
+function getRichTextPreview(document: RichTextDocument): string {
+  const parts: string[] = [];
+  const visit = (nodes = document.content ?? []) => {
+    for (const node of nodes) {
+      if (node.text) parts.push(node.text);
+      if (node.type === "image") parts.push("[Image]");
+      if (node.content) visit(node.content);
+    }
+  };
+  visit();
+  return parts.join(" ").trim();
 }
 
 function getCurrentPlayerTime(element: HTMLVideoElement | null, fallback: number) {
