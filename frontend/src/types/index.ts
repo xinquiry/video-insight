@@ -21,6 +21,8 @@ export interface Video {
   content_type: string;
   size_bytes: number;
   playback_url: string | null;
+  processing_status: "pending" | "processing" | "ready" | "failed";
+  processing_error: string | null;
   created_at: string;
   updated_at: string | null;
 }

@@ -11,20 +11,31 @@ import (
 	"github.com/xinquiry/video-insight/backend/internal/groups"
 	"github.com/xinquiry/video-insight/backend/internal/httpapi"
 	"github.com/xinquiry/video-insight/backend/internal/platform/config"
+	"github.com/xinquiry/video-insight/backend/internal/platform/media"
 	"github.com/xinquiry/video-insight/backend/internal/platform/postgres"
 	"github.com/xinquiry/video-insight/backend/internal/platform/storage"
 	"github.com/xinquiry/video-insight/backend/internal/videos"
 )
 
 type App struct {
-	Handler http.Handler
-	store   *postgres.Store
+	Handler         http.Handler
+	store           *postgres.Store
+	processorCancel context.CancelFunc
+	processorDone   <-chan struct{}
 }
 
 func New(ctx context.Context, cfg config.Config, logger *slog.Logger) (*App, error) {
 	store, err := postgres.Open(ctx, cfg.DatabaseURL)
 	if err != nil {
 		return nil, err
+	}
+	recovered, err := store.RequeueInterruptedVideoProcessing(ctx)
+	if err != nil {
+		store.Close()
+		return nil, fmt.Errorf("recover interrupted video processing jobs: %w", err)
+	}
+	if recovered > 0 {
+		logger.Info("requeued interrupted video processing jobs", "count", recovered)
 	}
 	objectStorage, err := storage.NewS3(ctx, storage.Config{
 		Endpoint: cfg.S3Endpoint, PublicEndpoint: cfg.S3PublicEndpoint,
@@ -47,10 +58,41 @@ func New(ctx context.Context, cfg config.Config, logger *slog.Logger) (*App, err
 	videoService := videos.NewService(store, objectStorage, videos.Config{
 		PartSize: cfg.UploadPartSize, MaxParts: cfg.UploadMaxParts,
 		URLTTL: cfg.UploadURLTTL, Concurrency: cfg.UploadConcurrency,
+		ProcessingEnabled: cfg.VideoProcessingEnabled,
 	})
 	annotationService := annotations.NewService(store)
 	handler := httpapi.New(authService, groupService, videoService, annotationService, tokens, store, logger, cfg.CORSOrigins)
-	return &App{Handler: handler, store: store}, nil
+	application := &App{Handler: handler, store: store}
+	if cfg.VideoProcessingEnabled {
+		optimizer, err := media.NewFFmpegOptimizer(
+			objectStorage,
+			cfg.VideoProcessingFFmpegPath,
+			cfg.VideoProcessingTempDir,
+		)
+		if err != nil {
+			store.Close()
+			return nil, fmt.Errorf("initialize video processor: %w", err)
+		}
+		processor := videos.NewProcessor(store, optimizer, logger, videos.ProcessorConfig{
+			PollInterval: cfg.VideoProcessingPollInterval,
+			MaxAttempts:  cfg.VideoProcessingMaxAttempts,
+		})
+		processorCtx, cancel := context.WithCancel(ctx)
+		done := make(chan struct{})
+		application.processorCancel = cancel
+		application.processorDone = done
+		go func() {
+			defer close(done)
+			processor.Run(processorCtx)
+		}()
+	}
+	return application, nil
 }
 
-func (a *App) Close() { a.store.Close() }
+func (a *App) Close() {
+	if a.processorCancel != nil {
+		a.processorCancel()
+		<-a.processorDone
+	}
+	a.store.Close()
+}

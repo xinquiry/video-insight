@@ -186,7 +186,7 @@ function VideoDetailPage() {
     element.currentTime = seconds;
     currentVideoTimeRef.current = seconds;
     setCurrentVideoTime(seconds);
-    if (shouldPlay) void element.play();
+    if (shouldPlay) requestVideoPlayback(element);
   };
 
   const seekByKeyboard = (deltaSeconds: number) => {
@@ -230,7 +230,7 @@ function VideoDetailPage() {
     const element = videoElement.current;
     if (!element) return;
     if (element.paused) {
-      void element.play();
+      requestVideoPlayback(element);
       return;
     }
     element.pause();
@@ -297,7 +297,7 @@ function VideoDetailPage() {
 
     if (shouldResumePlaybackRef.current) {
       shouldResumePlaybackRef.current = false;
-      void element.play();
+      requestVideoPlayback(element);
     }
   };
 
@@ -395,7 +395,13 @@ function VideoDetailPage() {
             isExpandedLayout && "h-full min-h-[22rem]",
           )}
         >
-          {t("videoDetail.videoUnavailable")}
+          {video.processing_status === "failed"
+            ? t("videoDetail.processing.failed", {
+                message: video.processing_error ?? t("videoDetail.processing.unknownError"),
+              })
+            : video.processing_status === "pending" || video.processing_status === "processing"
+              ? t("videoDetail.processing.inProgress")
+              : t("videoDetail.videoUnavailable")}
         </div>
       )}
     </motion.div>
@@ -1492,6 +1498,12 @@ function getRichTextPreview(document: RichTextDocument): string {
   };
   visit();
   return parts.join(" ").trim();
+}
+
+function requestVideoPlayback(element: HTMLVideoElement) {
+  // The media element exposes real load/decode failures through `error`; this
+  // promise can also reject during an intentional play/pause race.
+  void element.play().catch(() => undefined);
 }
 
 function getCurrentPlayerTime(element: HTMLVideoElement | null, fallback: number) {

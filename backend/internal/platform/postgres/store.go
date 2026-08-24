@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"math"
 	"time"
 
 	"github.com/google/uuid"
@@ -139,15 +138,46 @@ func (s *Store) ListVideosForGroup(ctx context.Context, groupID uuid.UUID, offse
 }
 
 func (s *Store) CreateVideo(ctx context.Context, video model.Video) (model.Video, error) {
-	if video.SizeBytes > math.MaxInt32 {
-		return model.Video{}, fmt.Errorf("video size %d exceeds current database integer limit", video.SizeBytes)
-	}
 	value, err := s.queries.CreateVideo(ctx, db.CreateVideoParams{
 		GroupID: video.GroupID, Title: video.Title, Description: video.Description,
 		ObjectKey: video.ObjectKey, OriginalFilename: video.OriginalFilename,
-		ContentType: video.ContentType, SizeBytes: int32(video.SizeBytes),
+		ContentType: video.ContentType, SizeBytes: video.SizeBytes,
+		ProcessingStatus: string(video.ProcessingStatus),
 	})
 	return videoModel(value), mapConflict(err)
+}
+
+func (s *Store) ClaimVideoForProcessing(ctx context.Context) (model.Video, bool, error) {
+	value, err := s.queries.ClaimVideoForProcessing(ctx)
+	if ok, foundErr := found(err); !ok || foundErr != nil {
+		return model.Video{}, ok, foundErr
+	}
+	return videoModel(value), true, nil
+}
+
+func (s *Store) RequeueInterruptedVideoProcessing(ctx context.Context) (int64, error) {
+	return s.queries.RequeueInterruptedVideoProcessing(ctx)
+}
+
+func (s *Store) MarkVideoProcessingReady(ctx context.Context, videoID uuid.UUID, sizeBytes int64) (bool, error) {
+	rows, err := s.queries.MarkVideoProcessingReady(ctx, db.MarkVideoProcessingReadyParams{
+		ID: videoID, SizeBytes: sizeBytes,
+	})
+	return rows > 0, err
+}
+
+func (s *Store) MarkVideoProcessingFailed(
+	ctx context.Context,
+	videoID uuid.UUID,
+	status model.VideoProcessingStatus,
+	message string,
+	nextAttemptAt time.Time,
+) (bool, error) {
+	rows, err := s.queries.MarkVideoProcessingFailed(ctx, db.MarkVideoProcessingFailedParams{
+		ID: videoID, ProcessingStatus: string(status), ProcessingError: &message,
+		ProcessingAvailableAt: pgtype.Timestamp{Time: nextAttemptAt, Valid: true},
+	})
+	return rows > 0, err
 }
 
 func (s *Store) UpdateVideo(ctx context.Context, video model.Video) (model.Video, error) {
@@ -287,8 +317,12 @@ func videoModel(value db.Video) model.Video {
 	return model.Video{
 		ID: value.ID, GroupID: value.GroupID, Title: value.Title, Description: value.Description,
 		ObjectKey: value.ObjectKey, OriginalFilename: value.OriginalFilename,
-		ContentType: value.ContentType, SizeBytes: int64(value.SizeBytes),
-		CreatedAt: value.CreatedAt.Time, UpdatedAt: optionalTime(value.UpdatedAt),
+		ContentType: value.ContentType, SizeBytes: value.SizeBytes,
+		ProcessingStatus: model.VideoProcessingStatus(value.ProcessingStatus),
+		ProcessingError:  value.ProcessingError, ProcessingAttempts: int(value.ProcessingAttempts),
+		ProcessingStartedAt:   optionalTime(value.ProcessingStartedAt),
+		ProcessingAvailableAt: value.ProcessingAvailableAt.Time,
+		CreatedAt:             value.CreatedAt.Time, UpdatedAt: optionalTime(value.UpdatedAt),
 	}
 }
 

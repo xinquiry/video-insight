@@ -25,6 +25,8 @@ services:
     depends_on:
       postgresql:
         condition: service_healthy
+    volumes:
+      - video-processing-tmp:/var/tmp/video-insight
     healthcheck:
       test:
         [
@@ -73,3 +75,4 @@ services:
 volumes:
   pg-data:
   minio-data:
+  video-processing-tmp:

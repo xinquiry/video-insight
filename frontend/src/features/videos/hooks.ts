@@ -19,6 +19,16 @@ export function useVideos(page = 1, pageSize = 20) {
   return useQuery({
     queryKey: ["videos", page, pageSize],
     queryFn: () => fetchVideos(page, pageSize),
+    refetchInterval: (query) => {
+      const data = query.state.data;
+      const videos = Array.isArray(data) ? data : data?.items ?? [];
+      return videos.some(
+        (video) =>
+          video.processing_status === "pending" || video.processing_status === "processing",
+      )
+        ? 3_000
+        : false;
+    },
   });
 }
 
@@ -27,6 +37,10 @@ export function useVideo(id: string) {
     queryKey: ["videos", id],
     queryFn: () => fetchVideo(id),
     refetchOnWindowFocus: false,
+    refetchInterval: (query) => {
+      const status = query.state.data?.processing_status;
+      return status === "pending" || status === "processing" ? 3_000 : false;
+    },
   });
 }
 

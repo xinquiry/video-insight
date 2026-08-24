@@ -11,6 +11,7 @@ import (
 )
 
 type Querier interface {
+	ClaimVideoForProcessing(ctx context.Context) (Video, error)
 	CountVideosForGroup(ctx context.Context, groupID uuid.UUID) (int64, error)
 	CreateAnnotation(ctx context.Context, arg CreateAnnotationParams) (Annotation, error)
 	CreateAnnotationComment(ctx context.Context, arg CreateAnnotationCommentParams) (CreateAnnotationCommentRow, error)
@@ -29,6 +30,9 @@ type Querier interface {
 	ListAnnotationsForVideo(ctx context.Context, videoID uuid.UUID) ([]Annotation, error)
 	ListGroups(ctx context.Context) ([]Group, error)
 	ListVideosForGroup(ctx context.Context, arg ListVideosForGroupParams) ([]Video, error)
+	MarkVideoProcessingFailed(ctx context.Context, arg MarkVideoProcessingFailedParams) (int64, error)
+	MarkVideoProcessingReady(ctx context.Context, arg MarkVideoProcessingReadyParams) (int64, error)
+	RequeueInterruptedVideoProcessing(ctx context.Context) (int64, error)
 	UpdateAnnotation(ctx context.Context, arg UpdateAnnotationParams) (Annotation, error)
 	UpdateUser(ctx context.Context, arg UpdateUserParams) (User, error)
 	UpdateVideo(ctx context.Context, arg UpdateVideoParams) (Video, error)

@@ -11,27 +11,32 @@ import (
 )
 
 type Config struct {
-	Address            string
-	DatabaseURL        string
-	CORSOrigins        []string
-	SecretKey          string
-	AccessTokenTTL     time.Duration
-	AdminUsername      string
-	AdminPassword      string
-	DefaultGroupName   string
-	SeedAdminOnStartup bool
-	S3Endpoint         string
-	S3PublicEndpoint   string
-	S3AccessKey        string
-	S3SecretKey        string
-	S3Bucket           string
-	S3Secure           bool
-	S3PublicSecure     bool
-	S3Region           string
-	UploadPartSize     int64
-	UploadURLTTL       time.Duration
-	UploadMaxParts     int
-	UploadConcurrency  int
+	Address                     string
+	DatabaseURL                 string
+	CORSOrigins                 []string
+	SecretKey                   string
+	AccessTokenTTL              time.Duration
+	AdminUsername               string
+	AdminPassword               string
+	DefaultGroupName            string
+	SeedAdminOnStartup          bool
+	S3Endpoint                  string
+	S3PublicEndpoint            string
+	S3AccessKey                 string
+	S3SecretKey                 string
+	S3Bucket                    string
+	S3Secure                    bool
+	S3PublicSecure              bool
+	S3Region                    string
+	UploadPartSize              int64
+	UploadURLTTL                time.Duration
+	UploadMaxParts              int
+	UploadConcurrency           int
+	VideoProcessingEnabled      bool
+	VideoProcessingFFmpegPath   string
+	VideoProcessingTempDir      string
+	VideoProcessingPollInterval time.Duration
+	VideoProcessingMaxAttempts  int
 }
 
 func Load() (Config, error) {
@@ -67,31 +72,48 @@ func Load() (Config, error) {
 	if err != nil {
 		return Config{}, err
 	}
+	processingEnabled, err := envBool("VIDEO_PROCESSING_ENABLED", true)
+	if err != nil {
+		return Config{}, err
+	}
+	processingPollSeconds, err := envInt64("VIDEO_PROCESSING_POLL_SECONDS", 5)
+	if err != nil {
+		return Config{}, err
+	}
+	processingMaxAttempts, err := envInt("VIDEO_PROCESSING_MAX_ATTEMPTS", 3)
+	if err != nil {
+		return Config{}, err
+	}
 
 	endpoint := env("MINIO_ENDPOINT", "localhost:9000")
 	publicEndpoint := env("MINIO_PUBLIC_ENDPOINT", endpoint)
 	cfg := Config{
-		Address:            env("GO_BACKEND_ADDRESS", ":8000"),
-		DatabaseURL:        env("GO_DATABASE_URL", "postgres://videoinsight:videoinsight@localhost:5432/videoinsight"),
-		CORSOrigins:        parseOrigins(env("CORS_ORIGINS", `["http://localhost:5173"]`)),
-		SecretKey:          env("SECRET_KEY", "dev-secret-change-me"),
-		AccessTokenTTL:     time.Duration(tokenMinutes) * time.Minute,
-		AdminUsername:      env("ADMIN_USERNAME", "admin"),
-		AdminPassword:      env("ADMIN_PASSWORD", "admin"),
-		DefaultGroupName:   env("DEFAULT_GROUP_NAME", "Default"),
-		SeedAdminOnStartup: seedAdmin,
-		S3Endpoint:         endpointURL(endpoint, secure),
-		S3PublicEndpoint:   endpointURL(publicEndpoint, publicSecure),
-		S3AccessKey:        env("MINIO_ACCESS_KEY", "minioadmin"),
-		S3SecretKey:        env("MINIO_SECRET_KEY", "minioadmin"),
-		S3Bucket:           env("MINIO_BUCKET", "videos"),
-		S3Secure:           secure,
-		S3PublicSecure:     publicSecure,
-		S3Region:           env("MINIO_REGION", "us-east-1"),
-		UploadPartSize:     partSize,
-		UploadURLTTL:       time.Duration(expires) * time.Second,
-		UploadMaxParts:     maxParts,
-		UploadConcurrency:  max(1, concurrency),
+		Address:                     env("GO_BACKEND_ADDRESS", ":8000"),
+		DatabaseURL:                 env("GO_DATABASE_URL", "postgres://videoinsight:videoinsight@localhost:5432/videoinsight"),
+		CORSOrigins:                 parseOrigins(env("CORS_ORIGINS", `["http://localhost:5173"]`)),
+		SecretKey:                   env("SECRET_KEY", "dev-secret-change-me"),
+		AccessTokenTTL:              time.Duration(tokenMinutes) * time.Minute,
+		AdminUsername:               env("ADMIN_USERNAME", "admin"),
+		AdminPassword:               env("ADMIN_PASSWORD", "admin"),
+		DefaultGroupName:            env("DEFAULT_GROUP_NAME", "Default"),
+		SeedAdminOnStartup:          seedAdmin,
+		S3Endpoint:                  endpointURL(endpoint, secure),
+		S3PublicEndpoint:            endpointURL(publicEndpoint, publicSecure),
+		S3AccessKey:                 env("MINIO_ACCESS_KEY", "minioadmin"),
+		S3SecretKey:                 env("MINIO_SECRET_KEY", "minioadmin"),
+		S3Bucket:                    env("MINIO_BUCKET", "videos"),
+		S3Secure:                    secure,
+		S3PublicSecure:              publicSecure,
+		S3Region:                    env("MINIO_REGION", "us-east-1"),
+		UploadPartSize:              partSize,
+		UploadURLTTL:                time.Duration(expires) * time.Second,
+		UploadMaxParts:              maxParts,
+		UploadConcurrency:           max(1, concurrency),
+		VideoProcessingEnabled:      processingEnabled,
+		VideoProcessingFFmpegPath:   env("VIDEO_PROCESSING_FFMPEG_PATH", "ffmpeg"),
+		VideoProcessingTempDir:      env("VIDEO_PROCESSING_TEMP_DIR", "/var/tmp/video-insight"),
+		VideoProcessingPollInterval: time.Duration(processingPollSeconds) * time.Second,
+		VideoProcessingMaxAttempts:  processingMaxAttempts,
 	}
 	if err := cfg.Validate(); err != nil {
 		return Config{}, err
@@ -108,6 +130,17 @@ func (c Config) Validate() error {
 	}
 	if c.UploadMaxParts < 1 || c.UploadMaxParts > 10000 {
 		return errors.New("UPLOAD_MAX_PARTS must be between 1 and 10000")
+	}
+	if c.VideoProcessingEnabled {
+		if c.VideoProcessingPollInterval <= 0 {
+			return errors.New("VIDEO_PROCESSING_POLL_SECONDS must be positive")
+		}
+		if c.VideoProcessingMaxAttempts < 1 || c.VideoProcessingMaxAttempts > 10 {
+			return errors.New("VIDEO_PROCESSING_MAX_ATTEMPTS must be between 1 and 10")
+		}
+		if c.VideoProcessingFFmpegPath == "" || c.VideoProcessingTempDir == "" {
+			return errors.New("video processing ffmpeg path and temp directory must not be empty")
+		}
 	}
 	return nil
 }

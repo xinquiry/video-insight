@@ -46,6 +46,8 @@ type videoResponse struct {
 	ContentType      string  `json:"content_type"`
 	SizeBytes        int64   `json:"size_bytes"`
 	PlaybackURL      *string `json:"playback_url"`
+	ProcessingStatus string  `json:"processing_status"`
+	ProcessingError  *string `json:"processing_error"`
 	CreatedAt        string  `json:"created_at"`
 	UpdatedAt        *string `json:"updated_at"`
 }
@@ -199,11 +201,11 @@ func groupDTO(group model.Group) groupResponse {
 }
 
 func videoDTO(read videos.Read) videoResponse {
-	playbackURL := read.PlaybackURL
 	return videoResponse{
 		ID: read.Video.ID.String(), GroupID: read.Video.GroupID.String(), Title: read.Video.Title,
 		Description: read.Video.Description, OriginalFilename: read.Video.OriginalFilename,
-		ContentType: read.Video.ContentType, SizeBytes: read.Video.SizeBytes, PlaybackURL: &playbackURL,
+		ContentType: read.Video.ContentType, SizeBytes: read.Video.SizeBytes, PlaybackURL: read.PlaybackURL,
+		ProcessingStatus: string(read.Video.ProcessingStatus), ProcessingError: read.Video.ProcessingError,
 		CreatedAt: formatTime(read.Video.CreatedAt), UpdatedAt: formatOptionalTime(read.Video.UpdatedAt),
 	}
 }

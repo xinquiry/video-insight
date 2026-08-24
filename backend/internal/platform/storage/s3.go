@@ -4,6 +4,8 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"io"
+	"os"
 	"sort"
 	"strings"
 	"time"
@@ -140,4 +142,49 @@ func (s *S3) DeleteObject(ctx context.Context, objectKey string) error {
 		return fmt.Errorf("delete object: %w", err)
 	}
 	return nil
+}
+
+func (s *S3) DownloadObject(ctx context.Context, objectKey, destination string) error {
+	output, err := s.client.GetObject(ctx, &s3.GetObjectInput{
+		Bucket: aws.String(s.bucket), Key: aws.String(objectKey),
+	})
+	if err != nil {
+		return fmt.Errorf("get object: %w", err)
+	}
+	defer func() { _ = output.Body.Close() }()
+
+	file, err := os.Create(destination)
+	if err != nil {
+		return fmt.Errorf("create download destination: %w", err)
+	}
+	if _, err := io.Copy(file, output.Body); err != nil {
+		_ = file.Close()
+		_ = os.Remove(destination)
+		return fmt.Errorf("download object: %w", err)
+	}
+	if err := file.Close(); err != nil {
+		_ = os.Remove(destination)
+		return fmt.Errorf("close download destination: %w", err)
+	}
+	return nil
+}
+
+func (s *S3) UploadObject(ctx context.Context, objectKey, contentType, source string) (int64, error) {
+	file, err := os.Open(source)
+	if err != nil {
+		return 0, fmt.Errorf("open upload source: %w", err)
+	}
+	defer func() { _ = file.Close() }()
+	info, err := file.Stat()
+	if err != nil {
+		return 0, fmt.Errorf("stat upload source: %w", err)
+	}
+	_, err = s.client.PutObject(ctx, &s3.PutObjectInput{
+		Bucket: aws.String(s.bucket), Key: aws.String(objectKey), Body: file,
+		ContentType: aws.String(contentType), ContentLength: aws.Int64(info.Size()),
+	})
+	if err != nil {
+		return 0, fmt.Errorf("put object: %w", err)
+	}
+	return info.Size(), nil
 }

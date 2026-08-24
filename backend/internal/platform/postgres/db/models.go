@@ -58,14 +58,19 @@ type User struct {
 }
 
 type Video struct {
-	Title            string           `json:"title"`
-	Description      *string          `json:"description"`
-	ObjectKey        string           `json:"object_key"`
-	OriginalFilename string           `json:"original_filename"`
-	ContentType      string           `json:"content_type"`
-	SizeBytes        int32            `json:"size_bytes"`
-	ID               uuid.UUID        `json:"id"`
-	CreatedAt        pgtype.Timestamp `json:"created_at"`
-	UpdatedAt        pgtype.Timestamp `json:"updated_at"`
-	GroupID          uuid.UUID        `json:"group_id"`
+	Title                 string           `json:"title"`
+	Description           *string          `json:"description"`
+	ObjectKey             string           `json:"object_key"`
+	OriginalFilename      string           `json:"original_filename"`
+	ContentType           string           `json:"content_type"`
+	SizeBytes             int64            `json:"size_bytes"`
+	ProcessingStatus      string           `json:"processing_status"`
+	ProcessingError       *string          `json:"processing_error"`
+	ProcessingAttempts    int32            `json:"processing_attempts"`
+	ProcessingStartedAt   pgtype.Timestamp `json:"processing_started_at"`
+	ProcessingAvailableAt pgtype.Timestamp `json:"processing_available_at"`
+	ID                    uuid.UUID        `json:"id"`
+	CreatedAt             pgtype.Timestamp `json:"created_at"`
+	UpdatedAt             pgtype.Timestamp `json:"updated_at"`
+	GroupID               uuid.UUID        `json:"group_id"`
 }

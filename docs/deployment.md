@@ -79,6 +79,58 @@ Use strong production values for `POSTGRES_PASSWORD`, `SECRET_KEY`, and
 `GO_SEED_ADMIN_ON_STARTUP=true` for its first start; established environments
 should keep it disabled so restarts do not rotate administrator credentials.
 
+## Playback Optimization
+
+The backend persists a processing job for every completed upload. A single
+background worker losslessly remuxes MP4 files with ffmpeg so the `moov` atom
+precedes media data (fast-start playback), then atomically replaces the S3
+object. The API withholds `playback_url` while a video is pending or processing,
+and the frontend polls until it is ready. On startup the backend immediately
+requeues work interrupted by a previous restart, even when processing is
+temporarily disabled; failed attempts are retried with backoff.
+
+The production image includes ffmpeg and Compose mounts the
+`video-processing-tmp` volume at `/var/tmp/video-insight`. Ensure that volume
+has enough free space for roughly two copies of the largest uploaded video.
+The defaults are normally sufficient; optional overrides are:
+
+```text
+VIDEO_PROCESSING_ENABLED=true
+VIDEO_PROCESSING_FFMPEG_PATH=ffmpeg
+VIDEO_PROCESSING_TEMP_DIR=/var/tmp/video-insight
+VIDEO_PROCESSING_POLL_SECONDS=5
+VIDEO_PROCESSING_MAX_ATTEMPTS=3
+```
+
+Non-MP4 video objects pass through unchanged. Failed jobs expose their status
+through the video API and remain unavailable for playback rather than serving
+a partially processed object. Run exactly one backend replica while processing
+is enabled; concurrency is intentionally limited per backend process. If
+`VIDEO_PROCESSING_ENABLED=false`, new uploads are marked ready without
+optimization and existing pending jobs wait until processing is re-enabled.
+
+Existing videos are left ready during the schema migration to avoid an
+unexpected playback outage. To enqueue an intentional MP4 backfill during a
+maintenance window, run the following SQL against the production database:
+
+```sql
+UPDATE videos
+SET processing_status = 'pending',
+    processing_error = NULL,
+    processing_attempts = 0,
+    processing_started_at = NULL,
+    processing_available_at = now(),
+    updated_at = now()
+WHERE processing_status = 'ready'
+  AND (
+    content_type ILIKE 'video/mp4%'
+    OR original_filename ILIKE '%.mp4'
+  );
+```
+
+The single worker processes the backfill serially. Already optimized files are
+verified and returned to ready without being uploaded again.
+
 ## Deploy
 
 From the repository on the server:

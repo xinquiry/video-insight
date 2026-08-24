@@ -96,6 +96,11 @@
     "totalCount_other": "{{count}} videos total",
     "previous": "Previous",
     "next": "Next",
+    "processing": {
+      "pending": "Queued for playback optimization",
+      "processing": "Optimizing for fast playback…",
+      "failed": "Playback optimization failed"
+    },
     "form": {
       "title": "Title",
       "file": "Video file",
@@ -112,6 +117,11 @@
     "kicker": "Watching edition",
     "deleteVideo": "Delete Video",
     "videoUnavailable": "Video URL unavailable.",
+    "processing": {
+      "inProgress": "Optimizing this video for reliable browser playback…",
+      "failed": "Playback optimization failed: {{message}}",
+      "unknownError": "Unknown processing error"
+    },
     "notFound": "Video not found.",
     "file": "File",
     "size": "Size",

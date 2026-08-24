@@ -30,6 +30,8 @@ services:
         condition: service_healthy
       minio:
         condition: service_healthy
+    volumes:
+      - video-processing-tmp:/var/tmp/video-insight
     healthcheck:
       test: ["CMD", "wget", "-qO-", "http://127.0.0.1:8000/api/health"]
       interval: 30s
@@ -68,3 +70,4 @@ services:
 volumes:
   pg-data:
   minio-data:
+  video-processing-tmp:

@@ -34,10 +34,11 @@ type Storage interface {
 }
 
 type Config struct {
-	PartSize    int64
-	MaxParts    int
-	URLTTL      time.Duration
-	Concurrency int
+	PartSize          int64
+	MaxParts          int
+	URLTTL            time.Duration
+	Concurrency       int
+	ProcessingEnabled bool
 }
 
 type Service struct {
@@ -83,7 +84,7 @@ type UpdateInput struct {
 
 type Read struct {
 	Video       model.Video
-	PlaybackURL string
+	PlaybackURL *string
 }
 
 func NewService(store Store, storage Storage, config Config) *Service {
@@ -137,10 +138,15 @@ func (s *Service) CompleteUpload(ctx context.Context, input CompleteInput, group
 	if err := s.storage.CompleteMultipartUpload(ctx, input.ObjectKey, input.UploadID, parts); err != nil {
 		return Read{}, apperror.Wrap(http.StatusBadRequest, "Failed to finalize upload", err)
 	}
+	processingStatus := model.VideoProcessingReady
+	if s.config.ProcessingEnabled {
+		processingStatus = model.VideoProcessingPending
+	}
 	video, err := s.store.CreateVideo(ctx, model.Video{
 		GroupID: groupID, Title: input.Title, Description: input.Description,
 		ObjectKey: input.ObjectKey, OriginalFilename: input.Filename,
 		ContentType: input.ContentType, SizeBytes: input.SizeBytes,
+		ProcessingStatus: processingStatus,
 	})
 	if err != nil {
 		_ = s.storage.DeleteObject(ctx, input.ObjectKey)
@@ -214,11 +220,21 @@ func (s *Service) Delete(ctx context.Context, videoID, groupID uuid.UUID) error 
 	if err != nil {
 		return err
 	}
+	if video.ProcessingStatus == model.VideoProcessingProcessing {
+		return apperror.New(http.StatusConflict, "Video is currently being processed")
+	}
 	deleted, err := s.store.DeleteVideo(ctx, videoID, groupID)
 	if err != nil {
 		return err
 	}
 	if !deleted {
+		current, found, getErr := s.store.GetVideoByIDForGroup(ctx, videoID, groupID)
+		if getErr != nil {
+			return getErr
+		}
+		if found && current.ProcessingStatus == model.VideoProcessingProcessing {
+			return apperror.New(http.StatusConflict, "Video is currently being processed")
+		}
 		return apperror.New(http.StatusNotFound, "Video not found")
 	}
 	return s.storage.DeleteObject(ctx, video.ObjectKey)
@@ -236,9 +252,12 @@ func (s *Service) get(ctx context.Context, videoID, groupID uuid.UUID) (model.Vi
 }
 
 func (s *Service) read(ctx context.Context, video model.Video) (Read, error) {
+	if video.ProcessingStatus != model.VideoProcessingReady {
+		return Read{Video: video}, nil
+	}
 	url, err := s.storage.PresignGet(ctx, video.ObjectKey, 2*time.Hour)
 	if err != nil {
 		return Read{}, err
 	}
-	return Read{Video: video, PlaybackURL: url}, nil
+	return Read{Video: video, PlaybackURL: &url}, nil
 }

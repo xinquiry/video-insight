@@ -86,6 +86,11 @@ function VideosPage() {
                       <p className="mt-1 max-w-xl text-sm text-[var(--muted)]">
                         {video.description ?? t("common.noDescription")}
                       </p>
+                      {video.processing_status !== "ready" && (
+                        <p className="vi-mono mt-2 text-xs text-[var(--accent)]">
+                          {t(`videos.processing.${video.processing_status}`)}
+                        </p>
+                      )}
                     </td>
                     <td className="px-5 py-4 text-sm text-[var(--muted)]">
                       <div className="flex items-center gap-2">

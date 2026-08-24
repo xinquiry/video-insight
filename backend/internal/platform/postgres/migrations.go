@@ -63,6 +63,32 @@ CREATE INDEX IF NOT EXISTS ix_annotation_comments_annotation_id
     ON annotation_comments (annotation_id);
 `
 
+const videoProcessingMigration = `
+ALTER TABLE videos ALTER COLUMN size_bytes TYPE bigint;
+ALTER TABLE videos ADD COLUMN IF NOT EXISTS processing_status varchar DEFAULT 'ready' NOT NULL;
+ALTER TABLE videos ADD COLUMN IF NOT EXISTS processing_error varchar;
+ALTER TABLE videos ADD COLUMN IF NOT EXISTS processing_attempts integer DEFAULT 0 NOT NULL;
+ALTER TABLE videos ADD COLUMN IF NOT EXISTS processing_started_at timestamp without time zone;
+ALTER TABLE videos ADD COLUMN IF NOT EXISTS processing_available_at timestamp without time zone DEFAULT now() NOT NULL;
+
+DO $migration$
+BEGIN
+    IF NOT EXISTS (
+        SELECT 1
+        FROM pg_constraint
+        WHERE conname = 'ck_videos_processing_status'
+          AND conrelid = 'videos'::regclass
+    ) THEN
+        ALTER TABLE videos ADD CONSTRAINT ck_videos_processing_status
+            CHECK (processing_status IN ('pending', 'processing', 'ready', 'failed'));
+    END IF;
+END
+$migration$;
+
+CREATE INDEX IF NOT EXISTS ix_videos_processing_queue
+    ON videos (processing_status, processing_available_at);
+`
+
 type migration struct {
 	version string
 	sql     string
@@ -72,6 +98,7 @@ type migration struct {
 // safe to retry because a transaction can be interrupted before it is recorded.
 var migrations = []migration{
 	{version: "202608200001_rich_text_annotations_and_comments", sql: annotationRichTextMigration},
+	{version: "202608210001_video_processing", sql: videoProcessingMigration},
 }
 
 func runMigrations(ctx context.Context, pool *pgxpool.Pool) error {

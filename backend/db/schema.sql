@@ -26,14 +26,23 @@ CREATE TABLE videos (
     object_key varchar NOT NULL UNIQUE,
     original_filename varchar NOT NULL,
     content_type varchar NOT NULL,
-    size_bytes integer NOT NULL,
+    size_bytes bigint NOT NULL,
+    processing_status varchar DEFAULT 'ready' NOT NULL,
+    processing_error varchar,
+    processing_attempts integer DEFAULT 0 NOT NULL,
+    processing_started_at timestamp without time zone,
+    processing_available_at timestamp without time zone DEFAULT now() NOT NULL,
     id uuid DEFAULT gen_random_uuid() NOT NULL PRIMARY KEY,
     created_at timestamp without time zone DEFAULT now() NOT NULL,
     updated_at timestamp without time zone DEFAULT now(),
     group_id uuid NOT NULL REFERENCES groups(id)
 );
+ALTER TABLE videos ADD CONSTRAINT ck_videos_processing_status
+    CHECK (processing_status IN ('pending', 'processing', 'ready', 'failed'));
 CREATE INDEX ix_videos_title ON videos (title);
 CREATE INDEX ix_videos_group_id ON videos (group_id);
+CREATE INDEX ix_videos_processing_queue
+    ON videos (processing_status, processing_available_at);
 
 CREATE TABLE annotations (
     video_id uuid NOT NULL REFERENCES videos(id) ON DELETE CASCADE,

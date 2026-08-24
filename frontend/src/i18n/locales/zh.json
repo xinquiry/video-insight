@@ -96,6 +96,11 @@
     "totalCount_other": "共 {{count}} 个视频",
     "previous": "上一页",
     "next": "下一页",
+    "processing": {
+      "pending": "等待播放优化",
+      "processing": "正在优化快速播放…",
+      "failed": "播放优化失败"
+    },
     "form": {
       "title": "标题",
       "file": "视频文件",
@@ -112,6 +117,11 @@
     "kicker": "观看版本",
     "deleteVideo": "删除视频",
     "videoUnavailable": "视频链接不可用。",
+    "processing": {
+      "inProgress": "正在为浏览器可靠播放优化视频…",
+      "failed": "播放优化失败：{{message}}",
+      "unknownError": "未知处理错误"
+    },
     "notFound": "未找到该视频。",
     "file": "文件",
     "size": "大小",

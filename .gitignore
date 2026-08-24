@@ -11,6 +11,7 @@ docker/.env.dev
 docker/.env.prod
 .DS_Store
 .claude/settings.local.json
+.private/
 
 # Logs
 *.log

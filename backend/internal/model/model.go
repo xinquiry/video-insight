@@ -24,17 +24,31 @@ type Group struct {
 	UpdatedAt *time.Time
 }
 
+type VideoProcessingStatus string
+
+const (
+	VideoProcessingPending    VideoProcessingStatus = "pending"
+	VideoProcessingProcessing VideoProcessingStatus = "processing"
+	VideoProcessingReady      VideoProcessingStatus = "ready"
+	VideoProcessingFailed     VideoProcessingStatus = "failed"
+)
+
 type Video struct {
-	ID               uuid.UUID
-	GroupID          uuid.UUID
-	Title            string
-	Description      *string
-	ObjectKey        string
-	OriginalFilename string
-	ContentType      string
-	SizeBytes        int64
-	CreatedAt        time.Time
-	UpdatedAt        *time.Time
+	ID                    uuid.UUID
+	GroupID               uuid.UUID
+	Title                 string
+	Description           *string
+	ObjectKey             string
+	OriginalFilename      string
+	ContentType           string
+	SizeBytes             int64
+	ProcessingStatus      VideoProcessingStatus
+	ProcessingError       *string
+	ProcessingAttempts    int
+	ProcessingStartedAt   *time.Time
+	ProcessingAvailableAt time.Time
+	CreatedAt             time.Time
+	UpdatedAt             *time.Time
 }
 
 type Annotation struct {
