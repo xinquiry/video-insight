@@ -1,0 +1,7 @@
+/target/
+/dist/
+*.zip
+**/target/
+**/.embuild/
+.DS_Store
+*.local.json

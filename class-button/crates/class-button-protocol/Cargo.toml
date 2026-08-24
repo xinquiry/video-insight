@@ -1,0 +1,8 @@
+[package]
+name = "class-button-protocol"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+description = "Dependency-free no_std wire protocol shared by Class Button firmware and host"
+
+[lib]

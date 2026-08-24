@@ -1,0 +1,15 @@
+{
+  "classroom": "调试班级",
+  "devices": [
+    {
+      "device_id": 1001,
+      "student": "测试学生 1",
+      "seat": "A1"
+    },
+    {
+      "device_id": 1002,
+      "student": "测试学生 2",
+      "seat": "A2"
+    }
+  ]
+}

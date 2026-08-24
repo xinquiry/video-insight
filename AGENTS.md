@@ -4,6 +4,9 @@
 
 - Backend: Go 1.26 with Chi, pgx/sqlc, AWS SDK v2, JWT, and PBKDF2 password compatibility. Formatted with `gofmt`, checked with `go vet`, and tested with the race detector.
 - Frontend: React 19 + TanStack Router + TanStack Query + TailwindCSS 4, built with Vite and managed with `pnpm`.
+- Classroom: a nested Rust workspace in `class-button/` for the Makepad desktop
+  player, serial host tools, protocol, and browser adapter. ESP32-S3 firmware is
+  a separate nested workspace so its ESP-IDF target does not affect host builds.
 - Storage: PostgreSQL 16 plus MinIO locally or Cloudflare R2 in production.
 - Orchestration: layered Docker Compose driven by `scripts/dev.sh` and `scripts/deploy-prod.sh`.
 
@@ -31,6 +34,10 @@ just check                 # lint + type
 just fix                   # format/fix both sides
 
 just prod-up               # pull pinned images and deploy
+just run-desktop           # run the native Makepad classroom player
+just run-desktop-demo      # run it with a simulated button press
+just check-class-button    # format-check and test Rust host crates
+just build-esp32 receiver  # build receiver or button ESP32-S3 firmware
 ```
 
 The dev stack always loads `docker/.env.example` and optionally loads the ignored `docker/.env.dev`. Production additionally uses the ignored `docker/.env.prod`.
