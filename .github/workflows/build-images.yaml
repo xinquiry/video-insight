@@ -1,4 +1,4 @@
-name: Build images
+name: Build products
 
 on:
   push:
@@ -108,6 +108,20 @@ jobs:
           if-no-files-found: error
           retention-days: 14
 
+  desktop-artifact:
+    name: Publish Class Button desktop artifact
+    needs: desktop
+    runs-on: ubuntu-latest
+    steps:
+      - name: Merge platform packages
+        uses: actions/upload-artifact/merge@v4
+        with:
+          name: class-button-desktop
+          pattern: class-button-desktop-*
+          separate-directories: true
+          delete-merged: true
+          retention-days: 14
+
   docker:
     name: Build ${{ matrix.service }}
     needs: go-check
@@ -160,6 +174,8 @@ jobs:
 
       - name: Build and push
         uses: docker/build-push-action@v6
+        env:
+          DOCKER_BUILD_RECORD_UPLOAD: false
         with:
           context: ${{ matrix.context }}
           file: ${{ matrix.dockerfile }}
