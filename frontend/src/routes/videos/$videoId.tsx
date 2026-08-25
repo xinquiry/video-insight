@@ -81,6 +81,8 @@ const surfaceMotion = {
 } as const;
 
 const KEYBOARD_SEEK_STEP_SECONDS = 5;
+const PLAYBACK_RATES = [0.5, 0.75, 1, 1.25, 1.5, 2] as const;
+type PlaybackRate = (typeof PLAYBACK_RATES)[number];
 
 function VideoDetailPage() {
   const { t } = useTranslation();
@@ -102,6 +104,7 @@ function VideoDetailPage() {
   const [durationSeconds, setDurationSeconds] = useState(0);
   const [hoveredAnnotationId, setHoveredAnnotationId] = useState<string | null>(null);
   const [isPlaying, setIsPlaying] = useState(false);
+  const [playbackRate, setPlaybackRate] = useState<PlaybackRate>(1);
   const [editingAnnotation, setEditingAnnotation] = useState<Annotation | null>(null);
   const [editorValues, setEditorValues] = useState<AnnotationEditorValues | null>(null);
   const [isPlaybackExpanded, setIsPlaybackExpanded] = useState(false);
@@ -239,6 +242,12 @@ function VideoDetailPage() {
     element.pause();
   };
 
+  const changePlaybackRate = (rate: PlaybackRate) => {
+    const element = videoElement.current;
+    if (element) element.playbackRate = rate;
+    setPlaybackRate(rate);
+  };
+
   const toggleExpandedPlayback = () => {
     if (isPlaybackExpanded || isFullscreenActive()) {
       if (isFullscreenActive()) void exitFullscreen();
@@ -285,6 +294,7 @@ function VideoDetailPage() {
   const restoreVideoTime = () => {
     const element = videoElement.current;
     if (!element) return;
+    element.playbackRate = playbackRate;
     const duration = toFiniteTime(element.duration);
     durationSecondsRef.current = duration;
     setDurationSeconds(duration);
@@ -384,8 +394,10 @@ function VideoDetailPage() {
               isPlaying={isPlaying}
               onExpand={toggleExpandedPlayback}
               onHoverAnnotation={setHoveredAnnotationId}
+              onPlaybackRateChange={changePlaybackRate}
               onSeek={seekTo}
               onTogglePlayback={togglePlayback}
+              playbackRate={playbackRate}
               showAnnotationPreview={!isPlaybackExpanded}
             />
           </div>
@@ -561,8 +573,10 @@ function VideoControls({
   isPlaying,
   onExpand,
   onHoverAnnotation,
+  onPlaybackRateChange,
   onSeek,
   onTogglePlayback,
+  playbackRate,
   showAnnotationPreview,
 }: {
   annotations: Annotation[];
@@ -573,8 +587,10 @@ function VideoControls({
   isPlaying: boolean;
   onExpand: () => void;
   onHoverAnnotation: (annotationId: string | null) => void;
+  onPlaybackRateChange: (rate: PlaybackRate) => void;
   onSeek: (seconds: number) => void;
   onTogglePlayback: () => void;
+  playbackRate: PlaybackRate;
   showAnnotationPreview: boolean;
 }) {
   const { t } = useTranslation();
@@ -610,6 +626,22 @@ function VideoControls({
           <span className="vi-mono hidden text-xs text-white/62 sm:inline">
             {annotations.length} {t("videoDetail.annotations.title")}
           </span>
+          <select
+            value={playbackRate}
+            onChange={(event) => {
+              const rate = Number(event.target.value);
+              if (isPlaybackRate(rate)) onPlaybackRateChange(rate);
+            }}
+            className="vi-mono h-9 cursor-pointer rounded-full border border-white/12 bg-white/12 px-2 text-xs text-[var(--paper)] outline-none transition-colors hover:bg-white/22 focus:border-white/40"
+            aria-label={t("videoDetail.player.playbackSpeed")}
+            title={t("videoDetail.player.playbackSpeed")}
+          >
+            {PLAYBACK_RATES.map((rate) => (
+              <option key={rate} value={rate} className="bg-[#171411] text-[var(--paper)]">
+                {rate}×
+              </option>
+            ))}
+          </select>
           <button
             type="button"
             onClick={onExpand}
@@ -631,6 +663,10 @@ function VideoControls({
       </div>
     </div>
   );
+}
+
+function isPlaybackRate(value: number): value is PlaybackRate {
+  return PLAYBACK_RATES.some((rate) => rate === value);
 }
 
 function AnnotationScrubber({

@@ -266,6 +266,18 @@ select {
   padding-left: 0.875rem;
 }
 
+.vi-rich-text .tiptap a {
+  color: var(--accent);
+  cursor: pointer;
+  text-decoration: underline;
+  text-decoration-color: rgba(192, 81, 47, 0.45);
+  text-underline-offset: 3px;
+}
+
+.vi-rich-text .tiptap a:hover {
+  text-decoration-color: var(--accent);
+}
+
 .vi-rich-text .tiptap pre {
   background: var(--ink);
   border-radius: 6px;
