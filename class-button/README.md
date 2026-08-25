@@ -28,6 +28,9 @@ Rust workspace 包括：
 
 ## 运行方式
 
+教师可从 [GitHub Releases](https://github.com/xinquiry/video-insight/releases/latest)
+直接下载最新的 macOS 或 Windows 桌面应用。
+
 教师电脑只需连接 Class Button Hub。Class Button Key 不需要连接电脑的数据口，
 可以由独立 USB 充电器、移动电源或后续电池模块供电；两者通过 ESP-NOW 直接通信。
 

@@ -1,0 +1,104 @@
+name: Release Class Button desktop
+
+on:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: write
+
+jobs:
+  desktop:
+    name: Package desktop (${{ matrix.name }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: macOS
+            os: macos-latest
+            artifact: class-button-desktop-macos
+          - name: Windows x64
+            os: windows-latest
+            artifact: class-button-desktop-windows-x64
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      - name: Set up pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 11.22.0
+          run_install: false
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v5
+        with:
+          node-version: 24
+          cache: pnpm
+          cache-dependency-path: class-button/desktop/pnpm-lock.yaml
+
+      - name: Set up Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Cache Rust build
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: class-button -> target
+          key: ${{ matrix.artifact }}
+
+      - name: Install desktop dependencies
+        run: pnpm --dir class-button/desktop install --frozen-lockfile
+
+      - name: Check Rust workspace formatting
+        run: cargo fmt --manifest-path class-button/Cargo.toml --all -- --check
+
+      - name: Test Rust workspace
+        run: cargo test --manifest-path class-button/Cargo.toml --workspace
+
+      - name: Check Electron application
+        run: pnpm --dir class-button/desktop check
+
+      - name: Package macOS application
+        if: runner.os == 'macOS'
+        run: ./class-button/scripts/package-macos.sh
+
+      - name: Package Windows application
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: ./class-button/scripts/package-windows.ps1 -Architecture x64
+
+      - name: Upload desktop package
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.artifact }}
+          path: |
+            class-button/dist/electron/*.zip
+            class-button/dist/electron/*.exe
+          if-no-files-found: error
+          retention-days: 1
+
+  release:
+    name: Publish GitHub release
+    needs: desktop
+    runs-on: ubuntu-latest
+    steps:
+      - name: Download desktop packages
+        uses: actions/download-artifact@v4
+        with:
+          pattern: class-button-desktop-*
+          path: release-assets
+          merge-multiple: true
+
+      - name: Create GitHub release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: >-
+          gh release create "$GITHUB_REF_NAME"
+          release-assets/*.zip
+          release-assets/*.exe
+          --verify-tag
+          --generate-notes
+          --title "Class Button $GITHUB_REF_NAME"

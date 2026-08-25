@@ -33,6 +33,9 @@ just run-desktop-demo         # player plus a simulated student press
 just class-button-cli ports   # discover attached USB serial devices
 ```
 
+Teachers can download the current macOS and Windows desktop packages from
+[GitHub Releases](https://github.com/xinquiry/video-insight/releases/latest).
+
 Build or flash the ESP32-S3 development firmware:
 
 ```sh
