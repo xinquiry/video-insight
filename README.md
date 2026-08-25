@@ -50,6 +50,7 @@ just flash-esp32 receiver /dev/cu.usbmodemXXXX
 - `docker/` — local and production Compose definitions.
 - `scripts/` — development and deployment entry points.
 - `docs/deployment.md` — production runbook.
+- `docs/portable-export.md` — versioned video and annotation export contract.
 
 The former Python service is preserved only as a frozen, non-operational
 [archive](backend-legacy/README.md). It is not built, tested, deployed, or used

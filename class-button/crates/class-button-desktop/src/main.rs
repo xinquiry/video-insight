@@ -1,10 +1,15 @@
 #![cfg_attr(target_os = "windows", windows_subsystem = "windows")]
 
+mod annotation_content;
+mod annotation_timeline;
 mod annotations;
 mod app;
+mod package;
 mod picker;
+mod portable_contract;
 mod runtime;
 mod server;
+mod ui;
 
 use std::{fs, net::SocketAddr, path::PathBuf};
 
@@ -34,7 +39,7 @@ pub(crate) struct Args {
     #[arg(long)]
     pub(crate) config: Option<PathBuf>,
 
-    /// Open this local video immediately.
+    /// Open this local .vinsight package or video immediately.
     #[arg(long)]
     pub(crate) video: Option<PathBuf>,
 

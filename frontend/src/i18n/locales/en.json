@@ -116,6 +116,13 @@
     "back": "Back to videos",
     "kicker": "Watching edition",
     "deleteVideo": "Delete Video",
+    "export": {
+      "action": "Export for local player",
+      "preparing": "Preparing export...",
+      "hint": "Downloads one portable package containing the video and all annotations.",
+      "started": "VideoInsight package saved.",
+      "failed": "Export could not be prepared."
+    },
     "videoUnavailable": "Video URL unavailable.",
     "processing": {
       "inProgress": "Optimizing this video for reliable browser playback…",

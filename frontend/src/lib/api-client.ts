@@ -20,6 +20,57 @@ function authHeaders(): Record<string, string> {
   return token ? { Authorization: `Bearer ${token}` } : {};
 }
 
+type SaveFileHandle = {
+  createWritable(): Promise<FileSystemWritableFileStream>;
+};
+
+type SaveFilePickerWindow = Window & {
+  showSaveFilePicker?: (options: {
+    suggestedName: string;
+    types: Array<{ description: string; accept: Record<string, string[]> }>;
+  }) => Promise<SaveFileHandle>;
+};
+
+async function download(path: string, suggestedName: string, contentType: string) {
+  const picker = (window as SaveFilePickerWindow).showSaveFilePicker;
+  let writable: FileSystemWritableFileStream | undefined;
+  if (picker) {
+    const handle = await picker.call(window, {
+      suggestedName,
+      types: [{ description: "VideoInsight package", accept: { [contentType]: [".vinsight"] } }],
+    });
+    writable = await handle.createWritable();
+  }
+
+  try {
+    const response = await fetch(`${API_URL}${path}`, { headers: authHeaders() });
+    if (!response.ok) return await handleResponse<never>(response);
+    if (writable) {
+      if (response.body) {
+        await response.body.pipeTo(writable);
+      } else {
+        await writable.write(await response.blob());
+        await writable.close();
+      }
+      return;
+    }
+    const blob = await response.blob();
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = suggestedName;
+    link.click();
+    window.setTimeout(() => URL.revokeObjectURL(url), 1_000);
+  } catch (error) {
+    try {
+      await writable?.abort();
+    } catch {
+      // Preserve the download error if cleanup also fails.
+    }
+    throw error;
+  }
+}
+
 export const apiClient = {
   tokenKey: TOKEN_KEY,
 
@@ -64,4 +115,6 @@ export const apiClient = {
     });
     return handleResponse<T>(response);
   },
+
+  download,
 };

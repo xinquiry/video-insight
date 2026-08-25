@@ -200,6 +200,15 @@ export function deleteVideo(id: string) {
   return apiClient.delete<void>(`/api/videos/${id}`);
 }
 
+export function exportVideo(input: { id: string; filename: string }) {
+  const stem = input.filename.replace(/\.[^./\\]+$/, "") || "video";
+  return apiClient.download(
+    `/api/videos/${input.id}/export`,
+    `${stem}.vinsight`,
+    "application/vnd.videoinsight.package+zip",
+  );
+}
+
 export function fetchAnnotations(videoId: string) {
   return apiClient.get<Annotation[]>(`/api/videos/${videoId}/annotations`);
 }

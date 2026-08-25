@@ -13,6 +13,8 @@
 - 串口和 localhost 兼容服务在 Tokio 后台线程运行，通过 `Cx::post_action` 把
   状态和按键事件交回 UI 线程。
 - ESP32-S3 固件仍是独立 Cargo workspace；桌面构建不需要 ESP-IDF 工具链。
+- `ui/theme.rs`、`ui/primitives.rs` 和 `ui/player_screen.rs` 分别管理品牌 token、
+  可复用控件和播放器组合；播放/课堂业务状态只保留在 `app.rs`。
 
 ## 视频与批注
 
@@ -22,7 +24,42 @@
 2. `/lessons/demo.annotations.json`
 3. `/lessons/annotations.json`
 
-文件内容可以直接是 SaaS `GET /api/videos/{id}/annotations` 返回的数组：
+SaaS 视频页面的“导出到本地播放器”会下载一个 `lesson.vinsight` 便携包。直接在
+播放器中打开这个文件即可；播放器会在受控临时目录解压视频，并在替换课程包或退出
+时清理。便携包是标准 ZIP，包含视频、带版本的 `manifest.json` 和批注图片资源：
+
+```json
+{
+  "format": "videoinsight.annotated-video",
+  "format_version": 1,
+  "exported_at": "2026-08-24T04:00:00Z",
+  "video": {
+    "filename": "lesson.mp4",
+    "media_path": "media/lesson.mp4"
+  },
+  "annotation_track": {
+    "format": "videoinsight.annotation-track",
+    "format_version": 1,
+    "annotations": [],
+    "extensions": {}
+  },
+  "extensions": {}
+}
+```
+
+完整格式和兼容性规则见 [`docs/portable-export.md`](../../docs/portable-export.md)。
+播放器忽略同版本中的未知字段，因此 SaaS 可以向 v1 增加可选数据；改变字段含义或
+结构时必须提升对应的 `format_version`。播放器遇到未知结构版本会停止载入批注、
+提示升级，并在能安全识别唯一 `media/` 视频时继续播放，而不会静默错误显示。
+
+批注中的图片由原生 Makepad `Image` 控件显示，不经过 WebView。当前批注侧栏和视频
+画面上的时效批注共用同一个富内容组件，因此文字和图片在两处遵循相同的数据适配
+规则。文字和图片按 SaaS 文档中的原始顺序显示；重复图片按内容哈希去重保存在包内
+`assets/`，播放器加载包时解析资源引用。视频舞台底部的批注时间轴按颜色和持续时间
+显示标记，可点击或拖动直接跳转。
+
+为兼容旧导出，播放器仍支持本地视频旁的 JSON 侧车；文件内容可以直接是 SaaS
+`GET /api/videos/{id}/annotations` 返回的数组：
 
 ```json
 [
@@ -43,15 +80,15 @@
 ]
 ```
 
-也可以使用课程包形状：
+也可以使用旧课程包形状：
 
 ```json
 { "annotations": [/* 相同的批注对象 */] }
 ```
 
 播放器按 `timestamp_seconds` 排序，在 `duration_seconds` 时间窗内显示卡片，并把
-富文本中的文字节点压平成适合课堂投影的纯文本。缺少 `duration_seconds` 时默认
-显示 6 秒；没有侧车文件时视频仍可正常播放。
+富内容规范化为有序的文字/图片块。缺少 `duration_seconds` 时默认显示 6 秒；没有
+侧车文件时视频仍可正常播放。
 
 ## 运行与验证
 

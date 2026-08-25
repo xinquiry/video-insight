@@ -10,8 +10,9 @@ pub struct PickedMediaAction {
 pub fn pick_local_video() {
     let filters: Vec<(String, Vec<String>)> = vec![
         (
-            "Video".into(),
+            "VideoInsight package or video".into(),
             vec![
+                "vinsight".into(),
                 "mp4".into(),
                 "mkv".into(),
                 "webm".into(),
@@ -29,7 +30,7 @@ pub fn pick_local_video() {
     let dialog = FileDialog::new()
         .set_title("打开课堂视频")
         .set_filters(filters);
-    let result = dialog.pick_video(|result| {
+    let result = dialog.pick_file(|result| {
         let action = match result {
             Ok(Some(file)) => PickedMediaAction {
                 path_or_uri: file

@@ -91,6 +91,13 @@
     },
     "editVideo": "编辑视频",
     "deleteVideo": "删除视频",
+    "export": {
+      "action": "导出到本地播放器",
+      "preparing": "正在准备导出...",
+      "hint": "下载一个包含视频和全部批注的便携包。",
+      "started": "VideoInsight 便携包已保存。",
+      "failed": "无法准备导出文件。"
+    },
     "empty": "暂无视频。",
     "totalCount_one": "共 {{count}} 个视频",
     "totalCount_other": "共 {{count}} 个视频",

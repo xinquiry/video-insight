@@ -136,6 +136,16 @@ func (s *S3) PresignGet(ctx context.Context, objectKey string, expires time.Dura
 	return request.URL, nil
 }
 
+func (s *S3) OpenObject(ctx context.Context, objectKey string) (io.ReadCloser, error) {
+	output, err := s.client.GetObject(ctx, &s3.GetObjectInput{
+		Bucket: aws.String(s.bucket), Key: aws.String(objectKey),
+	})
+	if err != nil {
+		return nil, fmt.Errorf("open object: %w", err)
+	}
+	return output.Body, nil
+}
+
 func (s *S3) DeleteObject(ctx context.Context, objectKey string) error {
 	_, err := s.client.DeleteObject(ctx, &s3.DeleteObjectInput{Bucket: aws.String(s.bucket), Key: aws.String(objectKey)})
 	if err != nil {
@@ -145,19 +155,17 @@ func (s *S3) DeleteObject(ctx context.Context, objectKey string) error {
 }
 
 func (s *S3) DownloadObject(ctx context.Context, objectKey, destination string) error {
-	output, err := s.client.GetObject(ctx, &s3.GetObjectInput{
-		Bucket: aws.String(s.bucket), Key: aws.String(objectKey),
-	})
+	body, err := s.OpenObject(ctx, objectKey)
 	if err != nil {
-		return fmt.Errorf("get object: %w", err)
+		return err
 	}
-	defer func() { _ = output.Body.Close() }()
+	defer func() { _ = body.Close() }()
 
 	file, err := os.Create(destination)
 	if err != nil {
 		return fmt.Errorf("create download destination: %w", err)
 	}
-	if _, err := io.Copy(file, output.Body); err != nil {
+	if _, err := io.Copy(file, body); err != nil {
 		_ = file.Close()
 		_ = os.Remove(destination)
 		return fmt.Errorf("download object: %w", err)

@@ -1,0 +1,73 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "VideoInsight portable annotated video v1",
+  "type": "object",
+  "required": ["format", "format_version", "exported_at", "video", "annotation_track", "extensions"],
+  "properties": {
+    "format": { "const": "videoinsight.annotated-video" },
+    "format_version": { "const": 1 },
+    "exported_at": { "type": "string", "format": "date-time" },
+    "video": {
+      "type": "object",
+      "required": ["id", "title", "description", "filename", "media_path", "content_type", "size_bytes"],
+      "properties": {
+        "id": { "type": "string", "format": "uuid" },
+        "title": { "type": "string" },
+        "description": { "type": ["string", "null"] },
+        "filename": { "type": "string", "minLength": 1 },
+        "media_path": { "type": "string", "pattern": "^media/[^/]+$" },
+        "content_type": { "type": "string", "pattern": "^video/" },
+        "size_bytes": { "type": "integer", "minimum": 0 }
+      },
+      "additionalProperties": true
+    },
+    "annotation_track": {
+      "type": "object",
+      "required": ["format", "format_version", "annotations", "extensions"],
+      "properties": {
+        "format": { "const": "videoinsight.annotation-track" },
+        "format_version": { "const": 1 },
+        "annotations": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/annotation" }
+        },
+        "extensions": { "type": "object" }
+      },
+      "additionalProperties": true
+    },
+    "extensions": { "type": "object" }
+  },
+  "$defs": {
+    "nullableUnit": { "type": ["number", "null"], "minimum": 0, "maximum": 1 },
+    "annotation": {
+      "type": "object",
+      "required": [
+        "id", "timestamp_seconds", "duration_seconds", "position_x", "position_y",
+        "region_x", "region_y", "region_width", "region_height", "shape", "display_mode",
+        "interactive", "content", "kind", "color", "custom_data", "created_at", "updated_at"
+      ],
+      "properties": {
+        "id": { "type": "string", "format": "uuid" },
+        "timestamp_seconds": { "type": "number", "minimum": 0 },
+        "duration_seconds": { "type": "number", "exclusiveMinimum": 0 },
+        "position_x": { "$ref": "#/$defs/nullableUnit" },
+        "position_y": { "$ref": "#/$defs/nullableUnit" },
+        "region_x": { "$ref": "#/$defs/nullableUnit" },
+        "region_y": { "$ref": "#/$defs/nullableUnit" },
+        "region_width": { "$ref": "#/$defs/nullableUnit" },
+        "region_height": { "$ref": "#/$defs/nullableUnit" },
+        "shape": { "type": "string" },
+        "display_mode": { "type": "string" },
+        "interactive": { "type": "boolean" },
+        "content": { "type": "object" },
+        "kind": { "type": "string" },
+        "color": { "type": "string", "pattern": "^#[0-9a-fA-F]{6}$" },
+        "custom_data": { "type": "object" },
+        "created_at": { "type": "string", "format": "date-time" },
+        "updated_at": { "type": ["string", "null"], "format": "date-time" }
+      },
+      "additionalProperties": true
+    }
+  },
+  "additionalProperties": true
+}

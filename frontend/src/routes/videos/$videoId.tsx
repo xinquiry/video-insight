@@ -3,6 +3,7 @@ import {
   ArrowLeft,
   Check,
   Clock,
+  Download,
   Edit2,
   Maximize2,
   MessageSquare,
@@ -34,6 +35,7 @@ import {
   useDeleteVideo,
   useUpdateAnnotation,
   useVideo,
+  useVideoExport,
 } from "@/features/videos/hooks";
 import { isRichTextEmpty, RichTextContent, RichTextEditor } from "@/components/RichTextEditor";
 import { cn, formatBytes, formatDate, formatDuration } from "@/lib/utils";
@@ -95,6 +97,7 @@ function VideoDetailPage() {
   const { data: video, isLoading, isError } = useVideo(videoId);
   const { data: annotations = [] } = useAnnotations(videoId);
   const deleteVideo = useDeleteVideo();
+  const exportVideo = useVideoExport();
   const [currentVideoTime, setCurrentVideoTime] = useState(0);
   const [durationSeconds, setDurationSeconds] = useState(0);
   const [hoveredAnnotationId, setHoveredAnnotationId] = useState<string | null>(null);
@@ -433,15 +436,39 @@ function VideoDetailPage() {
             {video.description ?? t("common.noDescription")}
           </p>
         </div>
-        <button
-          type="button"
-          onClick={handleDeleteVideo}
-          disabled={deleteVideo.isPending}
-          className="vi-button-danger disabled:opacity-60"
-        >
-          <Trash2 className="h-4 w-4" />
-          {t("videoDetail.deleteVideo")}
-        </button>
+        <div className="flex shrink-0 items-center gap-2">
+          {exportVideo.isSuccess && (
+            <span className="hidden text-xs text-[var(--muted)] lg:inline">
+              {t("videoDetail.export.started")}
+            </span>
+          )}
+          {exportVideo.isError && (
+            <span className="hidden text-xs text-[var(--danger)] lg:inline">
+              {t("videoDetail.export.failed")}
+            </span>
+          )}
+          <button
+            type="button"
+            onClick={() => exportVideo.mutate({ id: videoId, filename: video.original_filename })}
+            disabled={video.processing_status !== "ready" || exportVideo.isPending}
+            className="vi-button-secondary disabled:opacity-60"
+            title={t("videoDetail.export.hint")}
+          >
+            <Download className="h-4 w-4" />
+            {exportVideo.isPending
+              ? t("videoDetail.export.preparing")
+              : t("videoDetail.export.action")}
+          </button>
+          <button
+            type="button"
+            onClick={handleDeleteVideo}
+            disabled={deleteVideo.isPending}
+            className="vi-button-danger disabled:opacity-60"
+          >
+            <Trash2 className="h-4 w-4" />
+            {t("videoDetail.deleteVideo")}
+          </button>
+        </div>
       </div>
 
       <div className="grid min-h-0 flex-1 grid-rows-[minmax(0,1fr)_minmax(12rem,34vh)] gap-4 2xl:grid-cols-[minmax(0,1fr)_380px] xl:grid-cols-[minmax(0,1fr)_360px] xl:grid-rows-none">

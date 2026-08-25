@@ -1,0 +1,61 @@
+{
+  "format": "videoinsight.annotated-video",
+  "format_version": 1,
+  "exported_at": "2026-08-25T00:00:00Z",
+  "video": {
+    "id": "00000000-0000-0000-0000-000000000001",
+    "title": "Portable lesson",
+    "description": null,
+    "filename": "lesson.mp4",
+    "media_path": "media/lesson.mp4",
+    "content_type": "video/mp4",
+    "size_bytes": 5
+  },
+  "annotation_track": {
+    "format": "videoinsight.annotation-track",
+    "format_version": 1,
+    "annotations": [
+      {
+        "id": "00000000-0000-0000-0000-000000000002",
+        "timestamp_seconds": 3,
+        "duration_seconds": 6,
+        "position_x": null,
+        "position_y": null,
+        "region_x": null,
+        "region_y": null,
+        "region_width": null,
+        "region_height": null,
+        "shape": "marker",
+        "display_mode": "card",
+        "interactive": true,
+        "content": {
+          "type": "doc",
+          "content": [
+            {
+              "type": "paragraph",
+              "content": [{"type": "text", "text": "Before image"}]
+            },
+            {
+              "type": "image",
+              "attrs": {
+                "src": "vinsight-asset://assets/shared.png",
+                "alt": "Shared contract image"
+              }
+            },
+            {
+              "type": "paragraph",
+              "content": [{"type": "text", "text": "After image"}]
+            }
+          ]
+        },
+        "kind": "note",
+        "color": "#2563eb",
+        "custom_data": {},
+        "created_at": "2026-08-25T00:00:00Z",
+        "updated_at": null
+      }
+    ],
+    "extensions": {}
+  },
+  "extensions": {}
+}

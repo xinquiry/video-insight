@@ -68,9 +68,10 @@ Windows 版本为免安装 `.exe` 便携包。在 Windows PowerShell 中执行�
 后视频暂停，学生提示覆盖在同一播放器窗口中；点击“已处理”只关闭提示，由老师
 决定何时继续播放。
 
-播放器会自动读取与视频同目录的 VideoInsight JSON 批注侧车文件，在播放时间内
-显示批注卡片，并提供上一条/下一条跳转。命名约定、数据格式和兼容策略见
+播放器可直接打开 SaaS 导出的单文件 `.vinsight` 课程包，并原生显示文字和图片
+批注；旧视频旁的 JSON 批注侧车仍受支持。命名约定、数据格式和兼容策略见
 [`docs/desktop.md`](docs/desktop.md)。
+可复用的 Makepad 分层和 UI 设计规则见 [`docs/architecture.md`](docs/architecture.md)。
 
 应用仍在 `127.0.0.1:9842` 保留浏览器兼容事件接口。如果后续需要临时接回在线
 网站，可以使用下面的 `player-adapter`：

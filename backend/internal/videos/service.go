@@ -3,8 +3,10 @@ package videos
 import (
 	"context"
 	"fmt"
+	"io"
 	"math"
 	"net/http"
+	"path"
 	"sort"
 	"strings"
 	"time"
@@ -30,6 +32,7 @@ type Storage interface {
 	CompleteMultipartUpload(ctx context.Context, objectKey, uploadID string, parts []CompletedPart) error
 	AbortMultipartUpload(ctx context.Context, objectKey, uploadID string) error
 	PresignGet(ctx context.Context, objectKey string, expires time.Duration) (string, error)
+	OpenObject(ctx context.Context, objectKey string) (io.ReadCloser, error)
 	DeleteObject(ctx context.Context, objectKey string) error
 }
 
@@ -85,6 +88,12 @@ type UpdateInput struct {
 type Read struct {
 	Video       model.Video
 	PlaybackURL *string
+}
+
+type Export struct {
+	Video    model.Video
+	Filename string
+	Media    io.ReadCloser
 }
 
 func NewService(store Store, storage Storage, config Config) *Service {
@@ -169,6 +178,22 @@ func (s *Service) Get(ctx context.Context, videoID, groupID uuid.UUID) (Read, er
 		return Read{}, err
 	}
 	return s.read(ctx, video)
+}
+
+func (s *Service) OpenExport(ctx context.Context, videoID, groupID uuid.UUID) (Export, error) {
+	video, err := s.get(ctx, videoID, groupID)
+	if err != nil {
+		return Export{}, err
+	}
+	if video.ProcessingStatus != model.VideoProcessingReady {
+		return Export{}, apperror.New(http.StatusConflict, "Video is not ready for export")
+	}
+	filename := safeExportFilename(video.OriginalFilename, video.ID)
+	media, err := s.storage.OpenObject(ctx, video.ObjectKey)
+	if err != nil {
+		return Export{}, err
+	}
+	return Export{Video: video, Filename: filename, Media: media}, nil
 }
 
 func (s *Service) List(ctx context.Context, groupID uuid.UUID, page, pageSize int) ([]Read, int64, error) {
@@ -260,4 +285,49 @@ func (s *Service) read(ctx context.Context, video model.Video) (Read, error) {
 		return Read{}, err
 	}
 	return Read{Video: video, PlaybackURL: &url}, nil
+}
+
+func safeExportFilename(filename string, videoID uuid.UUID) string {
+	filename = strings.ReplaceAll(filename, "\\", "/")
+	parts := strings.Split(filename, "/")
+	filename = parts[len(parts)-1]
+	filename = strings.Map(func(char rune) rune {
+		if char < 0x20 || char == 0x7f {
+			return -1
+		}
+		if strings.ContainsRune(`<>:"|?*`, char) {
+			return '_'
+		}
+		return char
+	}, filename)
+	filename = strings.TrimRight(strings.TrimSpace(filename), ". ")
+	if filename == "" || filename == "." || filename == ".." {
+		return "video-" + videoID.String() + ".mp4"
+	}
+	extension := path.Ext(filename)
+	stem := strings.TrimSuffix(filename, extension)
+	upperStem := strings.ToUpper(stem)
+	reserved := upperStem == "CON" || upperStem == "PRN" || upperStem == "AUX" || upperStem == "NUL" ||
+		(len(upperStem) == 4 && (strings.HasPrefix(upperStem, "COM") || strings.HasPrefix(upperStem, "LPT")) && upperStem[3] >= '1' && upperStem[3] <= '9')
+	if reserved {
+		filename = "_" + filename
+	}
+	return truncateUTF8(filename, 240)
+}
+
+func truncateUTF8(value string, maximumBytes int) string {
+	if len(value) <= maximumBytes {
+		return value
+	}
+	end := 0
+	for index := range value {
+		if index > maximumBytes {
+			break
+		}
+		end = index
+	}
+	if end == 0 {
+		return ""
+	}
+	return value[:end]
 }

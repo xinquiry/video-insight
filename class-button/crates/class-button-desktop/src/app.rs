@@ -1,11 +1,17 @@
-use std::path::Path;
+use std::{
+    path::Path,
+    sync::{Arc, Mutex},
+    thread,
+};
 
 use clap::Parser;
 use makepad_widgets::*;
 
 use crate::{
+    annotation_timeline::{AnnotationTimeline, TimelineSeekAction},
     annotations::{self, Annotation},
     load_classroom,
+    package::{self, OpenedPackage},
     picker::{pick_local_video, PickedMediaAction},
     runtime::{self, UiEvent},
     Args,
@@ -19,243 +25,10 @@ script_mod! {
         ui: Root{
             main_window := Window{
                 window.title: "Class Button · VideoInsight Player"
-                window.inner_size: vec2(1180, 760)
-                pass.clear_color: #x08111f
+                window.inner_size: vec2(1220, 780)
+                pass.clear_color: theme.vi_paper
                 body +: {
-                    View{
-                        width: Fill
-                        height: Fill
-                        flow: Down
-                        show_bg: true
-                        draw_bg.color: #x08111f
-
-                        View{
-                            width: Fill
-                            height: 78
-                            flow: Right
-                            spacing: 12
-                            padding: Inset{left: 20, right: 20, top: 12, bottom: 12}
-                            align: Align{x: 0.0, y: 0.5}
-                            show_bg: true
-                            draw_bg.color: #x0f1b2d
-
-                            View{
-                                width: Fill
-                                height: Fit
-                                flow: Down
-                                spacing: 2
-                                title_label := Label{
-                                    text: "Class Button"
-                                    draw_text.color: #xf8fafc
-                                    draw_text.text_style.font_size: 19
-                                }
-                                classroom_label := Label{
-                                    text: "正在读取课堂配置…"
-                                    draw_text.color: #x91a4bd
-                                    draw_text.text_style.font_size: 11
-                                }
-                            }
-
-                            hub_status := Label{
-                                text: "Hub · 正在查找"
-                                draw_text.color: #xfbbf24
-                                draw_text.text_style.font_size: 11
-                            }
-                            open_video_button := Button{text: "打开视频" height: 36}
-                            fullscreen_button := Button{text: "全屏" height: 36}
-                        }
-
-                        View{
-                            width: Fill
-                            height: Fill
-                            flow: Right
-                            spacing: 1
-
-                            View{
-                                width: Fill
-                                height: Fill
-                                flow: Overlay
-                                show_bg: true
-                                draw_bg.color: #x000000
-
-                                video := Video{
-                                    width: Fill
-                                    height: Fill
-                                    show_controls: true
-                                    is_looping: false
-                                }
-
-                                empty_state := View{
-                                    width: Fill
-                                    height: Fill
-                                    flow: Down
-                                    spacing: 12
-                                    align: Align{x: 0.5, y: 0.35}
-                                    show_bg: true
-                                    draw_bg.color: #x08111f
-                                    Label{
-                                        text: "打开本地视频开始课堂播放"
-                                        draw_text.color: #xe2e8f0
-                                        draw_text.text_style.font_size: 20
-                                    }
-                                    Label{
-                                        text: "同目录的 VideoInsight 批注侧车文件会自动载入"
-                                        draw_text.color: #x7890ad
-                                        draw_text.text_style.font_size: 12
-                                    }
-                                    open_empty_button := Button{text: "选择视频" height: 38}
-                                }
-
-                                annotation_card := View{
-                                    width: 520
-                                    height: Fit
-                                    margin: Inset{left: 24, bottom: 56}
-                                    padding: 16
-                                    flow: Down
-                                    spacing: 6
-                                    align: Align{x: 0.0, y: 1.0}
-                                    visible: false
-                                    show_bg: true
-                                    draw_bg.color: #x0f1b2dee
-                                    annotation_meta := Label{
-                                        text: "批注"
-                                        draw_text.color: #x7dd3fc
-                                        draw_text.text_style.font_size: 11
-                                    }
-                                    annotation_text := Label{
-                                        width: Fill
-                                        height: Fit
-                                        text: ""
-                                        draw_text.color: #xf8fafc
-                                        draw_text.text_style.font_size: 16
-                                    }
-                                }
-
-                                student_overlay := View{
-                                    width: Fill
-                                    height: Fill
-                                    flow: Down
-                                    spacing: 14
-                                    padding: 24
-                                    align: Center
-                                    visible: false
-                                    show_bg: true
-                                    draw_bg.color: #x020617d9
-                                    Label{
-                                        text: "学生请求暂停"
-                                        draw_text.color: #x7dd3fc
-                                        draw_text.text_style.font_size: 15
-                                    }
-                                    student_name := Label{
-                                        text: ""
-                                        draw_text.color: #xffffff
-                                        draw_text.text_style.font_size: 34
-                                    }
-                                    student_seat := Label{
-                                        text: ""
-                                        draw_text.color: #xcbd5e1
-                                        draw_text.text_style.font_size: 18
-                                    }
-                                    handled_button := Button{text: "已处理" width: 120 height: 40}
-                                }
-                            }
-
-                            View{
-                                width: 328
-                                height: Fill
-                                flow: Down
-                                spacing: 16
-                                padding: 20
-                                show_bg: true
-                                draw_bg.color: #x0f1b2d
-
-                                Label{
-                                    text: "VideoInsight 批注"
-                                    draw_text.color: #xf8fafc
-                                    draw_text.text_style.font_size: 17
-                                }
-                                video_name := Label{
-                                    width: Fill
-                                    height: Fit
-                                    text: "尚未打开视频"
-                                    draw_text.color: #x91a4bd
-                                    draw_text.text_style.font_size: 11
-                                }
-                                annotation_count := Label{
-                                    text: "0 条批注"
-                                    draw_text.color: #x7dd3fc
-                                    draw_text.text_style.font_size: 11
-                                }
-
-                                View{
-                                    width: Fill
-                                    height: Fit
-                                    flow: Down
-                                    spacing: 7
-                                    padding: 14
-                                    show_bg: true
-                                    draw_bg.color: #x16253a
-                                    Label{
-                                        text: "当前"
-                                        draw_text.color: #x7890ad
-                                        draw_text.text_style.font_size: 10
-                                    }
-                                    current_annotation := Label{
-                                        width: Fill
-                                        height: Fit
-                                        text: "等待播放…"
-                                        draw_text.color: #xf1f5f9
-                                        draw_text.text_style.font_size: 14
-                                    }
-                                }
-
-                                Label{
-                                    text: "接下来"
-                                    draw_text.color: #x7890ad
-                                    draw_text.text_style.font_size: 10
-                                }
-                                next_annotation_1 := Label{
-                                    width: Fill
-                                    height: Fit
-                                    text: "—"
-                                    draw_text.color: #xcbd5e1
-                                    draw_text.text_style.font_size: 12
-                                }
-                                next_annotation_2 := Label{
-                                    width: Fill
-                                    height: Fit
-                                    text: "—"
-                                    draw_text.color: #xcbd5e1
-                                    draw_text.text_style.font_size: 12
-                                }
-
-                                View{width: Fill height: Fill}
-                                View{
-                                    width: Fill
-                                    height: Fit
-                                    flow: Right
-                                    spacing: 10
-                                    previous_annotation_button := Button{
-                                        text: "上一条"
-                                        width: Fill
-                                        height: 36
-                                    }
-                                    next_annotation_button := Button{
-                                        text: "下一条"
-                                        width: Fill
-                                        height: 36
-                                    }
-                                }
-                                runtime_error := Label{
-                                    width: Fill
-                                    height: Fit
-                                    text: ""
-                                    draw_text.color: #xfca5a5
-                                    draw_text.text_style.font_size: 10
-                                }
-                            }
-                        }
-                    }
+                    PlayerScreen{}
                 }
             }
         }
@@ -269,11 +42,17 @@ pub struct App {
     #[rust]
     annotations: Vec<Annotation>,
     #[rust]
-    active_annotation: Option<usize>,
+    overlay_annotation: Option<usize>,
+    #[rust]
+    current_annotation: Option<usize>,
     #[rust]
     tick_timer: Timer,
     #[rust]
-    pending_video: Option<String>,
+    pending_media: Option<PreparedMedia>,
+    #[rust]
+    active_package: Option<OpenedPackage>,
+    #[rust]
+    media_request_id: u64,
     #[rust(false)]
     is_fullscreen: bool,
 }
@@ -308,6 +87,25 @@ impl MatchEvent for App {
                 } else if let Some(path) = &picked.path_or_uri {
                     self.open_media(cx, path);
                 }
+            }
+            if let Some(prepared) = action.downcast_ref::<PreparedMediaAction>() {
+                if prepared.request_id != self.media_request_id {
+                    continue;
+                }
+                let result = prepared
+                    .result
+                    .lock()
+                    .ok()
+                    .and_then(|mut result| result.take());
+                match result {
+                    Some(Ok(media)) => self.accept_prepared_media(cx, media),
+                    Some(Err(error)) => self.show_error(cx, &error),
+                    None => {}
+                }
+            }
+            if let Some(seek) = action.downcast_ref::<TimelineSeekAction>() {
+                let millis = (seek.seconds.max(0.0) * 1000.0) as u64;
+                self.ui.video(cx, ids!(video)).seek_to(cx, millis);
             }
         }
 
@@ -361,9 +159,9 @@ impl App {
         match event {
             UiEvent::ReceiverStatus { online, port } => {
                 let status = if *online {
-                    format!("Hub · 已连接 {}", port.as_deref().unwrap_or(""))
+                    format!("HUB · 已连接 {}", port.as_deref().unwrap_or(""))
                 } else {
-                    "Hub · 正在查找".into()
+                    "HUB · 正在查找".into()
                 };
                 self.ui.label(cx, ids!(hub_status)).set_text(cx, &status);
                 if *online {
@@ -395,17 +193,43 @@ impl App {
         if source.is_empty() {
             return;
         }
+        self.media_request_id = self.media_request_id.wrapping_add(1);
+        let request_id = self.media_request_id;
+        self.set_annotation_source_status(cx, "正在打开视频包…");
+        let source = source.to_owned();
+        if let Err(error) = thread::Builder::new()
+            .name("videoinsight-package-loader".into())
+            .spawn(move || {
+                Cx::post_action(PreparedMediaAction {
+                    request_id,
+                    result: Arc::new(Mutex::new(Some(PreparedMedia::open(&source)))),
+                });
+            })
+        {
+            self.show_error(cx, &format!("无法启动课程包加载线程：{error}"));
+        }
+    }
+
+    fn accept_prepared_media(&mut self, cx: &mut Cx, prepared: PreparedMedia) {
         let video = self.ui.video(cx, ids!(video));
         if video.is_unprepared() {
-            self.start_media(cx, source);
+            self.start_media(cx, prepared);
         } else {
-            self.pending_video = Some(source.to_owned());
+            self.pending_media = Some(prepared);
             video.stop_and_cleanup_resources(cx);
         }
     }
 
-    fn start_media(&mut self, cx: &mut Cx, source: &str) {
-        let (path, is_network) = parse_media_ref(source);
+    fn start_media(&mut self, cx: &mut Cx, prepared: PreparedMedia) {
+        let PreparedMedia {
+            path,
+            is_network,
+            display_name,
+            annotations,
+            annotation_status,
+            package,
+        } = prepared;
+        self.active_package = package;
         let video = self.ui.video(cx, ids!(video));
         video.set_source(if is_network {
             VideoDataSource::Network { url: path.clone() }
@@ -415,57 +239,60 @@ impl App {
         video.begin_playback(cx);
         self.ui.view(cx, ids!(empty_state)).set_visible(cx, false);
 
-        let name = Path::new(&path)
-            .file_name()
-            .and_then(|name| name.to_str())
-            .unwrap_or(&path);
-        self.ui.label(cx, ids!(video_name)).set_text(cx, name);
-        self.active_annotation = None;
-
-        if is_network {
-            self.annotations.clear();
-            self.set_annotation_source_status(cx, "网络视频暂未关联本地批注");
-        } else {
-            match annotations::load_sidecar(Path::new(&path)) {
-                Ok((items, sidecar)) => {
-                    self.annotations = items;
-                    let status = sidecar
-                        .as_ref()
-                        .and_then(|path| path.file_name())
-                        .and_then(|name| name.to_str())
-                        .map(|name| format!("{} 条批注 · {name}", self.annotations.len()))
-                        .unwrap_or_else(|| "0 条批注 · 未找到侧车文件".into());
-                    self.set_annotation_source_status(cx, &status);
-                }
-                Err(error) => {
-                    self.annotations.clear();
-                    self.set_annotation_source_status(cx, "0 条批注");
-                    self.show_error(cx, &error);
-                }
-            }
+        self.ui
+            .label(cx, ids!(video_name))
+            .set_text(cx, &display_name);
+        // Force the reusable annotation view to rebind even when both the old
+        // and new videos start outside an annotation window.
+        self.overlay_annotation = Some(usize::MAX);
+        self.current_annotation = Some(usize::MAX);
+        self.annotations = annotations;
+        if let Some(mut timeline) = self
+            .ui
+            .widget(cx, ids!(annotation_timeline))
+            .borrow_mut::<AnnotationTimeline>()
+        {
+            timeline.set_annotations(cx, &self.annotations);
         }
+        self.ui
+            .label(cx, ids!(annotation_count))
+            .set_text(cx, &format!("{} 条", self.annotations.len()));
+        self.set_annotation_source_status(cx, &annotation_status);
         self.refresh_annotations(cx);
     }
 
     fn try_open_pending(&mut self, cx: &mut Cx) {
-        let Some(source) = self.pending_video.clone() else {
+        if self.pending_media.is_none() {
             return;
-        };
+        }
         if !self.ui.video(cx, ids!(video)).is_unprepared() {
             return;
         }
-        self.pending_video = None;
-        self.start_media(cx, &source);
+        let prepared = self
+            .pending_media
+            .take()
+            .expect("pending media checked above");
+        self.start_media(cx, prepared);
     }
 
     fn refresh_annotations(&mut self, cx: &mut Cx) {
-        let seconds = self.ui.video(cx, ids!(video)).current_position_ms() as f64 / 1000.0;
+        let video = self.ui.video(cx, ids!(video));
+        let seconds = video.current_position_ms() as f64 / 1000.0;
+        let duration = video.total_duration_ms() as f64 / 1000.0;
+        if let Some(mut timeline) = self
+            .ui
+            .widget(cx, ids!(annotation_timeline))
+            .borrow_mut::<AnnotationTimeline>()
+        {
+            timeline.set_progress(cx, seconds, duration);
+        }
         let active = self
             .annotations
             .iter()
             .position(|annotation| annotation.is_active(seconds));
-        if active != self.active_annotation {
-            self.active_annotation = active;
+
+        if active != self.overlay_annotation {
+            self.overlay_annotation = active;
             let card = self.ui.view(cx, ids!(annotation_card));
             if let Some(index) = active {
                 let annotation = &self.annotations[index];
@@ -474,26 +301,64 @@ impl App {
                     &format!(
                         "{} · {}",
                         fmt_time(annotation.timestamp_seconds),
-                        annotation.kind
+                        annotation.kind.to_uppercase()
                     ),
                 );
-                self.ui
-                    .label(cx, ids!(annotation_text))
-                    .set_text(cx, &annotation.text());
+                if let Some(mut content) =
+                    self.ui
+                        .widget(cx, ids!(overlay_annotation_content))
+                        .borrow_mut::<crate::annotation_content::AnnotationContent>()
+                {
+                    content.set_annotation(cx, Some(annotation));
+                }
                 card.set_visible(cx, true);
             } else {
                 card.set_visible(cx, false);
             }
         }
 
-        let current_text = active
-            .map(|index| self.timeline_text(index))
-            .unwrap_or_else(|| "当前时间没有批注".into());
-        self.ui
-            .label(cx, ids!(current_annotation))
-            .set_text(cx, &current_text);
+        // Match the SaaS playback panel: retain the most recently reached note
+        // in the sidebar while the stage overlay still honors its duration.
+        let current = self
+            .annotations
+            .iter()
+            .rposition(|annotation| annotation.timestamp_seconds <= seconds + 0.12);
+        if current != self.current_annotation {
+            self.current_annotation = current;
+            let annotation = current.map(|index| &self.annotations[index]);
+            if let Some(mut content) = self
+                .ui
+                .widget(cx, ids!(annotation_content))
+                .borrow_mut::<crate::annotation_content::AnnotationContent>()
+            {
+                content.set_annotation(cx, annotation);
+            }
 
-        let next_start = active.map_or_else(
+            if let Some(index) = current {
+                let annotation = &self.annotations[index];
+                self.ui
+                    .label(cx, ids!(current_annotation_meta))
+                    .set_text(cx, &fmt_time(annotation.timestamp_seconds));
+                self.ui
+                    .label(cx, ids!(current_annotation_kind))
+                    .set_text(cx, &annotation.kind.to_uppercase());
+                self.ui
+                    .label(cx, ids!(current_annotation_position))
+                    .set_text(cx, &format!("{} / {}", index + 1, self.annotations.len()));
+            } else {
+                self.ui
+                    .label(cx, ids!(current_annotation_meta))
+                    .set_text(cx, "等待播放");
+                self.ui
+                    .label(cx, ids!(current_annotation_kind))
+                    .set_text(cx, "NOTE");
+                self.ui
+                    .label(cx, ids!(current_annotation_position))
+                    .set_text(cx, &format!("— / {}", self.annotations.len()));
+            }
+        }
+
+        let next_start = current.map_or_else(
             || {
                 self.annotations
                     .iter()
@@ -502,22 +367,41 @@ impl App {
             },
             |index| index + 1,
         );
-        let next_one = self
-            .annotations
-            .get(next_start)
-            .map(|_| self.timeline_text(next_start))
-            .unwrap_or_else(|| "—".into());
-        let next_two = self
-            .annotations
-            .get(next_start + 1)
-            .map(|_| self.timeline_text(next_start + 1))
-            .unwrap_or_else(|| "—".into());
-        self.ui
-            .label(cx, ids!(next_annotation_1))
-            .set_text(cx, &next_one);
-        self.ui
-            .label(cx, ids!(next_annotation_2))
-            .set_text(cx, &next_two);
+        self.set_upcoming_row(
+            cx,
+            next_start,
+            ids!(next_annotation_1_time),
+            ids!(next_annotation_1),
+            "没有后续批注",
+        );
+        self.set_upcoming_row(
+            cx,
+            next_start + 1,
+            ids!(next_annotation_2_time),
+            ids!(next_annotation_2),
+            "—",
+        );
+    }
+
+    fn set_upcoming_row(
+        &self,
+        cx: &mut Cx,
+        index: usize,
+        time_path: &[LiveId],
+        text_path: &[LiveId],
+        empty_text: &str,
+    ) {
+        if let Some(annotation) = self.annotations.get(index) {
+            self.ui
+                .label(cx, time_path)
+                .set_text(cx, &fmt_time(annotation.timestamp_seconds));
+            self.ui
+                .label(cx, text_path)
+                .set_text(cx, &annotation.text());
+        } else {
+            self.ui.label(cx, time_path).set_text(cx, "—");
+            self.ui.label(cx, text_path).set_text(cx, empty_text);
+        }
     }
 
     fn seek_annotation(&mut self, cx: &mut Cx, forward: bool) {
@@ -540,18 +424,9 @@ impl App {
         self.ui.video(cx, ids!(video)).seek_to(cx, millis);
     }
 
-    fn timeline_text(&self, index: usize) -> String {
-        let annotation = &self.annotations[index];
-        format!(
-            "{}  {}",
-            fmt_time(annotation.timestamp_seconds),
-            annotation.text()
-        )
-    }
-
     fn set_annotation_source_status(&self, cx: &mut Cx, status: &str) {
         self.ui
-            .label(cx, ids!(annotation_count))
+            .label(cx, ids!(annotation_source))
             .set_text(cx, status);
     }
 
@@ -560,9 +435,88 @@ impl App {
     }
 }
 
+#[derive(Debug, Clone)]
+struct PreparedMediaAction {
+    request_id: u64,
+    result: Arc<Mutex<Option<Result<PreparedMedia, String>>>>,
+}
+
+#[derive(Debug)]
+struct PreparedMedia {
+    path: String,
+    is_network: bool,
+    display_name: String,
+    annotations: Vec<Annotation>,
+    annotation_status: String,
+    package: Option<OpenedPackage>,
+}
+
+impl PreparedMedia {
+    fn open(source: &str) -> Result<Self, String> {
+        let (path, is_network) = parse_media_ref(source);
+        if !is_network && package::is_package(Path::new(&path)) {
+            let package = package::open(Path::new(&path))?;
+            let display_name = package.display_name.clone();
+            let annotations = package.annotations.clone();
+            let annotation_status = package
+                .annotation_warning
+                .clone()
+                .unwrap_or_else(|| format!("{} 条批注 · VideoInsight 便携包", annotations.len()));
+            return Ok(Self {
+                path: package.video_path.to_string_lossy().into_owned(),
+                is_network: false,
+                display_name,
+                annotations,
+                annotation_status,
+                package: Some(package),
+            });
+        }
+
+        let display_name = Path::new(&path)
+            .file_name()
+            .and_then(|name| name.to_str())
+            .unwrap_or(&path)
+            .to_owned();
+        if is_network {
+            return Ok(Self {
+                path,
+                is_network,
+                display_name,
+                annotations: Vec::new(),
+                annotation_status: "网络视频暂未关联本地批注".into(),
+                package: None,
+            });
+        }
+        let (annotations, sidecar) = annotations::load_sidecar(Path::new(&path))?;
+        let annotation_status = sidecar
+            .as_ref()
+            .and_then(|path| path.file_name())
+            .and_then(|name| name.to_str())
+            .map(|name| format!("{} 条批注 · {name}", annotations.len()))
+            .unwrap_or_else(|| "0 条批注 · 未找到侧车文件".into());
+        Ok(Self {
+            path,
+            is_network,
+            display_name,
+            annotations,
+            annotation_status,
+            package: None,
+        })
+    }
+}
+
 impl AppMain for App {
     fn script_mod(vm: &mut ScriptVm) -> ScriptValue {
-        crate::makepad_widgets::script_mod(vm);
+        crate::makepad_widgets::theme_mod(vm);
+        crate::ui::theme_mod(vm);
+        script_eval!(vm, {
+            mod.theme = mod.themes.video_insight
+        });
+        crate::makepad_widgets::widgets_mod(vm);
+        crate::ui::primitives_mod(vm);
+        crate::annotation_content::script_mod(vm);
+        crate::annotation_timeline::script_mod(vm);
+        crate::ui::screen_mod(vm);
         self::script_mod(vm)
     }
 
@@ -622,5 +576,11 @@ mod tests {
     fn formats_annotation_timestamps() {
         assert_eq!(fmt_time(0.0), "00:00");
         assert_eq!(fmt_time(65.2), "01:05");
+    }
+
+    #[test]
+    fn makepad_design_modules_evaluate_headlessly() {
+        let mut cx = Cx::new(Box::new(|_, _| {}));
+        let _ = cx.with_vm(|vm| <App as AppMain>::script_mod(vm));
     }
 }

@@ -10,6 +10,7 @@ import {
   fetchAnnotationComments,
   fetchVideo,
   fetchVideos,
+  exportVideo,
   updateAnnotation,
   updateVideo,
   uploadVideo,
@@ -21,7 +22,7 @@ export function useVideos(page = 1, pageSize = 20) {
     queryFn: () => fetchVideos(page, pageSize),
     refetchInterval: (query) => {
       const data = query.state.data;
-      const videos = Array.isArray(data) ? data : data?.items ?? [];
+      const videos = Array.isArray(data) ? data : (data?.items ?? []);
       return videos.some(
         (video) =>
           video.processing_status === "pending" || video.processing_status === "processing",
@@ -110,6 +111,10 @@ export function useDeleteVideo() {
     mutationFn: deleteVideo,
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ["videos"] }),
   });
+}
+
+export function useVideoExport() {
+  return useMutation({ mutationFn: exportVideo });
 }
 
 export function useAnnotations(videoId: string) {

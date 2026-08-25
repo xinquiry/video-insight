@@ -6,7 +6,9 @@ import (
 	"errors"
 	"io"
 	"log/slog"
+	"mime"
 	"net/http"
+	"path"
 	"strconv"
 	"strings"
 	"time"
@@ -19,6 +21,7 @@ import (
 	"github.com/xinquiry/video-insight/backend/internal/auth"
 	"github.com/xinquiry/video-insight/backend/internal/groups"
 	"github.com/xinquiry/video-insight/backend/internal/model"
+	"github.com/xinquiry/video-insight/backend/internal/portable"
 	"github.com/xinquiry/video-insight/backend/internal/shared/apperror"
 	"github.com/xinquiry/video-insight/backend/internal/videos"
 )
@@ -61,7 +64,7 @@ func New(
 	router := chi.NewRouter()
 	router.Use(middleware.RequestID)
 	router.Use(middleware.Recoverer)
-	router.Use(middleware.Timeout(60 * time.Second))
+	router.Use(server.requestTimeout)
 	router.Use(server.cors)
 	router.Use(server.accessLog)
 	router.Route("/api", func(api chi.Router) {
@@ -79,6 +82,7 @@ func New(
 			protected.Post("/videos/uploads/abort", server.abortUpload)
 			protected.Post("/videos", server.completeUpload)
 			protected.Get("/videos/{videoID}", server.getVideo)
+			protected.Get("/videos/{videoID}/export", server.exportVideo)
 			protected.Patch("/videos/{videoID}", server.updateVideo)
 			protected.Delete("/videos/{videoID}", server.deleteVideo)
 			protected.Get("/videos/{videoID}/annotations", server.listAnnotations)
@@ -255,6 +259,46 @@ func (s *Server) getVideo(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	writeJSON(w, http.StatusOK, videoDTO(result))
+}
+
+func (s *Server) exportVideo(w http.ResponseWriter, r *http.Request) {
+	videoID, ok := pathUUID(w, r, "videoID")
+	if !ok {
+		return
+	}
+	groupID := currentUser(r).GroupID
+	result, err := s.videos.OpenExport(r.Context(), videoID, groupID)
+	if err != nil {
+		s.writeError(w, r, err)
+		return
+	}
+	defer func() { _ = result.Media.Close() }()
+	items, err := s.annotations.List(r.Context(), videoID, groupID)
+	if err != nil {
+		s.writeError(w, r, err)
+		return
+	}
+	portableVideo := result.Video
+	portableVideo.OriginalFilename = result.Filename
+	mediaPath := "media/" + result.Filename
+	bundle, err := portable.NewBundle(portableVideo, mediaPath, items, time.Now())
+	if err != nil {
+		s.writeError(w, r, err)
+		return
+	}
+	packageStem := strings.TrimSuffix(result.Filename, path.Ext(result.Filename))
+	if packageStem == "" {
+		packageStem = "video-" + videoID.String()
+	}
+	packageName := packageStem + portable.PackageExtension
+	w.Header().Set("Cache-Control", "private, no-store")
+	w.Header().Set("Content-Type", portable.PackageMIME)
+	w.Header().Set("Content-Disposition", mime.FormatMediaType("attachment", map[string]string{"filename": packageName}))
+	w.Header().Set("X-Content-Type-Options", "nosniff")
+	w.WriteHeader(http.StatusOK)
+	if err := portable.WritePackage(w, bundle, result.Media); err != nil {
+		s.logger.Error("stream video export", "request_id", middleware.GetReqID(r.Context()), "video_id", videoID, "error", err)
+	}
 }
 
 func (s *Server) updateVideo(w http.ResponseWriter, r *http.Request) {
@@ -443,6 +487,23 @@ func (s *Server) cors(next http.Handler) http.Handler {
 			return
 		}
 		next.ServeHTTP(w, r)
+	})
+}
+
+func (s *Server) requestTimeout(next http.Handler) http.Handler {
+	regular := middleware.Timeout(60 * time.Second)(next)
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Method == http.MethodGet && strings.HasPrefix(r.URL.Path, "/api/videos/") && strings.HasSuffix(r.URL.Path, "/export") {
+			// The API server's normal WriteTimeout is intentionally short. An
+			// annotated-video export can stream gigabytes, so let the downstream
+			// proxy's inactivity timeout govern this one authenticated route.
+			if err := http.NewResponseController(w).SetWriteDeadline(time.Time{}); err != nil && !errors.Is(err, http.ErrNotSupported) {
+				s.logger.Warn("disable export write deadline", "request_id", middleware.GetReqID(r.Context()), "error", err)
+			}
+			next.ServeHTTP(w, r)
+			return
+		}
+		regular.ServeHTTP(w, r)
 	})
 }
 

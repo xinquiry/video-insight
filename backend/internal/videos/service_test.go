@@ -3,9 +3,12 @@ package videos
 import (
 	"context"
 	"errors"
+	"io"
 	"net/http"
+	"strings"
 	"testing"
 	"time"
+	"unicode/utf8"
 
 	"github.com/google/uuid"
 
@@ -72,6 +75,9 @@ func (f *fakeStorage) AbortMultipartUpload(context.Context, string, string) erro
 func (f *fakeStorage) PresignGet(context.Context, string, time.Duration) (string, error) {
 	f.presigned++
 	return "https://playback", nil
+}
+func (f *fakeStorage) OpenObject(context.Context, string) (io.ReadCloser, error) {
+	return io.NopCloser(strings.NewReader("video data")), nil
 }
 
 func TestPlaybackURLIsOnlyIssuedForReadyVideos(t *testing.T) {
@@ -208,5 +214,49 @@ func TestUpdateCanClearDescription(t *testing.T) {
 	}
 	if store.video.Description != nil {
 		t.Fatal("description was not cleared")
+	}
+}
+
+func TestOpenExportUsesSafeFilenameAndRequiresReadyVideo(t *testing.T) {
+	t.Parallel()
+	groupID := uuid.New()
+	videoID := uuid.New()
+	store := &fakeStore{found: true, video: model.Video{
+		ID: videoID, GroupID: groupID, ObjectKey: "videos/key", OriginalFilename: `lessons\\demo.mp4`,
+		ContentType: "video/mp4", ProcessingStatus: model.VideoProcessingReady,
+	}}
+	result, err := NewService(store, &fakeStorage{}, Config{}).OpenExport(context.Background(), videoID, groupID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if result.Filename != "demo.mp4" || result.Media == nil {
+		t.Fatalf("unexpected export: %+v", result)
+	}
+	_ = result.Media.Close()
+
+	store.video.ProcessingStatus = model.VideoProcessingPending
+	_, err = NewService(store, &fakeStorage{}, Config{}).OpenExport(context.Background(), videoID, groupID)
+	appErr, ok := apperror.As(err)
+	if !ok || appErr.Status != http.StatusConflict {
+		t.Fatalf("pending export error = %v, want HTTP 409", err)
+	}
+}
+
+func TestSafeExportFilenameIsPortableAcrossDesktopPlatforms(t *testing.T) {
+	t.Parallel()
+	videoID := uuid.MustParse("11111111-1111-1111-1111-111111111111")
+	tests := map[string]string{
+		`folder\lesson:one?.mp4`: "lesson_one_.mp4",
+		"CON.mp4":                "_CON.mp4",
+		"trailing.mp4. ":         "trailing.mp4",
+		"../..":                  "video-11111111-1111-1111-1111-111111111111.mp4",
+	}
+	for input, expected := range tests {
+		if actual := safeExportFilename(input, videoID); actual != expected {
+			t.Errorf("safeExportFilename(%q) = %q, want %q", input, actual, expected)
+		}
+	}
+	if result := safeExportFilename(strings.Repeat("课", 200)+".mp4", videoID); len(result) > 240 || !utf8.ValidString(result) {
+		t.Fatalf("long filename is not bounded valid UTF-8: %d bytes", len(result))
 	}
 }
