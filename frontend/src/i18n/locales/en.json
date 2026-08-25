@@ -187,6 +187,15 @@
       "content": "Content",
       "contentPlaceholder": "Write an annotation…",
       "color": "Color",
+      "colors": {
+        "current": "Current color",
+        "terracotta": "Terracotta",
+        "amber": "Amber",
+        "forest": "Forest",
+        "ocean": "Ocean",
+        "violet": "Violet",
+        "rose": "Rose"
+      },
       "type": "Type",
       "bold": "Bold",
       "italic": "Italic",

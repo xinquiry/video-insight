@@ -187,6 +187,15 @@
       "content": "内容",
       "contentPlaceholder": "撰写批注…",
       "color": "颜色",
+      "colors": {
+        "current": "当前颜色",
+        "terracotta": "陶土色",
+        "amber": "琥珀色",
+        "forest": "森林绿",
+        "ocean": "海洋蓝",
+        "violet": "紫罗兰",
+        "rose": "玫瑰色"
+      },
       "type": "类型",
       "bold": "粗体",
       "italic": "斜体",

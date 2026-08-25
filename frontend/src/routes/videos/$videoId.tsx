@@ -82,6 +82,14 @@ const surfaceMotion = {
 
 const KEYBOARD_SEEK_STEP_SECONDS = 5;
 const PLAYBACK_RATES = [0.5, 0.75, 1, 1.25, 1.5, 2] as const;
+const ANNOTATION_COLORS = [
+  { value: "#C0512F", labelKey: "terracotta" },
+  { value: "#C28A2C", labelKey: "amber" },
+  { value: "#2F5B4F", labelKey: "forest" },
+  { value: "#3E6B89", labelKey: "ocean" },
+  { value: "#735A8D", labelKey: "violet" },
+  { value: "#A64D68", labelKey: "rose" },
+] as const;
 type PlaybackRate = (typeof PLAYBACK_RATES)[number];
 
 function VideoDetailPage() {
@@ -989,33 +997,6 @@ function PlaybackAnnotationDetail({
         </div>
       </div>
 
-      <dl className="grid gap-0 overflow-hidden rounded-lg border border-[var(--rule)] bg-[var(--paper)] text-sm sm:grid-cols-2">
-        <div className="border-b border-[var(--rule)] p-3 sm:border-r">
-          <dt className="vi-kicker">{t("videoDetail.form.timeSeconds")}</dt>
-          <dd className="vi-mono mt-2 text-xs">{formatDuration(annotation.timestamp_seconds)}</dd>
-        </div>
-        <div className="border-b border-[var(--rule)] p-3">
-          <dt className="vi-kicker">{t("videoDetail.form.durationSeconds")}</dt>
-          <dd className="vi-mono mt-2 text-xs">
-            {formatDuration(getAnnotationDuration(annotation))}
-          </dd>
-        </div>
-        <div className="border-b border-[var(--rule)] p-3 sm:border-r sm:border-b-0">
-          <dt className="vi-kicker">{t("videoDetail.form.type")}</dt>
-          <dd className="mt-2 text-sm font-semibold">{translateKind(t, annotation.kind)}</dd>
-        </div>
-        <div className="p-3">
-          <dt className="vi-kicker">{t("videoDetail.form.color")}</dt>
-          <dd className="mt-2 flex items-center gap-2">
-            <span
-              className="h-4 w-4 rounded-full border border-[var(--rule-strong)]"
-              style={{ backgroundColor: annotation.color }}
-            />
-            <span className="vi-mono text-xs">{annotation.color}</span>
-          </dd>
-        </div>
-      </dl>
-
       {hasCustomData && (
         <div className="mt-4 border-t border-[var(--rule)] pt-4">
           <p className="vi-kicker">{t("videoDetail.form.customJson")}</p>
@@ -1309,8 +1290,22 @@ function AnnotationComposer({
   const createAnnotation = useCreateAnnotation(videoId);
   const updateAnnotation = useUpdateAnnotation(videoId);
   const contentLabelId = useId();
+  const colorInputName = useId();
   const [jsonError, setJsonError] = useState<string | null>(null);
   const isPending = createAnnotation.isPending || updateAnnotation.isPending;
+  const selectedColor = normalizeAnnotationColor(values.color);
+  const hasPresetColor = ANNOTATION_COLORS.some(
+    ({ value }) => normalizeAnnotationColor(value) === selectedColor,
+  );
+  const colorOptions: ReadonlyArray<{ label: string; value: string }> = [
+    ...(!hasPresetColor
+      ? [{ label: t("videoDetail.form.colors.current"), value: values.color }]
+      : []),
+    ...ANNOTATION_COLORS.map(({ labelKey, value }) => ({
+      label: t(`videoDetail.form.colors.${labelKey}`),
+      value,
+    })),
+  ];
 
   const updateValues = (patch: Partial<AnnotationEditorValues>) => {
     onChange({ ...values, ...patch });
@@ -1451,15 +1446,47 @@ function AnnotationComposer({
               <option value="highlight">{t("videoDetail.form.kinds.highlight")}</option>
             </select>
           </label>
-          <label className="vi-label">
-            {t("videoDetail.form.color")}
-            <input
-              type="color"
-              value={values.color}
-              onChange={(event) => updateValues({ color: event.target.value })}
-              className="mt-2 h-10 w-14 rounded-lg border border-[var(--rule-strong)] bg-[var(--surface)] p-1"
-            />
-          </label>
+          <fieldset>
+            <legend className="vi-label">{t("videoDetail.form.color")}</legend>
+            <div className="mt-2 flex flex-wrap gap-2">
+              {colorOptions.map((option) => {
+                const isSelected = normalizeAnnotationColor(option.value) === selectedColor;
+                return (
+                  <label
+                    key={option.value}
+                    title={option.label}
+                    className="relative cursor-pointer rounded-full"
+                  >
+                    <input
+                      type="radio"
+                      name={colorInputName}
+                      value={option.value}
+                      checked={isSelected}
+                      onChange={() => updateValues({ color: option.value })}
+                      className="peer sr-only"
+                    />
+                    <span
+                      className={cn(
+                        "flex h-9 w-9 items-center justify-center rounded-full border-2 transition-transform hover:scale-105 peer-focus-visible:outline-none peer-focus-visible:ring-2 peer-focus-visible:ring-[var(--ink)] peer-focus-visible:ring-offset-2",
+                        isSelected
+                          ? "border-[var(--ink)] shadow-[0_0_0_2px_var(--paper),0_0_0_4px_var(--ink)]"
+                          : "border-white",
+                      )}
+                      style={{ backgroundColor: option.value }}
+                    >
+                      {isSelected && (
+                        <Check
+                          className="h-4 w-4 text-white drop-shadow-[0_1px_1px_rgba(0,0,0,0.65)]"
+                          aria-hidden="true"
+                        />
+                      )}
+                    </span>
+                    <span className="sr-only">{option.label}</span>
+                  </label>
+                );
+              })}
+            </div>
+          </fieldset>
         </div>
       </div>
 
@@ -1522,6 +1549,10 @@ function isAnnotationActive(annotation: Annotation, currentTime: number) {
 
 function getAnnotationDuration(annotation: Annotation) {
   return toPositiveDuration(annotation.duration_seconds);
+}
+
+function normalizeAnnotationColor(color: string) {
+  return color.toUpperCase();
 }
 
 function getEditorValuesFromAnnotation(annotation: Annotation): AnnotationEditorValues {
