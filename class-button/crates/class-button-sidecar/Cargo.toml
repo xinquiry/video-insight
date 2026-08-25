@@ -1,11 +1,11 @@
 [package]
-name = "class-button-desktop"
+name = "class-button-sidecar"
 version.workspace = true
 edition.workspace = true
 license.workspace = true
 
 [[bin]]
-name = "class-button-desktop"
+name = "class-button-sidecar"
 path = "src/main.rs"
 
 [dependencies]
@@ -15,8 +15,6 @@ clap.workspace = true
 class-button-core = { path = "../class-button-core" }
 class-button-host = { path = "../class-button-host" }
 futures-util.workspace = true
-makepad-widgets.workspace = true
-robius-file-picker.workspace = true
 serde.workspace = true
 serde_json.workspace = true
 tokio.workspace = true

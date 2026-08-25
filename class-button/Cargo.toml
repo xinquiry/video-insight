@@ -18,5 +18,3 @@ thiserror = "2"
 tokio = { version = "1", features = ["full"] }
 tokio-serial = "5.4"
 zip = { version = "8.6", default-features = false, features = ["deflate-flate2-zlib-rs"] }
-makepad-widgets = { git = "https://github.com/makepad/makepad.git", rev = "152b11f20a8cf8e81bfd0086210cb9b0269c51e9", version = "2.0.0" }
-robius-file-picker = "0.3"

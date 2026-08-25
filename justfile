@@ -85,13 +85,13 @@ test-frontend:
 
 # ── Classroom player and hardware ───────────────────────
 
-# Run the native Makepad classroom player; pass CLI flags as one quoted string
+# Run the Electron classroom player; pass CLI flags as one quoted string
 run-desktop args="":
-    cd class-button && cargo run --bin class-button-desktop -- {{ args }}
+    cd class-button/desktop && pnpm dev -- {{ args }}
 
 # Run the player and inject one sample student press
 run-desktop-demo:
-    cd class-button && cargo run --bin class-button-desktop -- --demo
+    cd class-button/desktop && pnpm dev:demo
 
 # Run host diagnostics, for example: just class-button-cli "ports"
 class-button-cli args="ports":
@@ -101,6 +101,10 @@ class-button-cli args="ports":
 check-class-button:
     cd class-button && cargo fmt --all -- --check
     cd class-button && cargo test --workspace
+
+# Type-check, test, and bundle the Electron classroom player
+check-desktop:
+    cd class-button/desktop && pnpm check
 
 # Test the browser compatibility adapter
 test-player-adapter:
@@ -129,7 +133,7 @@ test: test-backend test-frontend
 check: lint type
 
 # Verify SaaS plus Class Button host software and browser adapter
-check-all: check test check-class-button test-player-adapter
+check-all: check test check-class-button check-desktop test-player-adapter
 
 # ── Production stack ────────────────────────────────────
 

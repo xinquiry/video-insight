@@ -20,7 +20,7 @@ BOOT/GPIO0 即可发送一次请求。
 6. 给 Class Button Key 通电，短按按钮验证视频暂停和学生提示叠层。
 7. 点击“已处理”关闭提示，由老师手动继续播放。
 
-Makepad 播放控件支持播放/暂停、进度跳转、音量和全屏。视频只从本机读取，不会
+Electron 的 Chromium 播放控件支持播放/暂停、进度跳转、音量和全屏。视频只从本机读取，不会
 由播放器上传到网络；同目录存在 VideoInsight 批注侧车时会自动读取并展示。
 
 配置文件 `classroom.json` 必须与 `Class Button.exe` 放在同一个目录。修改学生映射
@@ -47,7 +47,7 @@ Key 不应出现在 Windows 设备管理器中，因为正常使用时它只连�
 .\scripts\package-windows.ps1
 ```
 
-默认生成 `dist\Class-Button-Windows-x64.zip`。Windows on ARM 可以运行：
+默认在 `dist\electron` 生成 x64 便携程序和 ZIP。Windows on ARM 可以运行：
 
 ```powershell
 .\scripts\package-windows.ps1 -Architecture arm64
@@ -59,6 +59,7 @@ Key 不应出现在 Windows 设备管理器中，因为正常使用时它只连�
 ./scripts/package-windows-from-macos.sh
 ```
 
-当前产物是免安装便携版；Windows 可能在首次运行未签名程序时显示 SmartScreen
-提醒。播放器使用 Makepad 的原生 DirectX UI 与 Windows Media Foundation 视频
-后端，不要求 WebView2。正式分发前应配置代码签名证书，再制作 MSIX 或安装器。
+当前产物是 Electron 免安装便携版；Windows 可能在首次运行未签名程序时显示
+SmartScreen 提醒。播放器自带 Chromium，不要求系统安装 WebView2。正式分发前
+应配置代码签名证书。推荐使用 MP4/H.264/AAC 或 WebM；其他格式需在打包产物中
+验证 Chromium 编码支持。

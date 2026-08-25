@@ -4,9 +4,10 @@
 
 - Backend: Go 1.26 with Chi, pgx/sqlc, AWS SDK v2, JWT, and PBKDF2 password compatibility. Formatted with `gofmt`, checked with `go vet`, and tested with the race detector.
 - Frontend: React 19 + TanStack Router + TanStack Query + TailwindCSS 4, built with Vite and managed with `pnpm`.
-- Classroom: a nested Rust workspace in `class-button/` for the Makepad desktop
-  player, serial host tools, protocol, and browser adapter. ESP32-S3 firmware is
-  a separate nested workspace so its ESP-IDF target does not affect host builds.
+- Classroom: an Electron + React + Vite desktop player in `class-button/desktop/`
+  backed by a nested Rust workspace for the sidecar, serial host tools, protocol,
+  and browser adapter. ESP32-S3 firmware is a separate nested workspace so its
+  ESP-IDF target does not affect host builds.
 - Storage: PostgreSQL 16 plus MinIO locally or Cloudflare R2 in production.
 - Orchestration: layered Docker Compose driven by `scripts/dev.sh` and `scripts/deploy-prod.sh`.
 
@@ -34,10 +35,11 @@ just check                 # lint + type
 just fix                   # format/fix both sides
 
 just prod-up               # pull pinned images and deploy
-just run-desktop           # run the native Makepad classroom player
+just run-desktop           # run the Electron classroom player
 just run-desktop-demo      # run it with a simulated button press
 just class-button-cli ports # discover attached USB serial devices
 just check-class-button    # format-check and test Rust host crates
+just check-desktop         # type-check, test, and bundle Electron
 just test-player-adapter   # test the legacy browser integration
 just build-esp32 receiver  # build receiver or button ESP32-S3 firmware
 just flash-esp32 receiver /dev/cu.usbmodemXXXX
@@ -91,9 +93,11 @@ Production nginx serves the bundle and proxies `/api` to the Go service.
 - `crates/class-button-host/` — USB serial discovery and receiver line parsing.
 - `crates/class-button-cli/` — host diagnostics, serial listening, and simulated
   events.
-- `crates/class-button-desktop/` — native Makepad classroom video player. It owns
-  player UI and coordinates the serial runtime, but reuses the core and host
-  crates for domain and device behavior.
+- `crates/class-button-sidecar/` — headless Rust runtime for package validation,
+  annotation normalization, serial events, and the localhost compatibility
+  server. It communicates with Electron main through versioned JSON lines.
+- `desktop/` — Electron main/preload processes and the React/Vite classroom
+  player. The sandboxed renderer only receives a narrow typed preload API.
 - `player-adapter/` — compatibility adapter for pausing browser video through the
   localhost WebSocket service. Student identity intentionally stays in the native
   process and is not sent to arbitrary webpages.
@@ -101,17 +105,16 @@ Production nginx serves the bundle and proxies `/api` to the Go service.
   `receiver` binaries. Do not add it to the host workspace or run host-wide Cargo
   commands from this directory.
 
-The desktop application uses Makepad 2's current `script_mod!` DSL and native
-`Video` widget. Do not reintroduce winit/wry, HTML player assets, or a WebView.
-Makepad is pinned to an exact git revision in `class-button/Cargo.toml`; update the
-revision and lockfile together, and verify the packaged application visually after
-framework upgrades. Follow current Makepad syntax (`Name: value` and
-`name := Type{...}`), not the deprecated `live_design!` syntax.
+Electron main owns process lifecycle, file dialogs, the allowlisted custom-media
+protocol, and the Rust sidecar. Keep `nodeIntegration` disabled, context isolation
+and renderer sandboxing enabled, validate IPC senders, and expose only task-specific
+functions from preload. The React renderer owns player state and presentation but
+must not receive filesystem paths or raw Electron APIs.
 
-Serial discovery and the localhost compatibility server run on a background Tokio
-runtime. Background work must deliver UI changes through `Cx::post_action`; do not
-mutate Makepad widgets from worker threads. A physical or simulated student press
-must pause video before displaying the student overlay.
+Serial discovery and the localhost compatibility server stay in the Tokio Rust
+sidecar. Student identity travels only over the private sidecar/Electron channel;
+the browser compatibility WebSocket remains pause-only. A physical or simulated
+student press must pause the HTML video before displaying the student overlay.
 
 The desktop player is a read-only consumer of VideoInsight annotations. For a
 video such as `lesson.mp4`, it searches for `lesson.mp4.annotations.json`, then
@@ -120,8 +123,9 @@ SaaS annotation array or an object with an `annotations` array. Keep this shape
 compatible with the API DTOs in `frontend/src/types/index.ts` and
 `backend/internal/httpapi/types.go`; see `class-button/docs/desktop.md`.
 
-Run host checks from the repository root with `just check-class-button`. The
-ESP32-S3 workspace requires the `esp` Rust toolchain and ESP-IDF environment, so
+Run host checks from the repository root with `just check-class-button` and the
+Electron checks with `just check-desktop`. The ESP32-S3 workspace requires the
+`esp` Rust toolchain and ESP-IDF environment, so
 firmware builds are separate and should name the intended role explicitly.
 
 ## Deployment

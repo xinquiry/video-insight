@@ -75,6 +75,7 @@ impl Annotation {
         Ok(())
     }
 
+    #[cfg(test)]
     pub fn is_active(&self, seconds: f64) -> bool {
         seconds + 0.12 >= self.timestamp_seconds
             && seconds <= self.timestamp_seconds + self.duration_seconds.max(0.0)

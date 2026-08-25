@@ -5,46 +5,30 @@ param(
 
 $ErrorActionPreference = "Stop"
 $ProjectRoot = Split-Path -Parent $PSScriptRoot
+$DesktopRoot = Join-Path $ProjectRoot "desktop"
 $TargetTriple = if ($Architecture -eq "arm64") {
     "aarch64-pc-windows-msvc"
 } else {
     "x86_64-pc-windows-msvc"
 }
-$PackageName = "Class-Button-Windows-$Architecture"
-$PackageDir = Join-Path $ProjectRoot "dist\$PackageName"
-$ArchivePath = Join-Path $ProjectRoot "dist\$PackageName.zip"
-$BinaryPath = Join-Path $ProjectRoot "target\$TargetTriple\release\class-button-desktop.exe"
+$Sidecar = Join-Path $ProjectRoot "target\$TargetTriple\release\class-button-sidecar.exe"
+$StagedSidecar = Join-Path $DesktopRoot "build-resources\bin\class-button-sidecar.exe"
+$ElectronArch = if ($Architecture -eq "arm64") { "--arm64" } else { "--x64" }
 
 rustup target add $TargetTriple
 cargo build `
     --release `
     --target $TargetTriple `
     --manifest-path (Join-Path $ProjectRoot "Cargo.toml") `
-    --bin class-button-desktop
+    --bin class-button-sidecar
 
-if (Test-Path $PackageDir) {
-    Remove-Item -Recurse -Force $PackageDir
+$StagedDirectory = Split-Path -Parent $StagedSidecar
+if (Test-Path $StagedDirectory) {
+    Remove-Item -Recurse -Force $StagedDirectory
 }
-New-Item -ItemType Directory -Force $PackageDir | Out-Null
-New-Item -ItemType Directory -Force (Join-Path $PackageDir "player-adapter") | Out-Null
+New-Item -ItemType Directory -Force $StagedDirectory | Out-Null
+Copy-Item -Force $Sidecar $StagedSidecar
+pnpm --dir $DesktopRoot build
+pnpm --dir $DesktopRoot exec electron-builder --win portable zip $ElectronArch
 
-Copy-Item $BinaryPath (Join-Path $PackageDir "Class Button.exe")
-Copy-Item `
-    (Join-Path $ProjectRoot "config\classroom.example.json") `
-    (Join-Path $PackageDir "classroom.json")
-Copy-Item `
-    (Join-Path $ProjectRoot "docs\windows.md") `
-    (Join-Path $PackageDir "README-Windows.md")
-Copy-Item `
-    (Join-Path $ProjectRoot "player-adapter\class-button-player.js") `
-    (Join-Path $PackageDir "player-adapter\class-button-player.js")
-Copy-Item `
-    (Join-Path $ProjectRoot "player-adapter\README.md") `
-    (Join-Path $PackageDir "player-adapter\README.md")
-
-if (Test-Path $ArchivePath) {
-    Remove-Item -Force $ArchivePath
-}
-Compress-Archive -Path "$PackageDir\*" -DestinationPath $ArchivePath
-
-Write-Output $ArchivePath
+Write-Output (Join-Path $ProjectRoot "dist\electron")
