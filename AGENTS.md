@@ -16,35 +16,27 @@
 Run from the repository root:
 
 ```sh
-just up                    # start Postgres, MinIO, Go API, and frontend
-just down                  # remove containers and keep volumes
-just nuke                  # also remove development volumes
-just logs-f backend        # follow the Go API logs
-just shell-db              # open psql
-just rebuild backend       # rebuild one service
+just dev                    # start PostgreSQL, MinIO, Go API, and frontend
+just dev down               # remove local containers and keep volumes
+just dev reset              # also remove development volumes
+just dev logs backend       # follow one service
+just dev rebuild frontend   # rebuild one service
+just dev db                 # open psql
 
-just run-backend           # run the Go API directly
-just generate-backend      # regenerate sqlc code
-just test-backend          # race-enabled Go tests
-just check-backend         # gofmt, vet, and tests
+just desktop                # run the Electron classroom player
+just desktop demo           # run with a simulated button press
+just desktop open VIDEO     # open a video immediately
 
-just lint                  # backend + frontend lint
-just type                  # Go vet + frontend TypeScript
-just test                  # backend + frontend tests
-just check                 # lint + type
-just fix                   # format/fix both sides
-
-just prod-up               # pull pinned images and deploy
-just run-desktop           # run the Electron classroom player
-just run-desktop-demo      # run it with a simulated button press
-just class-button-cli ports # discover attached USB serial devices
-just check-class-button    # format-check and test Rust host crates
-just check-desktop         # type-check, test, and bundle Electron
-just test-player-adapter   # test the legacy browser integration
-just build-esp32 receiver  # build receiver or button ESP32-S3 firmware
-just flash-esp32 receiver /dev/cu.usbmodemXXXX
-just check-all             # SaaS checks/tests plus Class Button checks
+just check                  # verify web plus desktop products
+just check unit             # run all unit suites only
+just check web              # verify backend and frontend
+just check desktop          # verify Rust host and Electron application
+just fix                    # format supported products
+just deploy                 # pull backend/frontend images and deploy
 ```
+
+The root Justfile exposes workflows, not component-level wrappers. Use Go,
+pnpm, Cargo, and the scripts inside each component for specialized operations.
 
 The dev stack always loads `docker/.env.example` and optionally loads the ignored `docker/.env.dev`. Production additionally uses the ignored `docker/.env.prod`.
 
@@ -123,15 +115,15 @@ SaaS annotation array or an object with an `annotations` array. Keep this shape
 compatible with the API DTOs in `frontend/src/types/index.ts` and
 `backend/internal/httpapi/types.go`; see `class-button/docs/desktop.md`.
 
-Run host checks from the repository root with `just check-class-button` and the
-Electron checks with `just check-desktop`. The ESP32-S3 workspace requires the
-`esp` Rust toolchain and ESP-IDF environment, so
+Run host and Electron checks from the repository root with
+`just check desktop`. The ESP32-S3 workspace requires the `esp` Rust toolchain
+and ESP-IDF environment, so
 firmware builds are separate and should name the intended role explicitly.
 
 ## Deployment
 
-- Local: `just up` builds the Go dev image and starts bundled MinIO.
-- Production: `just prod-up` pulls immutable `video-insight-backend` and `video-insight-frontend` images.
+- Local: `just dev` builds the Go dev image and starts bundled MinIO.
+- Production: `just deploy` pulls immutable `video-insight-backend` and `video-insight-frontend` images.
 - Only frontend port 8080 is bound to the host. Cloudflared publishes the app; R2 or browser-reachable MinIO serves object URLs.
 - Preserve `GO_SEED_ADMIN_ON_STARTUP=false` after the first production bootstrap.
 - Desktop packages are produced by `class-button/scripts/package-macos.sh` or

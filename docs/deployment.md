@@ -5,7 +5,7 @@
 Run the complete stack with the Go backend and frontend hot reload:
 
 ```sh
-just up
+just dev
 ```
 
 This uses `docker/docker-compose.base.yaml` plus
@@ -14,14 +14,17 @@ volumes, while `backend/` and `frontend/` are bind-mounted into their dev
 containers. Defaults live in `docker/.env.example`; optional local overrides
 live in the ignored `docker/.env.dev`.
 
-Useful backend commands:
+Useful development commands:
 
 ```sh
-just run-backend
-just generate-backend
-just test-backend
-just check-backend
+just dev logs backend
+just dev rebuild backend
+just check web
+just check unit
 ```
+
+After editing SQL queries, regenerate sqlc code from `backend/` with
+`go run github.com/sqlc-dev/sqlc/cmd/sqlc@v1.31.1 generate`.
 
 ## Image Publishing
 
@@ -137,7 +140,7 @@ From the repository on the server:
 
 ```sh
 git pull --ff-only
-just prod-up
+just deploy
 ```
 
 The deployment script pulls the pinned images and starts PostgreSQL. The Go API

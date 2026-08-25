@@ -94,11 +94,11 @@ SaaS 视频页面的“导出到本地播放器”会下载一个 `lesson.vinsig
 ## 运行与验证
 
 ```sh
-just run-desktop
-just run-desktop-demo
-just check-class-button
-just check-desktop
-just test-player-adapter
+just desktop
+just desktop demo
+just desktop open /path/to/lesson.mp4
+just check desktop
+just check unit
 ```
 
 `--config` 可覆盖课堂/设备映射，`--port` 可跳过自动发现，`--video` 可在启动时

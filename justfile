@@ -1,146 +1,182 @@
-# Show available commands
+# VideoInsight's public developer workflows.
+#
+# Keep this interface small. Component-specific operations belong to Go, pnpm,
+# Cargo, or the scripts in their respective directories.
+
+# Show the public workflow commands
+[private]
 default:
-    @just --list
+    @just --list --unsorted
 
-# ── Docker: development stack ───────────────────────────
+# Develop the hosted application: start, stop, down, reset, restart, rebuild, logs, logs-once, or db
+dev action="start" service="":
+    #!/usr/bin/env bash
+    set -euo pipefail
 
-# Start all services
-up:
-    ./scripts/dev.sh up
+    action={{ quote(action) }}
+    service={{ quote(service) }}
 
-# Start the complete SaaS stack (alias for `just up`)
-run-saas: up
+    run_dev() {
+      local command="$1"
+      if [[ -n "$service" ]]; then
+        exec ./scripts/dev.sh "$command" "$service"
+      fi
+      exec ./scripts/dev.sh "$command"
+    }
 
-# Stop services without removing containers
-stop:
-    ./scripts/dev.sh stop
+    require_no_service() {
+      if [[ -n "$service" ]]; then
+        echo "The '$action' action does not accept a service." >&2
+        exit 2
+      fi
+    }
 
-# Stop and remove containers/networks, keep volumes
-down:
-    ./scripts/dev.sh down
+    case "$action" in
+      start) run_dev up ;;
+      stop|down|restart|rebuild) run_dev "$action" ;;
+      reset)
+        require_no_service
+        exec ./scripts/dev.sh nuke
+        ;;
+      logs) run_dev logs-f ;;
+      logs-once) run_dev logs ;;
+      db)
+        require_no_service
+        exec ./scripts/dev.sh shell-db
+        ;;
+      *)
+        echo "Usage: just dev [start|stop|down|reset|restart|rebuild|logs|logs-once|db] [service]" >&2
+        exit 2
+        ;;
+    esac
 
-# Stop and remove containers/networks/volumes
-nuke:
-    ./scripts/dev.sh nuke
+# Run the classroom application: run, demo, or open <video>
+desktop action="run" target="":
+    #!/usr/bin/env bash
+    set -euo pipefail
 
-# Restart all services, or one service: just restart backend
-restart service="":
-    ./scripts/dev.sh restart {{ service }}
+    action={{ quote(action) }}
+    target={{ quote(target) }}
 
-# Rebuild and start all services, or one service: just rebuild frontend
-rebuild service="":
-    ./scripts/dev.sh rebuild {{ service }}
+    case "$action" in
+      run)
+        if [[ -n "$target" ]]; then
+          echo "Usage: just desktop [run|demo] or just desktop open <video>" >&2
+          exit 2
+        fi
+        cd class-button/desktop
+        exec pnpm dev
+        ;;
+      demo)
+        if [[ -n "$target" ]]; then
+          echo "Usage: just desktop demo" >&2
+          exit 2
+        fi
+        cd class-button/desktop
+        exec pnpm dev:demo
+        ;;
+      open)
+        if [[ -z "$target" ]]; then
+          echo "Usage: just desktop open <video>" >&2
+          exit 2
+        fi
+        cd class-button/desktop
+        exec pnpm dev -- --video "$target"
+        ;;
+      *)
+        echo "Usage: just desktop [run|demo] or just desktop open <video>" >&2
+        exit 2
+        ;;
+    esac
 
-# Show logs for all services, or one service: just logs backend
-logs service="":
-    ./scripts/dev.sh logs {{ service }}
+# Verify supported products: all, unit, web, or desktop
+check scope="all":
+    #!/usr/bin/env bash
+    set -euo pipefail
 
-# Follow logs for all services, or one service: just logs-f backend
-logs-f service="":
-    ./scripts/dev.sh logs-f {{ service }}
+    scope={{ quote(scope) }}
 
-# Open a psql shell in the dev database container
-shell-db:
-    ./scripts/dev.sh shell-db
+    check_web() {
+      echo "Checking hosted application..."
+      (cd backend && test -z "$(gofmt -l .)")
+      (cd backend && go vet ./...)
+      (cd backend && go test -race ./...)
+      (cd frontend && pnpm lint)
+      (cd frontend && pnpm test)
+      (cd frontend && pnpm build)
+    }
 
-# ── Backend ─────────────────────────────────────────────
+    check_desktop() {
+      echo "Checking classroom application..."
+      (cd class-button && cargo fmt --all -- --check)
+      (cd class-button && cargo test --workspace)
+      (cd class-button/desktop && pnpm check)
+    }
 
-lint-backend:
-    cd backend && test -z "$(gofmt -l .)"
+    check_unit() {
+      echo "Running unit tests..."
+      (cd backend && go test -race ./...)
+      (cd frontend && pnpm test)
+      (cd class-button && cargo test --workspace)
+      (cd class-button/desktop && pnpm test)
+    }
 
-fix-backend:
-    cd backend && gofmt -w .
+    case "$scope" in
+      all)
+        check_web
+        check_desktop
+        ;;
+      unit) check_unit ;;
+      web) check_web ;;
+      desktop) check_desktop ;;
+      *)
+        echo "Usage: just check [all|unit|web|desktop]" >&2
+        exit 2
+        ;;
+    esac
 
-type-backend:
-    cd backend && go vet ./...
+# Apply safe automatic fixes: all, web, or desktop
+fix scope="all":
+    #!/usr/bin/env bash
+    set -euo pipefail
 
-test-backend:
-    cd backend && go test -race ./...
+    scope={{ quote(scope) }}
 
-run-backend:
-    cd backend && go run ./cmd/api
+    fix_web() {
+      (cd backend && gofmt -w .)
+      (cd frontend && pnpm lint:fix)
+      (cd frontend && pnpm format)
+    }
 
-generate-backend:
-    cd backend && go run github.com/sqlc-dev/sqlc/cmd/sqlc@v1.31.1 generate
+    fix_desktop() {
+      (cd class-button && cargo fmt --all)
+    }
 
-check-backend: lint-backend type-backend test-backend
+    case "$scope" in
+      all)
+        fix_web
+        fix_desktop
+        ;;
+      web) fix_web ;;
+      desktop) fix_desktop ;;
+      *)
+        echo "Usage: just fix [all|web|desktop]" >&2
+        exit 2
+        ;;
+    esac
 
-# ── Frontend ────────────────────────────────────────────
+# Reconcile production: apply or down
+deploy action="apply":
+    #!/usr/bin/env bash
+    set -euo pipefail
 
-# Run the React development server outside Docker
-run-frontend:
-    cd frontend && pnpm dev
+    action={{ quote(action) }}
 
-lint-frontend:
-    cd frontend && pnpm oxlint .
-
-fix-frontend:
-    cd frontend && pnpm oxlint --fix . && pnpm oxfmt .
-
-type-frontend:
-    cd frontend && pnpm tsc -b --noEmit
-
-test-frontend:
-    cd frontend && pnpm test
-
-# ── Classroom player and hardware ───────────────────────
-
-# Run the Electron classroom player; pass CLI flags as one quoted string
-run-desktop args="":
-    cd class-button/desktop && pnpm dev -- {{ args }}
-
-# Run the player and inject one sample student press
-run-desktop-demo:
-    cd class-button/desktop && pnpm dev:demo
-
-# Run host diagnostics, for example: just class-button-cli "ports"
-class-button-cli args="ports":
-    cd class-button && cargo run --bin class-button -- {{ args }}
-
-# Format-check and test all host-side Class Button crates
-check-class-button:
-    cd class-button && cargo fmt --all -- --check
-    cd class-button && cargo test --workspace
-
-# Type-check, test, and bundle the Electron classroom player
-check-desktop:
-    cd class-button/desktop && pnpm check
-
-# Test the browser compatibility adapter
-test-player-adapter:
-    npm --prefix class-button/player-adapter test
-
-# Build one ESP32-S3 image: receiver or button
-build-esp32 role="receiver":
-    cd class-button/firmware/esp32s3 && rustup run esp cargo build --release --bin {{ role }}
-
-# Flash and monitor one ESP32-S3 image; pass its serial port explicitly
-flash-esp32 role port:
-    cd class-button/firmware/esp32s3 && rustup run esp cargo build --release --bin {{ role }}
-    cd class-button/firmware/esp32s3 && espflash flash --monitor --port {{ port }} --flash-size 16mb target/xtensa-esp32s3-espidf/release/{{ role }}
-
-# ── Aggregate checks ────────────────────────────────────
-
-lint: lint-backend lint-frontend
-
-fix: fix-backend fix-frontend
-
-type: type-backend type-frontend
-
-test: test-backend test-frontend
-
-# Lint and type-check backend + frontend
-check: lint type
-
-# Verify SaaS plus Class Button host software and browser adapter
-check-all: check test check-class-button check-desktop test-player-adapter
-
-# ── Production stack ────────────────────────────────────
-
-# Pull images and start production services; the Go backend migrates on startup
-prod-up:
-    ./scripts/deploy-prod.sh up
-
-# Stop and remove production containers/networks, keep volumes
-prod-down:
-    ./scripts/deploy-prod.sh down
+    case "$action" in
+      apply) exec ./scripts/deploy-prod.sh up ;;
+      down) exec ./scripts/deploy-prod.sh down ;;
+      *)
+        echo "Usage: just deploy [apply|down]" >&2
+        exit 2
+        ;;
+    esac

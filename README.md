@@ -9,40 +9,37 @@ that lets a student pause playback and identify who requested help.
 Start the complete local stack:
 
 ```sh
-just up
+just dev
 ```
 
 The application is available at `http://localhost:5173`; the API listens on
 `http://localhost:8000`.
 
-Run the checks:
+Run the complete check suite or only the unit tests:
 
 ```sh
 just check
-just test
+just check unit
 ```
 
-Run individual products and components:
+The root Justfile exposes complete workflows rather than individual component
+commands:
 
 ```sh
-just run-saas                 # Go API, React, PostgreSQL, and MinIO
-just run-frontend             # React only, outside Docker
-just run-backend              # Go API only, outside Docker
-just run-desktop              # Electron + React classroom player
-just run-desktop-demo         # player plus a simulated student press
-just class-button-cli ports   # discover attached USB serial devices
+just dev logs backend             # follow one local service
+just dev rebuild frontend         # rebuild one local service
+just desktop                      # run the classroom player
+just desktop demo                 # run with a simulated student press
+just desktop open /path/video.mp4 # open a video immediately
+just fix                          # format supported products
+just deploy                       # reconcile production
 ```
 
 Teachers can download the current macOS and Windows desktop packages from
 [GitHub Releases](https://github.com/xinquiry/video-insight/releases/latest).
 
-Build or flash the ESP32-S3 development firmware:
-
-```sh
-just build-esp32 receiver
-just build-esp32 button
-just flash-esp32 receiver /dev/cu.usbmodemXXXX
-```
+Specialized backend, frontend, Rust, and ESP32 operations use their native
+tooling inside the relevant directory; see the component guides below.
 
 ## Repository layout
 

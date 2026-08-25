@@ -8,7 +8,7 @@ service interfaces and platform adapters.
 Start PostgreSQL, MinIO, the Go API, and the frontend:
 
 ```sh
-just up
+just dev
 ```
 
 To run the API directly against already-running dependencies:
@@ -29,13 +29,14 @@ environments should set `GO_SEED_ADMIN_ON_STARTUP=false`.
 Regenerate type-safe PostgreSQL queries after changing SQL:
 
 ```sh
-just generate-backend
+cd backend
+go run github.com/sqlc-dev/sqlc/cmd/sqlc@v1.31.1 generate
 ```
 
-Run all backend checks:
+Run all hosted-application checks:
 
 ```sh
-just check-backend
+just check web
 ```
 
 `db/schema.sql` is the schema snapshot used to initialize a new development

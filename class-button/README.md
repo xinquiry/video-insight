@@ -37,8 +37,8 @@ Rust workspace 包括：
 从 monorepo 根目录启动本地播放器：
 
 ```bash
-just run-desktop
-just run-desktop-demo # 启动后模拟一次学生按键
+just desktop
+just desktop demo # 启动后模拟一次学生按键
 ```
 
 首次运行前安装 Electron 依赖：
@@ -50,7 +50,7 @@ pnpm --dir class-button/desktop install
 启动时打开指定视频：
 
 ```bash
-just run-desktop "--video /path/to/lesson.mp4"
+just desktop open /path/to/lesson.mp4
 ```
 
 也可以打包成可双击运行的 macOS 应用：
@@ -101,11 +101,10 @@ const classButton = new ClassButtonPlayer({
 ## 本地验证
 
 ```bash
-just check-class-button
-just check-desktop
-just class-button-cli ports
-just class-button-cli simulate
-just test-player-adapter
+just check desktop
+just check unit
+cd class-button && cargo run --bin class-button -- ports
+cd class-button && cargo run --bin class-button -- simulate
 ```
 
 接收器固件输出格式为：
