@@ -1,16 +1,16 @@
 # Standalone ESP-IDF workspace; intentionally excluded from the host workspace.
-# Source files live in ../src/bin and are shared with the esp32c3 package.
+# Source files live in ../src/bin and are shared with the esp32s3 package.
 [workspace]
 
 [package]
-name = "class-button-esp32s3-firmware"
+name = "class-button-esp32c3-firmware"
 version = "0.1.0"
 edition = "2021"
 resolver = "2"
 rust-version = "1.82"
 
 [features]
-default = ["board_esp32s3"]
+default = ["board_esp32c3"]
 # 共享源码会检查所有板卡 feature，因此两边都声明。
 board_esp32s3 = []
 board_esp32c3 = []

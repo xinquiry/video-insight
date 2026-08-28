@@ -25,6 +25,13 @@ const MAX_ATTEMPTS: u8 = 4;
 const ACK_TIMEOUT: Duration = Duration::from_millis(120);
 const DEBOUNCE: Duration = Duration::from_millis(40);
 
+// 按钮输入：C3 使用外接按键（GPIO3，低电平按下，板上拉）。
+// S3 开发板仍使用 BOOT 键（GPIO0）。
+#[cfg(feature = "board_esp32c3")]
+const BOOT_BUTTON_GPIO: &str = "gpio3";
+#[cfg(not(feature = "board_esp32c3"))]
+const BOOT_BUTTON_GPIO: &str = "gpio0";
+
 #[derive(Debug, Clone, Copy)]
 struct Ack {
     device_id: u32,
@@ -40,6 +47,9 @@ fn main() -> anyhow::Result<()> {
     let system_loop = EspSystemEventLoop::take()?;
     let nvs = EspDefaultNvsPartition::take()?;
 
+    #[cfg(feature = "board_esp32c3")]
+    let boot_button = PinDriver::input(peripherals.pins.gpio3, Pull::Up)?;
+    #[cfg(not(feature = "board_esp32c3"))]
     let boot_button = PinDriver::input(peripherals.pins.gpio0, Pull::Up)?;
 
     let mut wifi = EspWifi::new(peripherals.modem, system_loop, Some(nvs))?;
@@ -69,17 +79,29 @@ fn main() -> anyhow::Result<()> {
         "INFO button-ready device={DEVICE_ID} mac={} session={session_id} channel={CHANNEL}",
         mac_hex(&mac)
     );
-    println!("INFO trigger-with-boot-gpio0");
+    println!("INFO trigger-with-boot-{BOOT_BUTTON_GPIO}");
 
     let mut sequence = 0_u32;
     let mut was_pressed = false;
     let mut pressed_since = None;
+    let mut last_heartbeat = Instant::now();
 
     loop {
         let gpio_pressed = boot_button.is_low();
         if gpio_pressed != was_pressed {
             was_pressed = gpio_pressed;
             pressed_since = Some(Instant::now());
+        }
+
+        if last_heartbeat.elapsed() >= Duration::from_secs(30) {
+            last_heartbeat = Instant::now();
+            unsafe {
+                println!(
+                    "INFO heap free={} min={}",
+                    esp_idf_svc::sys::esp_get_free_heap_size(),
+                    esp_idf_svc::sys::esp_get_minimum_free_heap_size()
+                );
+            }
         }
 
         let stable_gpio_press = gpio_pressed

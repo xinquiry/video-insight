@@ -93,9 +93,13 @@ Production nginx serves the bundle and proxies `/api` to the Go service.
 - `player-adapter/` — compatibility adapter for pausing browser video through the
   localhost WebSocket service. Student identity intentionally stays in the native
   process and is not sent to arbitrary webpages.
-- `firmware/esp32s3/` — separate ESP-IDF Cargo workspace containing `button` and
-  `receiver` binaries. Do not add it to the host workspace or run host-wide Cargo
-  commands from this directory.
+- `firmware/src/bin/` — shared `button` and `receiver` firmware sources,
+  built for both chips.
+- `firmware/esp32s3/` and `firmware/esp32c3/` — standalone ESP-IDF Cargo
+  packages (xtensa and riscv32imc targets) that build the shared sources for
+  each chip. The BOOT button is GPIO0 on ESP32-S3 and GPIO9 on ESP32-C3,
+  selected by the `board_esp32c3` cargo feature. Do not add them to the host
+  workspace or run host-wide Cargo commands from these directories.
 
 Electron main owns process lifecycle, file dialogs, the allowlisted custom-media
 protocol, and the Rust sidecar. Keep `nodeIntegration` disabled, context isolation
@@ -116,9 +120,9 @@ compatible with the API DTOs in `frontend/src/types/index.ts` and
 `backend/internal/httpapi/types.go`; see `class-button/docs/desktop.md`.
 
 Run host and Electron checks from the repository root with
-`just check desktop`. The ESP32-S3 workspace requires the `esp` Rust toolchain
-and ESP-IDF environment, so
-firmware builds are separate and should name the intended role explicitly.
+`just check desktop`. The firmware packages require the `esp` Rust toolchain
+and ESP-IDF environment, so firmware builds are separate and should name the
+intended role and chip explicitly.
 
 ## Deployment
 
