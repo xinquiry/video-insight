@@ -7,6 +7,7 @@ import (
 	"github.com/google/uuid"
 
 	"github.com/xinquiry/video-insight/backend/internal/model"
+	"github.com/xinquiry/video-insight/backend/internal/shared/apperror"
 	"github.com/xinquiry/video-insight/backend/internal/shared/optional"
 )
 
@@ -115,10 +116,33 @@ func TestCreateRejectsRemoteImage(t *testing.T) {
 			"type": "image", "attrs": map[string]any{"src": "https://example.com/tracker.png"},
 		}},
 	}
-	if _, err := NewService(store).Create(context.Background(), uuid.New(), uuid.New(), CreateInput{
+	_, err := NewService(store).Create(context.Background(), uuid.New(), uuid.New(), CreateInput{
 		TimestampSeconds: 3, Content: content, Interactive: true,
-	}); err == nil {
+	})
+	if err == nil {
 		t.Fatal("expected remote image to be rejected")
+	}
+	appErr, ok := apperror.As(err)
+	if !ok || appErr.Code != "annotation_image_source_invalid" {
+		t.Fatalf("expected image source error, got %#v", err)
+	}
+}
+
+func TestCreateReportsInvalidImageData(t *testing.T) {
+	t.Parallel()
+	store := &fakeStore{videoFound: true}
+	content := map[string]any{
+		"type": "doc",
+		"content": []any{map[string]any{
+			"type": "image", "attrs": map[string]any{"src": "data:image/png;base64,aGVsbG8="},
+		}},
+	}
+	_, err := NewService(store).Create(context.Background(), uuid.New(), uuid.New(), CreateInput{
+		TimestampSeconds: 3, Content: content, Interactive: true,
+	})
+	appErr, ok := apperror.As(err)
+	if !ok || appErr.Code != "annotation_image_invalid" {
+		t.Fatalf("expected invalid image data error, got %#v", err)
 	}
 }
 

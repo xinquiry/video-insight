@@ -134,6 +134,14 @@ WHERE processing_status = 'ready'
 The single worker processes the backfill serially. Already optimized files are
 verified and returned to ready without being uploaded again.
 
+## Embedded Annotation Images
+
+Annotation images are stored inline as base64 data URLs. The application accepts
+PNG, JPEG, GIF, and WebP images up to 50 MiB each. Base64 expands a 50 MiB image
+to roughly 67 MiB, so the annotation endpoints and production nginx allow JSON
+request bodies up to 72 MiB. Keep any upstream proxy request-body limit at or
+above 72 MiB when changing ingress.
+
 ## Deploy
 
 From the repository on the server:

@@ -1,13 +1,52 @@
 const API_URL = import.meta.env.VITE_API_URL ?? "";
 const TOKEN_KEY = "videoinsight_token";
 
+type ErrorResponse = {
+  code?: string;
+  detail?: string;
+};
+
+export class ApiError extends Error {
+  readonly status: number;
+  readonly code: string | null;
+
+  constructor(status: number, code: string | null, detail: string) {
+    super(detail);
+    this.name = "ApiError";
+    this.status = status;
+    this.code = code;
+  }
+}
+
+async function readErrorResponse(response: Response): Promise<ErrorResponse> {
+  const body = await response.text();
+  if (!body) return {};
+  try {
+    const parsed = JSON.parse(body) as unknown;
+    if (parsed && typeof parsed === "object") {
+      const value = parsed as Record<string, unknown>;
+      return {
+        code: typeof value.code === "string" ? value.code : undefined,
+        detail: typeof value.detail === "string" ? value.detail : undefined,
+      };
+    }
+  } catch {
+    // Preserve a short plain-text response from a proxy or upstream service.
+  }
+  return { detail: body.length <= 500 ? body : undefined };
+}
+
 async function handleResponse<T>(response: Response): Promise<T> {
   if (!response.ok) {
-    const body = await response.text();
+    const body = await readErrorResponse(response);
     if (response.status === 401) {
       localStorage.removeItem(TOKEN_KEY);
     }
-    throw new Error(`${response.status}: ${body}`);
+    throw new ApiError(
+      response.status,
+      body.code ?? null,
+      body.detail || response.statusText || "Request failed",
+    );
   }
   if (response.status === 204) {
     return undefined as T;

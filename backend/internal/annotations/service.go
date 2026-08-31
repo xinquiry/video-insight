@@ -18,6 +18,11 @@ import (
 
 var colorPattern = regexp.MustCompile(`^#[0-9a-fA-F]{6}$`)
 
+const (
+	MaxEmbeddedImageBytes = 50 << 20
+	MaxRichTextBytes      = ((MaxEmbeddedImageBytes + 2) / 3 * 4) + (1 << 20)
+)
+
 type Store interface {
 	GetVideoByIDForGroup(ctx context.Context, videoID, groupID uuid.UUID) (model.Video, bool, error)
 	GetAnnotationByID(ctx context.Context, id uuid.UUID) (model.Annotation, bool, error)
@@ -184,12 +189,24 @@ func (s *Service) ensureVideo(ctx context.Context, videoID, groupID uuid.UUID) e
 }
 
 func validateCreate(input CreateInput) error {
-	if input.TimestampSeconds < 0 || input.DurationSeconds <= 0 || input.DurationSeconds > 3600 ||
-		!validUnit(input.PositionX) || !validUnit(input.PositionY) || !validUnit(input.RegionX) ||
-		!validUnit(input.RegionY) || !validUnit(input.RegionWidth) || !validUnit(input.RegionHeight) ||
-		!validText(input.Shape, 60) || !validText(input.DisplayMode, 60) || !validRichText(input.Content) ||
-		!validText(input.Kind, 60) || !colorPattern.MatchString(input.Color) {
-		return apperror.New(http.StatusUnprocessableEntity, "Invalid annotation data")
+	if input.TimestampSeconds < 0 {
+		return invalidAnnotation("annotation_timestamp_invalid", "Annotation timestamp must be zero or greater")
+	}
+	if input.DurationSeconds <= 0 || input.DurationSeconds > 3600 {
+		return invalidAnnotation("annotation_duration_invalid", "Annotation duration must be between 0 and 3600 seconds")
+	}
+	if !validUnit(input.PositionX) || !validUnit(input.PositionY) || !validUnit(input.RegionX) ||
+		!validUnit(input.RegionY) || !validUnit(input.RegionWidth) || !validUnit(input.RegionHeight) {
+		return invalidAnnotation("annotation_geometry_invalid", "Annotation positions and regions must be between 0 and 1")
+	}
+	if !validText(input.Shape, 60) || !validText(input.DisplayMode, 60) || !validText(input.Kind, 60) {
+		return invalidAnnotation("annotation_field_invalid", "Annotation type fields are invalid")
+	}
+	if !colorPattern.MatchString(input.Color) {
+		return invalidAnnotation("annotation_color_invalid", "Annotation color must be a six-digit hexadecimal color")
+	}
+	if err := validateRichText(input.Content); err != nil {
+		return err
 	}
 	return nil
 }
@@ -197,13 +214,13 @@ func validateCreate(input CreateInput) error {
 func applyUpdate(annotation *model.Annotation, input UpdateInput) error {
 	if input.TimestampSeconds.Set {
 		if input.TimestampSeconds.Null || input.TimestampSeconds.Value < 0 {
-			return invalidUpdate()
+			return invalidAnnotation("annotation_timestamp_invalid", "Annotation timestamp must be zero or greater")
 		}
 		annotation.TimestampSeconds = input.TimestampSeconds.Value
 	}
 	if input.DurationSeconds.Set {
 		if input.DurationSeconds.Null || input.DurationSeconds.Value <= 0 || input.DurationSeconds.Value > 3600 {
-			return invalidUpdate()
+			return invalidAnnotation("annotation_duration_invalid", "Annotation duration must be between 0 and 3600 seconds")
 		}
 		annotation.DurationSeconds = input.DurationSeconds.Value
 	}
@@ -216,7 +233,7 @@ func applyUpdate(annotation *model.Annotation, input UpdateInput) error {
 			if value.Null {
 				*target = nil
 			} else if value.Value < 0 || value.Value > 1 {
-				return invalidUpdate()
+				return invalidAnnotation("annotation_geometry_invalid", "Annotation positions and regions must be between 0 and 1")
 			} else {
 				copy := value.Value
 				*target = &copy
@@ -231,13 +248,16 @@ func applyUpdate(annotation *model.Annotation, input UpdateInput) error {
 	}
 	if input.Interactive.Set {
 		if input.Interactive.Null {
-			return invalidUpdate()
+			return invalidAnnotation("annotation_field_invalid", "Annotation type fields are invalid")
 		}
 		annotation.Interactive = input.Interactive.Value
 	}
 	if input.Content.Set {
-		if input.Content.Null || !validRichText(input.Content.Value) {
-			return invalidUpdate()
+		if input.Content.Null {
+			return invalidAnnotation("annotation_content_invalid", "Annotation content is invalid")
+		}
+		if err := validateRichText(input.Content.Value); err != nil {
+			return err
 		}
 		annotation.Content = input.Content.Value
 	}
@@ -246,13 +266,13 @@ func applyUpdate(annotation *model.Annotation, input UpdateInput) error {
 	}
 	if input.Color.Set {
 		if input.Color.Null || !colorPattern.MatchString(input.Color.Value) {
-			return invalidUpdate()
+			return invalidAnnotation("annotation_color_invalid", "Annotation color must be a six-digit hexadecimal color")
 		}
 		annotation.Color = input.Color.Value
 	}
 	if input.CustomData.Set {
 		if input.CustomData.Null {
-			return invalidUpdate()
+			return invalidAnnotation("annotation_custom_data_invalid", "Annotation custom data must be an object")
 		}
 		annotation.CustomData = model.NormalizeJSONMap(input.CustomData.Value)
 	}
@@ -264,7 +284,7 @@ func applyString(target *string, value optional.Value[string], maxLength int, al
 		return nil
 	}
 	if value.Null || (!allowEmpty && value.Value == "") || (maxLength > 0 && len(value.Value) > maxLength) {
-		return invalidUpdate()
+		return invalidAnnotation("annotation_field_invalid", "Annotation type fields are invalid")
 	}
 	*target = value.Value
 	return nil
@@ -273,19 +293,28 @@ func applyString(target *string, value optional.Value[string], maxLength int, al
 func validUnit(value *float64) bool              { return value == nil || (*value >= 0 && *value <= 1) }
 func validText(value string, maxLength int) bool { return value != "" && len(value) <= maxLength }
 
-func validRichText(value map[string]any) bool {
+func validateRichText(value map[string]any) error {
 	if value == nil || value["type"] != "doc" {
-		return false
+		return invalidAnnotation("annotation_content_invalid", "Annotation content must be a rich-text document")
 	}
 	content, ok := value["content"].([]any)
 	if !ok || len(content) == 0 {
-		return false
+		return invalidAnnotation("annotation_content_invalid", "Annotation content cannot be empty")
 	}
 	encoded, err := json.Marshal(value)
-	if err != nil || len(encoded) > 4*1024*1024 {
-		return false
+	if err != nil {
+		return invalidAnnotation("annotation_content_invalid", "Annotation content is invalid")
 	}
-	return validDocumentNodes(content) && richTextHasContent(content)
+	if len(encoded) > MaxRichTextBytes {
+		return invalidAnnotation("annotation_content_too_large", "Annotation content is too large")
+	}
+	if err := validateEmbeddedImages(content); err != nil {
+		return err
+	}
+	if !validDocumentNodes(content) || !richTextHasContent(content) {
+		return invalidAnnotation("annotation_content_invalid", "Annotation content contains unsupported or malformed formatting")
+	}
+	return nil
 }
 
 func validDocumentNodes(nodes []any) bool {
@@ -343,7 +372,7 @@ func validBlockNode(node map[string]any) bool {
 	case "image":
 		attrs, ok := node["attrs"].(map[string]any)
 		src, srcOK := attrs["src"].(string)
-		return ok && srcOK && validImageDataURL(src) && validLeafNode(node)
+		return ok && srcOK && src != "" && validLeafNode(node)
 	default:
 		return false
 	}
@@ -497,7 +526,32 @@ func validLink(value string) bool {
 	return strings.HasPrefix(value, "https://") || strings.HasPrefix(value, "http://") || strings.HasPrefix(value, "mailto:")
 }
 
-func validImageDataURL(value string) bool {
+func validateEmbeddedImages(nodes []any) error {
+	for _, raw := range nodes {
+		node, ok := richTextNode(raw)
+		if !ok {
+			continue
+		}
+		if node["type"] == "image" {
+			attrs, attrsOK := node["attrs"].(map[string]any)
+			src, srcOK := attrs["src"].(string)
+			if !attrsOK || !srcOK {
+				return invalidAnnotation("annotation_image_invalid", "Embedded image data is invalid")
+			}
+			if err := validateImageDataURL(src); err != nil {
+				return err
+			}
+		}
+		if children, ok := node["content"].([]any); ok {
+			if err := validateEmbeddedImages(children); err != nil {
+				return err
+			}
+		}
+	}
+	return nil
+}
+
+func validateImageDataURL(value string) error {
 	checks := map[string]func([]byte) bool{
 		"data:image/png;base64,":  func(data []byte) bool { return bytes.HasPrefix(data, []byte("\x89PNG\r\n\x1a\n")) },
 		"data:image/jpeg;base64,": func(data []byte) bool { return bytes.HasPrefix(data, []byte("\xff\xd8\xff")) },
@@ -513,10 +567,23 @@ func validImageDataURL(value string) bool {
 			continue
 		}
 		decoded, err := base64.StdEncoding.DecodeString(strings.TrimPrefix(value, prefix))
-		return err == nil && len(decoded) <= 5*1024*1024/2 && validSignature(decoded)
+		if err != nil {
+			return invalidAnnotation("annotation_image_invalid", "Embedded image data is not valid base64")
+		}
+		if len(decoded) > MaxEmbeddedImageBytes {
+			return invalidAnnotation("annotation_image_too_large", "Embedded images must be 50 MiB or smaller")
+		}
+		if !validSignature(decoded) {
+			return invalidAnnotation("annotation_image_invalid", "Embedded image type does not match its file data")
+		}
+		return nil
 	}
-	return false
+	if strings.HasPrefix(value, "data:image/") {
+		return invalidAnnotation("annotation_image_type_unsupported", "Embedded images must be PNG, JPEG, GIF, or WebP")
+	}
+	return invalidAnnotation("annotation_image_source_invalid", "Embedded images must use an inline data URL")
 }
-func invalidUpdate() error {
-	return apperror.New(http.StatusUnprocessableEntity, "Invalid annotation data")
+
+func invalidAnnotation(code, detail string) error {
+	return apperror.NewCode(http.StatusUnprocessableEntity, code, detail)
 }

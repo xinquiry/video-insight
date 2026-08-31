@@ -2,13 +2,9 @@ import { Link, createFileRoute } from "@tanstack/react-router";
 import { Edit2, Plus, Trash2, Upload, Video as VideoIcon } from "lucide-react";
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
-import {
-  useDeleteVideo,
-  useUpdateVideo,
-  useUploadVideo,
-  useVideos,
-} from "@/features/videos/hooks";
+import { useDeleteVideo, useUpdateVideo, useUploadVideo, useVideos } from "@/features/videos/hooks";
 import { formatBytes, formatDate } from "@/lib/utils";
+import { getErrorMessage } from "@/lib/errors";
 import type { Video } from "@/types";
 
 export const Route = createFileRoute("/videos/")({
@@ -22,8 +18,8 @@ function VideosPage() {
   const [editing, setEditing] = useState<Video | null>(null);
   const { data, isLoading } = useVideos(page, 20);
   const deleteVideo = useDeleteVideo();
-  const videos = Array.isArray(data) ? data : data?.items ?? [];
-  const totalVideos = Array.isArray(data) ? data.length : data?.total ?? 0;
+  const videos = Array.isArray(data) ? data : (data?.items ?? []);
+  const totalVideos = Array.isArray(data) ? data.length : (data?.total ?? 0);
 
   return (
     <div className="mx-auto max-w-6xl space-y-8">
@@ -31,9 +27,7 @@ function VideosPage() {
         <div>
           <p className="vi-kicker">{t("videos.kicker")}</p>
           <h1 className="vi-display mt-3 text-5xl">{t("videos.title")}</h1>
-          <p className="mt-3 max-w-2xl text-sm text-[var(--muted)]">
-            {t("videos.subtitle")}
-          </p>
+          <p className="mt-3 max-w-2xl text-sm text-[var(--muted)]">{t("videos.subtitle")}</p>
         </div>
         <button
           type="button"
@@ -46,9 +40,7 @@ function VideosPage() {
       </div>
 
       {showForm && <CreateVideoForm onDone={() => setShowForm(false)} />}
-      {editing && (
-        <EditVideoForm video={editing} onDone={() => setEditing(null)} />
-      )}
+      {editing && <EditVideoForm video={editing} onDone={() => setEditing(null)} />}
 
       {isLoading && <p className="text-[var(--muted)]">{t("common.loading")}</p>}
 
@@ -58,18 +50,10 @@ function VideosPage() {
             <table className="min-w-full divide-y divide-[var(--rule)]">
               <thead className="bg-[var(--paper)]">
                 <tr>
-                  <th className="vi-kicker px-5 py-3 text-left">
-                    {t("videos.table.title")}
-                  </th>
-                  <th className="vi-kicker px-5 py-3 text-left">
-                    {t("videos.table.file")}
-                  </th>
-                  <th className="vi-kicker px-5 py-3 text-left">
-                    {t("videos.table.created")}
-                  </th>
-                  <th className="vi-kicker px-5 py-3 text-right">
-                    {t("videos.table.actions")}
-                  </th>
+                  <th className="vi-kicker px-5 py-3 text-left">{t("videos.table.title")}</th>
+                  <th className="vi-kicker px-5 py-3 text-left">{t("videos.table.file")}</th>
+                  <th className="vi-kicker px-5 py-3 text-left">{t("videos.table.created")}</th>
+                  <th className="vi-kicker px-5 py-3 text-right">{t("videos.table.actions")}</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-[var(--rule)]">
@@ -191,10 +175,7 @@ function CreateVideoForm({ onDone }: { onDone: () => void }) {
       : 0;
 
   return (
-    <form
-      onSubmit={submit}
-      className="vi-panel space-y-5 p-5"
-    >
+    <form onSubmit={submit} className="vi-panel space-y-5 p-5">
       <div className="grid gap-4 md:grid-cols-2">
         <label className="vi-label">
           {t("videos.form.title")}
@@ -266,20 +247,16 @@ function CreateVideoForm({ onDone }: { onDone: () => void }) {
       </div>
       {error && (
         <p className="text-sm text-[var(--danger)]">
-          {t("videos.form.uploadFailed", { message: error.message })}
+          {t("videos.form.uploadFailed", {
+            message: getErrorMessage(error, t),
+          })}
         </p>
       )}
     </form>
   );
 }
 
-function EditVideoForm({
-  video,
-  onDone,
-}: {
-  video: Video;
-  onDone: () => void;
-}) {
+function EditVideoForm({ video, onDone }: { video: Video; onDone: () => void }) {
   const { t } = useTranslation();
   const updateVideo = useUpdateVideo(video.id);
   const [title, setTitle] = useState(video.title);
@@ -287,17 +264,11 @@ function EditVideoForm({
 
   const submit = (event: React.FormEvent) => {
     event.preventDefault();
-    updateVideo.mutate(
-      { title, description },
-      { onSuccess: () => onDone() },
-    );
+    updateVideo.mutate({ title, description }, { onSuccess: () => onDone() });
   };
 
   return (
-    <form
-      onSubmit={submit}
-      className="vi-panel space-y-5 p-5"
-    >
+    <form onSubmit={submit} className="vi-panel space-y-5 p-5">
       <div className="grid gap-4 md:grid-cols-2">
         <label className="vi-label">
           {t("videos.form.title")}
@@ -332,11 +303,7 @@ function EditVideoForm({
         >
           {updateVideo.isPending ? t("common.saving") : t("common.save")}
         </button>
-        <button
-          type="button"
-          onClick={onDone}
-          className="vi-button-secondary"
-        >
+        <button type="button" onClick={onDone} className="vi-button-secondary">
           {t("common.cancel")}
         </button>
       </div>

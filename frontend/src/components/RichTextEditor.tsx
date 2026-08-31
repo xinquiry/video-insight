@@ -17,6 +17,8 @@ import {
   Undo2,
 } from "lucide-react";
 import {
+  type ClipboardEvent as ReactClipboardEvent,
+  type DragEvent as ReactDragEvent,
   type KeyboardEvent as ReactKeyboardEvent,
   useEffect,
   useMemo,
@@ -26,8 +28,14 @@ import {
 import { useTranslation } from "react-i18next";
 import type { RichTextDocument } from "@/types";
 
-const MAX_IMAGE_BYTES = 2.5 * 1024 * 1024;
+const MAX_IMAGE_BYTES = 50 * 1024 * 1024;
 const ALLOWED_IMAGE_TYPES = new Set(["image/png", "image/jpeg", "image/gif", "image/webp"]);
+const ALLOWED_IMAGE_DATA_PREFIXES = [
+  "data:image/png;base64,",
+  "data:image/jpeg;base64,",
+  "data:image/gif;base64,",
+  "data:image/webp;base64,",
+];
 
 const contentExtensions = [
   StarterKit.configure({
@@ -92,8 +100,12 @@ export function RichTextEditor({
 
   const addImage = (file: File | undefined) => {
     if (!file || !editor) return;
-    if (!ALLOWED_IMAGE_TYPES.has(file.type) || file.size > MAX_IMAGE_BYTES) {
-      setImageError(t("videoDetail.form.imageError"));
+    if (!ALLOWED_IMAGE_TYPES.has(file.type)) {
+      setImageError(t("videoDetail.form.imageTypeUnsupported"));
+      return;
+    }
+    if (file.size > MAX_IMAGE_BYTES) {
+      setImageError(t("videoDetail.form.imageTooLarge"));
       return;
     }
     const reader = new FileReader();
@@ -102,7 +114,44 @@ export function RichTextEditor({
       editor.chain().focus().setImage({ src: reader.result, alt: file.name }).run();
       setImageError(null);
     };
+    reader.onerror = () => setImageError(t("videoDetail.form.imageReadError"));
     reader.readAsDataURL(file);
+  };
+
+  const clipboardImageFiles = (event: ReactClipboardEvent<HTMLDivElement>) =>
+    Array.from(event.clipboardData.items)
+      .filter((item) => item.kind === "file" && item.type.startsWith("image/"))
+      .map((item) => item.getAsFile())
+      .filter((file): file is File => file !== null);
+
+  const handlePaste = (event: ReactClipboardEvent<HTMLDivElement>) => {
+    const files = clipboardImageFiles(event);
+    if (files.length > 0) {
+      event.preventDefault();
+      files.forEach(addImage);
+      return;
+    }
+
+    const html = event.clipboardData.getData("text/html");
+    if (!html) return;
+    const pastedDocument = new DOMParser().parseFromString(html, "text/html");
+    const sources = Array.from(pastedDocument.images, (image) => image.src);
+    const imageIssue = sources.map(validateImageDataURLSize).find((issue) => issue !== null);
+    if (!imageIssue) return;
+
+    event.preventDefault();
+    const plainText = event.clipboardData.getData("text/plain");
+    if (plainText) editor.chain().focus().insertContent(plainText).run();
+    setImageError(t(`videoDetail.form.${imageIssue}`));
+  };
+
+  const handleDrop = (event: ReactDragEvent<HTMLDivElement>) => {
+    const files = Array.from(event.dataTransfer.files).filter((file) =>
+      file.type.startsWith("image/"),
+    );
+    if (files.length === 0) return;
+    event.preventDefault();
+    files.forEach(addImage);
   };
 
   const openLinkEditor = () => {
@@ -352,9 +401,18 @@ export function RichTextEditor({
             </button>
           </div>
         )}
-        <EditorContent editor={editor} className="vi-rich-text vi-rich-editor" />
+        <EditorContent
+          editor={editor}
+          className="vi-rich-text vi-rich-editor"
+          onPaste={handlePaste}
+          onDrop={handleDrop}
+        />
       </div>
-      {imageError && <p className="mt-2 text-sm text-[var(--danger)]">{imageError}</p>}
+      {imageError && (
+        <p className="mt-2 text-sm text-[var(--danger)]" role="alert" aria-live="polite">
+          {imageError}
+        </p>
+      )}
       <p className="mt-2 text-xs text-[var(--muted)]">{t("videoDetail.form.imageHint")}</p>
     </div>
   );
@@ -385,6 +443,19 @@ export function isRichTextEmpty(content: RichTextDocument): boolean {
   const visit = (nodes: RichTextDocument["content"] = []): boolean =>
     nodes.every((node) => node.type !== "image" && !node.text?.trim() && visit(node.content));
   return visit(content.content);
+}
+
+function validateImageDataURLSize(
+  source: string,
+): "imageTooLarge" | "imageTypeUnsupported" | "imageSourceInvalid" | null {
+  const prefix = ALLOWED_IMAGE_DATA_PREFIXES.find((candidate) => source.startsWith(candidate));
+  if (!prefix) {
+    return source.startsWith("data:image/") ? "imageTypeUnsupported" : "imageSourceInvalid";
+  }
+  const encoded = source.slice(prefix.length);
+  const paddingBytes = encoded.endsWith("==") ? 2 : encoded.endsWith("=") ? 1 : 0;
+  const decodedBytes = Math.floor((encoded.length * 3) / 4) - paddingBytes;
+  return decodedBytes > MAX_IMAGE_BYTES ? "imageTooLarge" : null;
 }
 
 function normalizeLinkUrl(value: string): string | null {

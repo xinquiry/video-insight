@@ -43,6 +43,11 @@ type contextKey string
 
 const currentUserKey contextKey = "current-user"
 
+const (
+	maxJSONRequestBytes       int64 = 5 << 20
+	maxAnnotationRequestBytes int64 = 72 << 20
+)
+
 func New(
 	authService *auth.Service,
 	groupService *groups.Service,
@@ -355,12 +360,12 @@ func (s *Server) createAnnotation(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	var request createAnnotationRequest
-	if !decodeJSON(w, r, &request) {
+	if !decodeJSONLimit(w, r, &request, maxAnnotationRequestBytes) {
 		return
 	}
 	input, ok := annotationCreateInput(request)
 	if !ok {
-		writeValidation(w, "Invalid annotation data")
+		writeProblem(w, http.StatusUnprocessableEntity, "annotation_timestamp_invalid", "Annotation timestamp is required")
 		return
 	}
 	annotation, err := s.annotations.Create(r.Context(), videoID, currentUser(r).GroupID, input)
@@ -377,7 +382,7 @@ func (s *Server) updateAnnotation(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	var request updateAnnotationRequest
-	if !decodeJSON(w, r, &request) {
+	if !decodeJSONLimit(w, r, &request, maxAnnotationRequestBytes) {
 		return
 	}
 	annotation, err := s.annotations.Update(r.Context(), annotationID, currentUser(r).GroupID, annotations.UpdateInput{
@@ -524,8 +529,11 @@ func (s *Server) writeError(w http.ResponseWriter, r *http.Request, err error) {
 		}
 		if appErr.Status >= 500 {
 			s.logger.Error("request failed", "request_id", middleware.GetReqID(r.Context()), "error", err)
+		} else if appErr.Code != "" {
+			s.logger.Warn("request rejected", "request_id", middleware.GetReqID(r.Context()),
+				"status", appErr.Status, "code", appErr.Code)
 		}
-		writeJSON(w, appErr.Status, detailResponse{Detail: appErr.Detail})
+		writeJSON(w, appErr.Status, detailResponse{Code: appErr.Code, Detail: appErr.Detail})
 		return
 	}
 	if errors.Is(err, context.DeadlineExceeded) {
@@ -539,14 +547,27 @@ func (s *Server) writeError(w http.ResponseWriter, r *http.Request, err error) {
 func currentUser(r *http.Request) model.User { return r.Context().Value(currentUserKey).(model.User) }
 
 func decodeJSON(w http.ResponseWriter, r *http.Request, target any) bool {
-	// Rich-text annotations may include a validated, size-limited embedded image.
-	r.Body = http.MaxBytesReader(w, r.Body, 5<<20)
+	return decodeJSONLimit(w, r, target, maxJSONRequestBytes)
+}
+
+func decodeJSONLimit(w http.ResponseWriter, r *http.Request, target any, maxBytes int64) bool {
+	r.Body = http.MaxBytesReader(w, r.Body, maxBytes)
 	decoder := json.NewDecoder(r.Body)
 	if err := decoder.Decode(target); err != nil {
+		var tooLarge *http.MaxBytesError
+		if errors.As(err, &tooLarge) {
+			writeProblem(w, http.StatusRequestEntityTooLarge, "request_too_large", "Request body is too large")
+			return false
+		}
 		writeValidation(w, "Invalid request body")
 		return false
 	}
 	if err := decoder.Decode(&struct{}{}); !errors.Is(err, io.EOF) {
+		var tooLarge *http.MaxBytesError
+		if errors.As(err, &tooLarge) {
+			writeProblem(w, http.StatusRequestEntityTooLarge, "request_too_large", "Request body is too large")
+			return false
+		}
 		writeValidation(w, "Invalid request body")
 		return false
 	}
@@ -580,7 +601,11 @@ func queryInt(w http.ResponseWriter, r *http.Request, name string, fallback int)
 }
 
 func writeValidation(w http.ResponseWriter, detail string) {
-	writeJSON(w, http.StatusUnprocessableEntity, detailResponse{Detail: detail})
+	writeProblem(w, http.StatusUnprocessableEntity, "invalid_request_body", detail)
+}
+
+func writeProblem(w http.ResponseWriter, status int, code, detail string) {
+	writeJSON(w, status, detailResponse{Code: code, Detail: detail})
 }
 
 func writeJSON(w http.ResponseWriter, status int, value any) {

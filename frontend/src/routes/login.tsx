@@ -17,10 +17,7 @@ function LoginPage() {
 
   const submit = (event: React.FormEvent) => {
     event.preventDefault();
-    login.mutate(
-      { username, password },
-      { onSuccess: () => navigate({ to: "/" }) },
-    );
+    login.mutate({ username, password }, { onSuccess: () => navigate({ to: "/" }) });
   };
 
   const isPending = login.isPending;
@@ -48,55 +45,46 @@ function LoginPage() {
         </div>
       </section>
       <section className="flex items-center px-5 py-10 lg:px-8">
-      <form
-        onSubmit={submit}
-        className="vi-panel w-full space-y-6 p-6"
-      >
-        <div>
-          <p className="vi-kicker">{t("auth.login.accountKicker")}</p>
-          <h2 className="vi-display mt-2 text-3xl">{t("auth.login.welcome")}</h2>
-          <p className="mt-2 text-sm text-[var(--muted)]">
-            {t("auth.login.hint")}
-          </p>
-        </div>
+        <form onSubmit={submit} className="vi-panel w-full space-y-6 p-6">
+          <div>
+            <p className="vi-kicker">{t("auth.login.accountKicker")}</p>
+            <h2 className="vi-display mt-2 text-3xl">{t("auth.login.welcome")}</h2>
+            <p className="mt-2 text-sm text-[var(--muted)]">{t("auth.login.hint")}</p>
+          </div>
 
-        <label className="vi-label">
-          {t("auth.login.username")}
-          <input
-            value={username}
-            onChange={(event) => setUsername(event.target.value)}
-            className="vi-input mt-1 text-base normal-case"
-            minLength={3}
-            required
-          />
-        </label>
+          <label className="vi-label">
+            {t("auth.login.username")}
+            <input
+              value={username}
+              onChange={(event) => setUsername(event.target.value)}
+              className="vi-input mt-1 text-base normal-case"
+              minLength={3}
+              required
+            />
+          </label>
 
-        <label className="vi-label">
-          {t("auth.login.password")}
-          <input
-            value={password}
-            onChange={(event) => setPassword(event.target.value)}
-            className="vi-input mt-1 text-base normal-case"
-            type="password"
-            required
-          />
-        </label>
+          <label className="vi-label">
+            {t("auth.login.password")}
+            <input
+              value={password}
+              onChange={(event) => setPassword(event.target.value)}
+              className="vi-input mt-1 text-base normal-case"
+              type="password"
+              required
+            />
+          </label>
 
-        <button
-          type="submit"
-          disabled={isPending}
-          className="vi-button-primary w-full disabled:opacity-60"
-        >
-          <LogIn className="h-4 w-4" />
-          {isPending ? t("common.working") : t("auth.login.submit")}
-        </button>
+          <button
+            type="submit"
+            disabled={isPending}
+            className="vi-button-primary w-full disabled:opacity-60"
+          >
+            <LogIn className="h-4 w-4" />
+            {isPending ? t("common.working") : t("auth.login.submit")}
+          </button>
 
-        {hasError && (
-          <p className="text-sm text-[var(--danger)]">
-            {t("auth.login.invalid")}
-          </p>
-        )}
-      </form>
+          {hasError && <p className="text-sm text-[var(--danger)]">{t("auth.login.invalid")}</p>}
+        </form>
       </section>
     </main>
   );

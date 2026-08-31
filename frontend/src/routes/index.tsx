@@ -3,14 +3,10 @@ import { Link } from "@tanstack/react-router";
 import { Clock, Film, Plus, Tags, Users, UserPlus } from "lucide-react";
 import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
-import {
-  useCreateGroup,
-  useCreateUser,
-  useGroups,
-  useMe,
-} from "@/features/auth/hooks";
+import { useCreateGroup, useCreateUser, useGroups, useMe } from "@/features/auth/hooks";
 import { useVideos } from "@/features/videos/hooks";
 import { formatBytes, formatDate } from "@/lib/utils";
+import { getErrorMessage } from "@/lib/errors";
 
 export const Route = createFileRoute("/")({
   component: DashboardPage,
@@ -27,17 +23,10 @@ function DashboardPage() {
       <div className="flex flex-wrap items-end justify-between gap-6 pb-8">
         <div>
           <p className="vi-kicker">{t("dashboard.kicker")}</p>
-          <h1 className="vi-display mt-3 max-w-3xl text-5xl">
-            {t("dashboard.title")}
-          </h1>
-          <p className="mt-4 max-w-2xl text-sm text-[var(--muted)]">
-            {t("dashboard.subtitle")}
-          </p>
+          <h1 className="vi-display mt-3 max-w-3xl text-5xl">{t("dashboard.title")}</h1>
+          <p className="mt-4 max-w-2xl text-sm text-[var(--muted)]">{t("dashboard.subtitle")}</p>
         </div>
-        <Link
-          to="/videos"
-          className="vi-button-primary"
-        >
+        <Link to="/videos" className="vi-button-primary">
           <Plus className="h-4 w-4" />
           {t("dashboard.addVideo")}
         </Link>
@@ -150,74 +139,74 @@ function AdminCreateUserPanel() {
   return (
     <section className="vi-panel grid gap-6 p-5 lg:grid-cols-[1fr_1fr]">
       <div>
-      <div className="flex flex-wrap items-start justify-between gap-4 border-b border-[var(--rule)] pb-4">
-        <div>
-          <p className="vi-kicker">{t("dashboard.admin.kicker")}</p>
-          <h2 className="vi-display mt-1 text-2xl">{t("dashboard.admin.createAccount")}</h2>
-          <p className="mt-2 max-w-xl text-sm text-[var(--muted)]">
-            {t("dashboard.admin.createAccountHint")}
-          </p>
+        <div className="flex flex-wrap items-start justify-between gap-4 border-b border-[var(--rule)] pb-4">
+          <div>
+            <p className="vi-kicker">{t("dashboard.admin.kicker")}</p>
+            <h2 className="vi-display mt-1 text-2xl">{t("dashboard.admin.createAccount")}</h2>
+            <p className="mt-2 max-w-xl text-sm text-[var(--muted)]">
+              {t("dashboard.admin.createAccountHint")}
+            </p>
+          </div>
+          <UserPlus className="h-5 w-5 text-[var(--accent)]" />
         </div>
-        <UserPlus className="h-5 w-5 text-[var(--accent)]" />
-      </div>
-      <form onSubmit={submit} className="mt-5 grid gap-4">
-        <label className="vi-label">
-          {t("dashboard.admin.username")}
-          <input
-            value={username}
-            onChange={(event) => setUsername(event.target.value)}
-            className="vi-input mt-1 text-base normal-case"
-            minLength={3}
-            maxLength={80}
-            required
-          />
-        </label>
-        <label className="vi-label">
-          {t("dashboard.admin.group")}
-          <select
-            value={groupId}
-            onChange={(event) => setGroupId(event.target.value)}
-            className="vi-select mt-1 text-base normal-case"
-            required
+        <form onSubmit={submit} className="mt-5 grid gap-4">
+          <label className="vi-label">
+            {t("dashboard.admin.username")}
+            <input
+              value={username}
+              onChange={(event) => setUsername(event.target.value)}
+              className="vi-input mt-1 text-base normal-case"
+              minLength={3}
+              maxLength={80}
+              required
+            />
+          </label>
+          <label className="vi-label">
+            {t("dashboard.admin.group")}
+            <select
+              value={groupId}
+              onChange={(event) => setGroupId(event.target.value)}
+              className="vi-select mt-1 text-base normal-case"
+              required
+            >
+              {groups.map((group) => (
+                <option key={group.id} value={group.id}>
+                  {group.name}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label className="vi-label">
+            {t("dashboard.admin.tempPassword")}
+            <input
+              value={password}
+              onChange={(event) => setPassword(event.target.value)}
+              className="vi-input mt-1 text-base normal-case"
+              minLength={8}
+              maxLength={256}
+              type="password"
+              required
+            />
+          </label>
+          <button
+            type="submit"
+            disabled={createUser.isPending || !username || !password || !groupId}
+            className="vi-button-primary disabled:opacity-50"
           >
-            {groups.map((group) => (
-              <option key={group.id} value={group.id}>
-                {group.name}
-              </option>
-            ))}
-          </select>
-        </label>
-        <label className="vi-label">
-          {t("dashboard.admin.tempPassword")}
-          <input
-            value={password}
-            onChange={(event) => setPassword(event.target.value)}
-            className="vi-input mt-1 text-base normal-case"
-            minLength={8}
-            maxLength={256}
-            type="password"
-            required
-          />
-        </label>
-        <button
-          type="submit"
-          disabled={createUser.isPending || !username || !password || !groupId}
-          className="vi-button-primary disabled:opacity-50"
-        >
-          <UserPlus className="h-4 w-4" />
-          {createUser.isPending ? t("common.creating") : t("dashboard.admin.createButton")}
-        </button>
-      </form>
-      {createdUsername && (
-        <p className="mt-4 text-sm text-[var(--forest)]">
-          {t("dashboard.admin.created", { username: createdUsername })}
-        </p>
-      )}
-      {createUser.isError && (
-        <p className="mt-4 text-sm text-[var(--danger)]">
-          {t("dashboard.admin.createError")}
-        </p>
-      )}
+            <UserPlus className="h-4 w-4" />
+            {createUser.isPending ? t("common.creating") : t("dashboard.admin.createButton")}
+          </button>
+        </form>
+        {createdUsername && (
+          <p className="mt-4 text-sm text-[var(--forest)]">
+            {t("dashboard.admin.created", { username: createdUsername })}
+          </p>
+        )}
+        {createUser.isError && (
+          <p className="mt-4 text-sm text-[var(--danger)]">
+            {getErrorMessage(createUser.error, t, "dashboard.admin.createError")}
+          </p>
+        )}
       </div>
 
       <div>
@@ -259,7 +248,7 @@ function AdminCreateUserPanel() {
         )}
         {createGroup.isError && (
           <p className="mt-4 text-sm text-[var(--danger)]">
-            {t("dashboard.admin.createGroupError")}
+            {getErrorMessage(createGroup.error, t, "dashboard.admin.createGroupError")}
           </p>
         )}
         <div className="mt-5 border-t border-[var(--rule)] pt-4">

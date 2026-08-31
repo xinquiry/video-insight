@@ -38,6 +38,7 @@ import {
   useVideoExport,
 } from "@/features/videos/hooks";
 import { isRichTextEmpty, RichTextContent, RichTextEditor } from "@/components/RichTextEditor";
+import { getErrorMessage } from "@/lib/errors";
 import { cn, formatBytes, formatDate, formatDuration } from "@/lib/utils";
 import type { Annotation, RichTextDocument } from "@/types";
 
@@ -464,7 +465,7 @@ function VideoDetailPage() {
           )}
           {exportVideo.isError && (
             <span className="hidden text-xs text-[var(--danger)] lg:inline">
-              {t("videoDetail.export.failed")}
+              {getErrorMessage(exportVideo.error, t, "videoDetail.export.failed")}
             </span>
           )}
           <button
@@ -1263,7 +1264,9 @@ function AnnotationComments({ annotationId }: { annotationId: string }) {
         </button>
       </form>
       {createComment.isError && (
-        <p className="mt-2 text-xs text-[var(--danger)]">{t("videoDetail.comments.error")}</p>
+        <p className="mt-2 text-xs text-[var(--danger)]" role="alert">
+          {getErrorMessage(createComment.error, t, "videoDetail.comments.error")}
+        </p>
       )}
     </div>
   );
@@ -1293,6 +1296,7 @@ function AnnotationComposer({
   const colorInputName = useId();
   const [jsonError, setJsonError] = useState<string | null>(null);
   const isPending = createAnnotation.isPending || updateAnnotation.isPending;
+  const saveError = createAnnotation.error ?? updateAnnotation.error;
   const selectedColor = normalizeAnnotationColor(values.color);
   const hasPresetColor = ANNOTATION_COLORS.some(
     ({ value }) => normalizeAnnotationColor(value) === selectedColor,
@@ -1408,6 +1412,7 @@ function AnnotationComposer({
             <input
               type="number"
               min="0.1"
+              max="3600"
               step="0.1"
               value={values.duration_seconds}
               onChange={(event) => updateValues({ duration_seconds: event.target.value })}
@@ -1505,8 +1510,10 @@ function AnnotationComposer({
         </button>
       </div>
       {jsonError && <p className="mt-3 text-sm text-[var(--danger)]">{jsonError}</p>}
-      {(createAnnotation.isError || updateAnnotation.isError) && (
-        <p className="mt-3 text-sm text-[var(--danger)]">{t("videoDetail.form.errorSave")}</p>
+      {saveError && (
+        <p className="mt-3 text-sm text-[var(--danger)]" role="alert" aria-live="polite">
+          {getErrorMessage(saveError, t, "videoDetail.form.errorSave")}
+        </p>
       )}
     </form>
   );
