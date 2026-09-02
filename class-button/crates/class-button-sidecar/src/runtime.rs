@@ -1,7 +1,7 @@
 use std::time::Duration;
 
 use class_button_core::{ClassroomConfig, EventProcessor, ProcessOutcome, ProcessedPress};
-use class_button_host::{list_serial_ports, parse_receiver_line, ReceiverLine};
+use class_button_host::{list_serial_ports, parse_receiver_line, PortInfo, ReceiverLine};
 use tokio::io::{AsyncBufReadExt, BufReader};
 use tokio::sync::{broadcast, mpsc};
 use tokio::task::JoinHandle;
@@ -146,11 +146,17 @@ async fn serial_loop(
 }
 
 fn discover_receiver() -> Option<String> {
-    let ports = list_serial_ports().ok()?;
+    discover_receiver_in(&list_serial_ports().ok()?)
+}
+
+fn discover_receiver_in(ports: &[PortInfo]) -> Option<String> {
     ports
         .iter()
         .find(|port| port.vid == Some(0x1a86) && port.pid == Some(0x55d3))
         .or_else(|| ports.iter().find(|port| port.vid == Some(0x1a86)))
+        // FTDI-based receivers, e.g. FT232R cables showing up as cu.usbserial-*.
+        .or_else(|| ports.iter().find(|port| port.vid == Some(0x0403)))
+        .or_else(|| ports.iter().find(|port| port.name.contains("usbserial")))
         .or_else(|| ports.iter().find(|port| port.name.contains("usbmodem")))
         .map(|port| port.name.clone())
 }
@@ -162,4 +168,58 @@ fn now_ms() -> u64 {
         .as_millis()
         .try_into()
         .unwrap_or(u64::MAX)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn usb_port(name: &str, vid: u16, pid: u16) -> PortInfo {
+        PortInfo {
+            name: name.to_owned(),
+            kind: "usb".into(),
+            vid: Some(vid),
+            pid: Some(pid),
+            serial_number: None,
+        }
+    }
+
+    #[test]
+    fn discovers_ftdi_receiver_by_vid_and_name() {
+        let ports = vec![
+            usb_port("/dev/cu.Bluetooth-Incoming-Port", 0x0000, 0x0000),
+            usb_port("/dev/cu.usbserial-A5069RR4", 0x0403, 0x6001),
+        ];
+        assert_eq!(
+            discover_receiver_in(&ports),
+            Some("/dev/cu.usbserial-A5069RR4".to_owned())
+        );
+    }
+
+    #[test]
+    fn prefers_wch_receiver_over_ftdi() {
+        let ports = vec![
+            usb_port("/dev/cu.usbserial-A5069RR4", 0x0403, 0x6001),
+            usb_port("/dev/cu.wchusbserial-1234", 0x1a86, 0x55d3),
+        ];
+        assert_eq!(
+            discover_receiver_in(&ports),
+            Some("/dev/cu.wchusbserial-1234".to_owned())
+        );
+    }
+
+    #[test]
+    fn falls_back_to_usbserial_name_without_known_vid() {
+        let ports = vec![PortInfo {
+            name: "/dev/cu.usbserial-XYZ".into(),
+            kind: "unknown".into(),
+            vid: None,
+            pid: None,
+            serial_number: None,
+        }];
+        assert_eq!(
+            discover_receiver_in(&ports),
+            Some("/dev/cu.usbserial-XYZ".to_owned())
+        );
+    }
 }
