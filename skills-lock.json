@@ -1,0 +1,23 @@
+{
+  "version": 1,
+  "skills": {
+    "baoyu-design": {
+      "source": "JimLiu/baoyu-design",
+      "sourceUrl": "https://github.com/JimLiu/baoyu-design.git",
+      "sourceType": "github",
+      "skillPath": "skills/baoyu-design/SKILL.md",
+      "computedHash": "84dc30ea095a846ad75aeea47593ecdef5f512b3e3a05f1fc1c32e22c3242bc2",
+      "resolvedCommit": "026d4ea012bdd5cada72ac8cc13f21ba4edf2245",
+      "version": "026d4ea"
+    },
+    "parametric-3d-printing": {
+      "source": "flowful-ai/cad-skill",
+      "sourceUrl": "https://github.com/flowful-ai/cad-skill.git",
+      "sourceType": "github",
+      "skillPath": "SKILL.md",
+      "computedHash": "11cb68383ee46486ed2935407adbd70c7b2e7c447ad6efb029718838f5be48d2",
+      "resolvedCommit": "fe4215970d39f388ff1afc411fac49a9c5f79756",
+      "version": "fe42159"
+    }
+  }
+}

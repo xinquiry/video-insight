@@ -16,3 +16,9 @@ docker/.env.prod
 
 # Logs
 *.log
+
+# Hardware (3D models)
+hardware/.venv/
+hardware/**/__pycache__/
+hardware/*.blend1
+hardware/out/
