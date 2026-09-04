@@ -124,6 +124,34 @@ Run host and Electron checks from the repository root with
 and ESP-IDF environment, so firmware builds are separate and should name the
 intended role and chip explicitly.
 
+### Hardware enclosure (`hardware/`)
+
+3D-printable enclosure models for the Key remote, built as parametric
+**CadQuery** scripts (B-rep kernel, Z-up, units mm):
+
+- `hardware/models/key_bottom.py` — bottom shell: hollow rounded box, rabbet
+  (止口) boss, and the post that the microswitch rests against.
+- `hardware/models/key_top.py` — top shell: cover with lid, button hole
+  (Ø25.6 for the cap waist), retaining rim, and the matching rabbet groove.
+- `hardware/print/` — printable STLs (`key_bottom`, `key_top`, `key_cap`).
+  `key_cap.stl` is the button cap from `obj_1_arrows.stl` (Ø29.65 dome,
+  Ø25 waist that slides into the top hole).
+- `hardware/key_assembly.blend` / `.step` — assembled model for inspection.
+- `hardware/.venv/` — local CadQuery environment (git-ignored).
+
+Edit dimensions in the `参数` block at the top of each script, then regenerate:
+
+```sh
+hardware/.venv/bin/python hardware/models/key_bottom.py
+hardware/.venv/bin/python hardware/models/key_top.py
+```
+
+Each run exports to `hardware/print/` and reports hollow/watertight status.
+Model with CadQuery, not hand-written bpy mesh — the `parametric-3d-printing`
+agent skill (`.agents/skills/parametric-3d-printing/`) documents the workflow
+and the preview/watertight-check loop. Keep the button-cap interface
+dimensions (waist Ø25, four Ø4 recesses at r=8) in sync with the physical cap.
+
 ## Deployment
 
 - Local: `just dev` builds the Go dev image and starts bundled MinIO.
