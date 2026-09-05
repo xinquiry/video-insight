@@ -3,8 +3,8 @@ node_modules/
 dist/
 *.tsbuildinfo
 .pnpm-store/
-class-button/desktop/out/
-class-button/desktop/build-resources/bin/
+apps/desktop/out/
+apps/desktop/build-resources/bin/
 
 # Environment and local state
 .env

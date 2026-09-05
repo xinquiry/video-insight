@@ -19,17 +19,20 @@ services:
 
   frontend:
     build:
-      context: ../frontend
+      context: ..
+      dockerfile: apps/web/Dockerfile
       target: dev
     image: videoinsight-frontend:dev
     pull_policy: build
-    command: sh -c "pnpm install --frozen-lockfile && pnpm dev --host 0.0.0.0"
+    command: sh -c "cd /repo/apps/web && pnpm install --frozen-lockfile && pnpm dev --host 0.0.0.0"
     environment:
       BACKEND_URL: http://backend:8000
       CI: "true"
     volumes:
-      - ../frontend:/app
-      - frontend-node-modules:/app/node_modules
+      - ../packages:/repo/packages
+      - ../apps/web:/repo/apps/web
+      - ../pnpm-workspace.yaml:/repo/pnpm-workspace.yaml
+      - frontend-node-modules:/repo/node_modules
 
 volumes:
   backend-modules:

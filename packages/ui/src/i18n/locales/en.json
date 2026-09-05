@@ -1,0 +1,309 @@
+{
+  "common": {
+    "loading": "Loading...",
+    "cancel": "Cancel",
+    "save": "Save",
+    "saving": "Saving...",
+    "creating": "Creating...",
+    "working": "Working...",
+    "noDescription": "No description"
+  },
+  "errors": {
+    "unknown": "Something went wrong. Please try again.",
+    "network": "Could not reach the server. Check your connection and try again.",
+    "server": "The server could not complete the request. Please try again shortly.",
+    "unauthorized": "Your session has expired. Sign in and try again.",
+    "forbidden": "You do not have permission to perform this action.",
+    "notFound": "The requested item no longer exists.",
+    "conflict": "The request conflicts with the item's current state. Refresh and try again.",
+    "requestTooLarge": "The request is too large. Each embedded image must be 50 MiB or smaller.",
+    "invalidRequestBody": "Some submitted data could not be read. Refresh and try again.",
+    "annotationTimestampInvalid": "The annotation time must be zero or greater.",
+    "annotationDurationInvalid": "The annotation duration must be greater than zero and no more than 3600 seconds.",
+    "annotationGeometryInvalid": "The annotation position or region is outside the video frame.",
+    "annotationFieldInvalid": "The annotation type or display setting is invalid.",
+    "annotationColorInvalid": "Choose a valid six-digit color.",
+    "annotationCustomDataInvalid": "Custom data must be a JSON object.",
+    "annotationContentInvalid": "The annotation contains empty, unsupported, or malformed formatting. Remove the affected formatting or image and try again.",
+    "annotationContentTooLarge": "The complete annotation is too large. Reduce its text or embedded images and try again.",
+    "annotationImageTooLarge": "An embedded image is larger than 50 MiB. Compress or resize it and try again.",
+    "annotationImageTypeUnsupported": "Only PNG, JPEG, GIF, and WebP images are supported.",
+    "annotationImageSourceInvalid": "The pasted image could not be embedded. Save it as PNG, JPEG, GIF, or WebP and insert it again.",
+    "annotationImageInvalid": "An embedded image is damaged or its file type does not match its data. Re-export the image and try again."
+  },
+  "brand": {
+    "name": "Video Insight",
+    "studio": "Studio",
+    "tagline": "A reader's edition for video"
+  },
+  "nav": {
+    "dashboard": "Dashboard",
+    "videos": "Videos",
+    "classroom": "Classroom"
+  },
+  "settings": {
+    "title": "Settings",
+    "language": {
+      "title": "Language",
+      "system": "System default",
+      "en": "English",
+      "zh": "中文"
+    }
+  },
+  "auth": {
+    "signedIn": "Signed in",
+    "logout": "Log out",
+    "login": {
+      "kicker": "Annotated learning archive",
+      "headline_line1": "Annotate Video.",
+      "headline_line2": "Share Insight.",
+      "subheadline": "Upload source material, add timestamped marginalia, and keep a shared edition for learners.",
+      "accountKicker": "Account",
+      "welcome": "Welcome Back",
+      "hint": "Sign in with the seeded admin account or a user created by an admin.",
+      "username": "Username",
+      "password": "Password",
+      "submit": "Login",
+      "invalid": "Invalid username or password."
+    }
+  },
+  "dashboard": {
+    "kicker": "Library",
+    "title": "Learning Video Library",
+    "subtitle": "Shared videos and timestamped annotations for students.",
+    "addVideo": "Add Video",
+    "stats": {
+      "totalVideos": "Total videos",
+      "recentUploads": "Recent uploads",
+      "annotationModel": "Annotation model",
+      "shared": "Shared"
+    },
+    "recent": {
+      "title": "Recent Videos",
+      "latest": "Latest 05"
+    },
+    "admin": {
+      "kicker": "Admin",
+      "createAccount": "Create Account",
+      "createAccountHint": "New accounts belong to one group and share that group's videos.",
+      "username": "Username",
+      "group": "Group",
+      "tempPassword": "Temporary password",
+      "createButton": "Create",
+      "created": "Created account for {{username}}.",
+      "createError": "Could not create that account. The username may already exist.",
+      "groupsKicker": "Groups",
+      "createGroup": "Create Group",
+      "createGroupHint": "Groups are the sharing boundary for videos and annotations.",
+      "groupName": "Group name",
+      "createGroupButton": "Create Group",
+      "createGroupSuccess": "Created group {{name}}.",
+      "createGroupError": "Could not create that group. The name may already exist.",
+      "existingGroups": "Existing groups"
+    }
+  },
+  "videos": {
+    "kicker": "Archive",
+    "title": "Videos",
+    "subtitle": "Upload source videos for shared student learning materials.",
+    "newVideo": "New Video",
+    "table": {
+      "title": "Title",
+      "file": "File",
+      "created": "Created",
+      "actions": "Actions"
+    },
+    "editVideo": "Edit video",
+    "deleteVideo": "Delete video",
+    "empty": "No videos yet.",
+    "totalCount_one": "{{count}} video total",
+    "totalCount_other": "{{count}} videos total",
+    "previous": "Previous",
+    "next": "Next",
+    "processing": {
+      "pending": "Queued for playback optimization",
+      "processing": "Optimizing for fast playback…",
+      "failed": "Playback optimization failed"
+    },
+    "form": {
+      "title": "Title",
+      "file": "Video file",
+      "description": "Description",
+      "upload": "Upload",
+      "uploading": "Uploading...",
+      "cancelUpload": "Cancel upload",
+      "uploadFailed": "Upload failed: {{message}}",
+      "progressParts": "part {{completed}}/{{total}}"
+    }
+  },
+  "videoDetail": {
+    "back": "Back to videos",
+    "kicker": "Watching edition",
+    "deleteVideo": "Delete Video",
+    "export": {
+      "action": "Export for local player",
+      "preparing": "Preparing export...",
+      "hint": "Downloads one portable package containing the video and all annotations.",
+      "started": "VideoInsight package saved.",
+      "failed": "Export could not be prepared."
+    },
+    "videoUnavailable": "Video URL unavailable.",
+    "processing": {
+      "inProgress": "Optimizing this video for reliable browser playback…",
+      "failed": "Playback optimization failed: {{message}}",
+      "unknownError": "Unknown processing error"
+    },
+    "notFound": "Video not found.",
+    "file": "File",
+    "size": "Size",
+    "created": "Created",
+    "preview": {
+      "kicker": "Live annotations",
+      "title": "Annotations",
+      "empty": "Waiting for the first timed annotation."
+    },
+    "annotations": {
+      "title": "Annotations",
+      "empty": "No annotations yet.",
+      "edit": "Edit annotation",
+      "delete": "Delete annotation",
+      "addAtPoint": "Add annotation",
+      "addAtCurrentTime": "Add at current time",
+      "clickToEdit": "Select an annotation below to edit it here, or add a new one at the current time.",
+      "liveKicker": "Live timeline",
+      "activeNow": "Now",
+      "timelineMask": "Annotation timeline"
+    },
+    "comments": {
+      "title": "Comments",
+      "add": "Add comment",
+      "placeholder": "Add to the discussion…",
+      "error": "Could not add comment."
+    },
+    "player": {
+      "play": "Play",
+      "pause": "Pause",
+      "playbackSpeed": "Playback speed",
+      "fullscreen": "Fullscreen",
+      "exitFullscreen": "Exit fullscreen",
+      "editThis": "Edit this annotation",
+      "tabs": {
+        "preview": "Preview",
+        "edit": "Edit"
+      }
+    },
+    "form": {
+      "kicker": "Studio note",
+      "editorTitle": "Annotation Editor",
+      "newTitle": "New Annotation",
+      "editTitle": "Edit Annotation",
+      "current": "Current {{time}}",
+      "timeSeconds": "Time in seconds",
+      "durationSeconds": "Duration",
+      "positionX": "X",
+      "positionY": "Y",
+      "shape": "Shape",
+      "displayMode": "Display",
+      "interactive": "Interactive",
+      "advanced": "Advanced",
+      "animation": "Animation",
+      "resize": "Resize annotation",
+      "content": "Content",
+      "contentPlaceholder": "Write an annotation…",
+      "color": "Color",
+      "colors": {
+        "current": "Current color",
+        "terracotta": "Terracotta",
+        "amber": "Amber",
+        "forest": "Forest",
+        "ocean": "Ocean",
+        "violet": "Violet",
+        "rose": "Rose"
+      },
+      "type": "Type",
+      "bold": "Bold",
+      "italic": "Italic",
+      "strike": "Strikethrough",
+      "bulletList": "Bullet list",
+      "orderedList": "Numbered list",
+      "quote": "Quote",
+      "code": "Code block",
+      "image": "Insert image",
+      "link": "Insert or edit link",
+      "unlink": "Remove link",
+      "linkText": "Link text",
+      "linkTextPlaceholder": "Text to display",
+      "linkUrl": "Link URL",
+      "linkPlaceholder": "https://example.com",
+      "applyLink": "Apply link",
+      "linkError": "Enter a valid HTTP, HTTPS, or email link.",
+      "undo": "Undo",
+      "redo": "Redo",
+      "imageHint": "Choose or paste a PNG, JPEG, GIF, or WebP image up to 50 MiB. Images are stored with the annotation.",
+      "imageTooLarge": "The image is larger than 50 MiB. Compress or resize it and try again.",
+      "imageTypeUnsupported": "Only PNG, JPEG, GIF, and WebP images are supported.",
+      "imageSourceInvalid": "The pasted image could not be embedded. Save it as PNG, JPEG, GIF, or WebP and insert it again.",
+      "imageReadError": "The image could not be read. Re-export it and try again.",
+      "customJson": "Custom JSON",
+      "useCurrentTime": "Use current {{time}}",
+      "submitNew": "Add Annotation",
+      "submitEdit": "Save",
+      "errorJsonObject": "Custom data must be a JSON object.",
+      "errorJsonInvalid": "Custom data must be valid JSON.",
+      "errorSave": "Could not save annotation.",
+      "kinds": {
+        "note": "Note",
+        "question": "Question",
+        "resource": "Resource",
+        "highlight": "Highlight"
+      },
+      "shapes": {
+        "marker": "Marker",
+        "spotlight": "Spotlight",
+        "region": "Region"
+      },
+      "displayModes": {
+        "card": "Card",
+        "marker": "Marker"
+      },
+      "animations": {
+        "none": "None",
+        "fade": "Fade",
+        "slide": "Slide",
+        "pulse": "Pulse"
+      }
+    },
+    "cache": {
+      "action": "Cache offline",
+      "caching": "Caching…",
+      "cached": "Cached",
+      "hint": "Download video and annotations for offline playback"
+    }
+  },
+  "classroom": {
+    "kicker": "VIDEOINSIGHT · CLASS BUTTON",
+    "title": "Classroom Player",
+    "open": "Open video",
+    "selectVideo": "Choose video",
+    "empty": "Open a VideoInsight package or video to start, or drop a file here.",
+    "fullscreen": "Fullscreen",
+    "exitFullscreen": "Exit fullscreen",
+    "unsupported": "This video cannot be played; prefer MP4/H.264/AAC or WebM.",
+    "hub": {
+      "online": "HUB · connected {{port}}",
+      "searching": "HUB · searching"
+    },
+    "student": {
+      "request": "CLASS BUTTON · student requests a pause",
+      "seat": "Seat {{seat}}",
+      "device": "Device {{id}}",
+      "handled": "Handled"
+    },
+    "annotations": {
+      "kicker": "Playback annotations",
+      "title": "Annotations",
+      "hint": "Open a package to show annotations here",
+      "empty": "No annotation at the current time"
+    }
+  }
+}

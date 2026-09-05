@@ -1,0 +1,309 @@
+{
+  "common": {
+    "loading": "加载中...",
+    "cancel": "取消",
+    "save": "保存",
+    "saving": "保存中...",
+    "creating": "创建中...",
+    "working": "处理中...",
+    "noDescription": "暂无描述"
+  },
+  "errors": {
+    "unknown": "操作失败，请重试。",
+    "network": "无法连接服务器，请检查网络后重试。",
+    "server": "服务器暂时无法完成请求，请稍后重试。",
+    "unauthorized": "登录状态已过期，请重新登录后再试。",
+    "forbidden": "你没有执行此操作的权限。",
+    "notFound": "请求的内容已不存在。",
+    "conflict": "当前数据状态已发生变化，请刷新后重试。",
+    "requestTooLarge": "提交内容过大，每张内嵌图片不能超过 50 MiB。",
+    "invalidRequestBody": "部分提交数据无法读取，请刷新后重试。",
+    "annotationTimestampInvalid": "批注时间必须大于或等于零。",
+    "annotationDurationInvalid": "批注持续时间必须大于零且不能超过 3600 秒。",
+    "annotationGeometryInvalid": "批注的位置或区域超出了视频画面范围。",
+    "annotationFieldInvalid": "批注类型或显示设置无效。",
+    "annotationColorInvalid": "请选择有效的六位十六进制颜色。",
+    "annotationCustomDataInvalid": "自定义数据必须是 JSON 对象。",
+    "annotationContentInvalid": "批注包含空内容、不支持或格式异常的内容，请移除相关格式或图片后重试。",
+    "annotationContentTooLarge": "整个批注内容过大，请减少文字或内嵌图片后重试。",
+    "annotationImageTooLarge": "有图片超过 50 MiB，请压缩或缩小后重试。",
+    "annotationImageTypeUnsupported": "仅支持 PNG、JPEG、GIF 和 WebP 图片。",
+    "annotationImageSourceInvalid": "粘贴的图片无法内嵌，请先另存为 PNG、JPEG、GIF 或 WebP 后重新插入。",
+    "annotationImageInvalid": "图片已损坏，或文件类型与实际数据不符，请重新导出后重试。"
+  },
+  "brand": {
+    "name": "Video Insight",
+    "studio": "工作室",
+    "tagline": "视频的读者批注版"
+  },
+  "nav": {
+    "dashboard": "仪表盘",
+    "videos": "视频",
+    "classroom": "课堂"
+  },
+  "settings": {
+    "title": "设置",
+    "language": {
+      "title": "语言",
+      "system": "跟随系统",
+      "en": "English",
+      "zh": "中文"
+    }
+  },
+  "auth": {
+    "signedIn": "已登录",
+    "logout": "退出登录",
+    "login": {
+      "kicker": "带批注的学习视频库",
+      "headline_line1": "让视频如同",
+      "headline_line2": "批注过的书页。",
+      "subheadline": "上传素材,添加带时间戳的批注,与学习者共享一份注释版本。",
+      "accountKicker": "账号",
+      "welcome": "欢迎回来",
+      "hint": "请使用预置的管理员账号或由管理员创建的账号登录。",
+      "username": "用户名",
+      "password": "密码",
+      "submit": "登录",
+      "invalid": "用户名或密码不正确。"
+    }
+  },
+  "dashboard": {
+    "kicker": "资料库",
+    "title": "学习视频库",
+    "subtitle": "面向学生的共享视频与带时间戳的批注。",
+    "addVideo": "添加视频",
+    "stats": {
+      "totalVideos": "视频总数",
+      "recentUploads": "最近上传",
+      "annotationModel": "批注模式",
+      "shared": "共享"
+    },
+    "recent": {
+      "title": "最近的视频",
+      "latest": "最新 05"
+    },
+    "admin": {
+      "kicker": "管理",
+      "createAccount": "创建账号",
+      "createAccountHint": "新账号归属于某个分组,共享该分组的视频。",
+      "username": "用户名",
+      "group": "分组",
+      "tempPassword": "临时密码",
+      "createButton": "创建",
+      "created": "已创建账号 {{username}}。",
+      "createError": "无法创建账号,该用户名可能已存在。",
+      "groupsKicker": "分组",
+      "createGroup": "创建分组",
+      "createGroupHint": "分组是视频和批注的共享边界。",
+      "groupName": "分组名称",
+      "createGroupButton": "创建分组",
+      "createGroupSuccess": "已创建分组 {{name}}。",
+      "createGroupError": "无法创建分组,该名称可能已存在。",
+      "existingGroups": "已有分组"
+    }
+  },
+  "videos": {
+    "kicker": "档案",
+    "title": "视频",
+    "subtitle": "为学生共享的学习资料上传源视频。",
+    "newVideo": "新建视频",
+    "table": {
+      "title": "标题",
+      "file": "文件",
+      "created": "创建时间",
+      "actions": "操作"
+    },
+    "editVideo": "编辑视频",
+    "deleteVideo": "删除视频",
+    "export": {
+      "action": "导出到本地播放器",
+      "preparing": "正在准备导出...",
+      "hint": "下载一个包含视频和全部批注的便携包。",
+      "started": "VideoInsight 便携包已保存。",
+      "failed": "无法准备导出文件。"
+    },
+    "empty": "暂无视频。",
+    "totalCount_one": "共 {{count}} 个视频",
+    "totalCount_other": "共 {{count}} 个视频",
+    "previous": "上一页",
+    "next": "下一页",
+    "processing": {
+      "pending": "等待播放优化",
+      "processing": "正在优化快速播放…",
+      "failed": "播放优化失败"
+    },
+    "form": {
+      "title": "标题",
+      "file": "视频文件",
+      "description": "描述",
+      "upload": "上传",
+      "uploading": "上传中...",
+      "cancelUpload": "取消上传",
+      "uploadFailed": "上传失败:{{message}}",
+      "progressParts": "第 {{completed}}/{{total}} 块"
+    }
+  },
+  "videoDetail": {
+    "back": "返回视频列表",
+    "kicker": "观看版本",
+    "deleteVideo": "删除视频",
+    "videoUnavailable": "视频链接不可用。",
+    "processing": {
+      "inProgress": "正在为浏览器可靠播放优化视频…",
+      "failed": "播放优化失败：{{message}}",
+      "unknownError": "未知处理错误"
+    },
+    "notFound": "未找到该视频。",
+    "file": "文件",
+    "size": "大小",
+    "created": "创建时间",
+    "preview": {
+      "kicker": "实时批注",
+      "title": "批注",
+      "empty": "等待第一个时间点标注。"
+    },
+    "annotations": {
+      "title": "批注",
+      "empty": "暂无批注。",
+      "edit": "编辑批注",
+      "delete": "删除批注",
+      "addAtPoint": "添加批注",
+      "addAtCurrentTime": "在当前时间添加",
+      "clickToEdit": "在下方选择批注后可在这里编辑，也可以在当前时间新建批注。",
+      "liveKicker": "实时轴",
+      "activeNow": "正在播放",
+      "timelineMask": "批注时间线"
+    },
+    "comments": {
+      "title": "评论",
+      "add": "添加评论",
+      "placeholder": "参与讨论…",
+      "error": "无法添加评论。"
+    },
+    "player": {
+      "play": "播放",
+      "pause": "暂停",
+      "playbackSpeed": "播放速度",
+      "fullscreen": "全屏",
+      "exitFullscreen": "退出全屏",
+      "editThis": "编辑此批注",
+      "tabs": {
+        "preview": "预览",
+        "edit": "编辑"
+      }
+    },
+    "form": {
+      "kicker": "工作室笔记",
+      "editorTitle": "批注编辑器",
+      "newTitle": "新建批注",
+      "editTitle": "编辑批注",
+      "current": "当前 {{time}}",
+      "timeSeconds": "时间(秒)",
+      "durationSeconds": "持续时间",
+      "positionX": "X",
+      "positionY": "Y",
+      "shape": "形状",
+      "displayMode": "显示",
+      "interactive": "可交互",
+      "advanced": "高级",
+      "animation": "动画",
+      "resize": "调整批注大小",
+      "content": "内容",
+      "contentPlaceholder": "撰写批注…",
+      "color": "颜色",
+      "colors": {
+        "current": "当前颜色",
+        "terracotta": "陶土色",
+        "amber": "琥珀色",
+        "forest": "森林绿",
+        "ocean": "海洋蓝",
+        "violet": "紫罗兰",
+        "rose": "玫瑰色"
+      },
+      "type": "类型",
+      "bold": "粗体",
+      "italic": "斜体",
+      "strike": "删除线",
+      "bulletList": "项目符号列表",
+      "orderedList": "编号列表",
+      "quote": "引用",
+      "code": "代码块",
+      "image": "插入图片",
+      "link": "插入或编辑链接",
+      "unlink": "移除链接",
+      "linkText": "链接文字",
+      "linkTextPlaceholder": "要显示的文字",
+      "linkUrl": "链接地址",
+      "linkPlaceholder": "https://example.com",
+      "applyLink": "应用链接",
+      "linkError": "请输入有效的 HTTP、HTTPS 或电子邮件链接。",
+      "undo": "撤销",
+      "redo": "重做",
+      "imageHint": "可选择或粘贴不超过 50 MiB 的 PNG、JPEG、GIF 或 WebP，图片将随批注保存。",
+      "imageTooLarge": "图片超过 50 MiB，请压缩或缩小后重试。",
+      "imageTypeUnsupported": "仅支持 PNG、JPEG、GIF 和 WebP 图片。",
+      "imageSourceInvalid": "粘贴的图片无法内嵌，请先另存为 PNG、JPEG、GIF 或 WebP 后重新插入。",
+      "imageReadError": "无法读取图片，请重新导出后重试。",
+      "customJson": "自定义 JSON",
+      "useCurrentTime": "使用当前 {{time}}",
+      "submitNew": "添加批注",
+      "submitEdit": "保存",
+      "errorJsonObject": "自定义数据必须是 JSON 对象。",
+      "errorJsonInvalid": "自定义数据必须是合法的 JSON。",
+      "errorSave": "无法保存批注。",
+      "kinds": {
+        "note": "笔记",
+        "question": "问题",
+        "resource": "资源",
+        "highlight": "重点"
+      },
+      "shapes": {
+        "marker": "标记",
+        "spotlight": "聚焦",
+        "region": "区域"
+      },
+      "displayModes": {
+        "card": "卡片",
+        "marker": "标记"
+      },
+      "animations": {
+        "none": "无",
+        "fade": "淡入",
+        "slide": "滑入",
+        "pulse": "脉冲"
+      }
+    },
+    "cache": {
+      "action": "缓存到本机",
+      "caching": "缓存中…",
+      "cached": "已缓存",
+      "hint": "下载视频与批注到本机,离线也能播放"
+    }
+  },
+  "classroom": {
+    "kicker": "VIDEOINSIGHT · CLASS BUTTON",
+    "title": "课堂播放器",
+    "open": "打开视频",
+    "selectVideo": "选择视频",
+    "empty": "打开 VideoInsight 课程包或视频开始上课,也可以把文件拖到这里。",
+    "fullscreen": "全屏",
+    "exitFullscreen": "退出全屏",
+    "unsupported": "视频无法播放;请确认编码受支持(推荐 MP4/H.264/AAC 或 WebM)。",
+    "hub": {
+      "online": "HUB · 已连接 {{port}}",
+      "searching": "HUB · 正在查找"
+    },
+    "student": {
+      "request": "CLASS BUTTON · 学生请求暂停",
+      "seat": "座位 {{seat}}",
+      "device": "设备 {{id}}",
+      "handled": "已处理"
+    },
+    "annotations": {
+      "kicker": "播放批注",
+      "title": "批注",
+      "hint": "打开课程包后在此显示批注",
+      "empty": "当前时间没有批注"
+    }
+  }
+}

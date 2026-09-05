@@ -3,8 +3,8 @@
 ## Stack
 
 - Backend: Go 1.26 with Chi, pgx/sqlc, AWS SDK v2, JWT, and PBKDF2 password compatibility. Formatted with `gofmt`, checked with `go vet`, and tested with the race detector.
-- Frontend: React 19 + TanStack Router + TanStack Query + TailwindCSS 4, built with Vite and managed with `pnpm`.
-- Classroom: an Electron + React + Vite desktop player in `class-button/desktop/`
+- Frontend: React 19 + TanStack Router + TanStack Query + TailwindCSS 4, built with Vite in a pnpm monorepo (`packages/ui` shared by `apps/web` and `apps/desktop`).
+- Classroom: an Electron + React + Vite desktop player in `apps/desktop/`
   backed by a nested Rust workspace for the sidecar, serial host tools, protocol,
   and browser adapter. ESP32-S3 firmware is a separate nested workspace so its
   ESP-IDF target does not affect host builds.
@@ -63,14 +63,27 @@ Services depend on narrow interfaces rather than pgx or S3 clients directly. Kee
 
 Clients upload directly to MinIO/R2 through presigned multipart URLs. Upload concurrency remains intentionally serialized by default for constrained production tunnels.
 
-### Frontend (`frontend/src/`)
+### Frontend monorepo (`packages/ui` + `apps/`)
 
-- `routes/` — TanStack Router file routes; do not edit generated `routeTree.gen.ts`.
-- `features/<domain>/` — typed API calls and TanStack Query hooks.
-- `components/layout/` — shared layout chrome.
-- `i18n/` — English and Chinese resources.
+The web and desktop products share one React codebase in a pnpm workspace:
 
-Production nginx serves the bundle and proxies `/api` to the Go service.
+- `packages/ui/` (`@videoinsight/ui`) — the single frontend. Code-based TanStack
+  routes in `routes/`, domain logic and hooks in `features/<domain>/`, shared
+  chrome in `components/`, i18n in `i18n/`, and the host boundary in
+  `platform/` (`host.ts` `HostServices`/`capabilities`, `api-client.ts`).
+  The UI never reads the environment directly; every difference between web and
+  desktop goes through the injected `HostServices`.
+- `apps/web/` (`@videoinsight/web`) — thin Vite shell. `main.tsx` mounts
+  `AppRoot` with `platform/host.web.ts` (online, auth+annotate, no desktop
+  capabilities). Built context for Docker is the repo root (monorepo).
+- `apps/desktop/` (`@videoinsight/class-button-desktop`) — Electron app.
+  `src/main` and `src/preload` keep the privileged/sandbox boundary;
+  `src/renderer` mounts `AppRoot` with `platform/host.desktop.ts`, which adds
+  media caching (offline playback), local `.vinsight` open, and classroom
+  button events. Without a configured backend URL it runs offline
+  (classroom-only); with one, login unlocks the full online UI.
+
+Production nginx serves the web bundle and proxies `/api` to the Go service.
 
 ### Classroom system (`class-button/`)
 
@@ -116,7 +129,7 @@ The desktop player is a read-only consumer of VideoInsight annotations. For a
 video such as `lesson.mp4`, it searches for `lesson.mp4.annotations.json`, then
 `lesson.annotations.json`, then `annotations.json`. Sidecars may be either the
 SaaS annotation array or an object with an `annotations` array. Keep this shape
-compatible with the API DTOs in `frontend/src/types/index.ts` and
+compatible with the API DTOs in `packages/ui/src/types/index.ts` and
 `backend/internal/httpapi/types.go`; see `class-button/docs/desktop.md`.
 
 Run host and Electron checks from the repository root with

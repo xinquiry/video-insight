@@ -1,0 +1,321 @@
+@import "tailwindcss";
+
+/* 共享包被多个 app 复用:显式声明扫描源,否则宿主构建时
+   Tailwind 只扫宿主目录,ui 组件里的布局工具类不会生成。 */
+@source ".";
+
+:root {
+  --paper: #faf7f2;
+  --ink: #1c1a17;
+  --accent: #c0512f;
+  --forest: #2f5b4f;
+  --muted: #8a817a;
+  --surface: #fffdf9;
+  --rule: rgba(28, 26, 23, 0.12);
+  --rule-strong: rgba(28, 26, 23, 0.22);
+  --rule-soft: rgba(28, 26, 23, 0.06);
+  --danger: #9f2f24;
+  --font-display: "GT Sectra", "Source Serif Pro", "Iowan Old Style", "Times New Roman", serif;
+  --font-body:
+    "Sohne", "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
+  --font-mono: "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
+  --color-primary: var(--accent);
+  --color-primary-hover: #9f3f25;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  background: var(--paper);
+  color: var(--ink);
+  font-family: var(--font-body);
+  font-size: 16px;
+  line-height: 1.6;
+  font-synthesis-weight: none;
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+}
+
+::selection {
+  background: var(--accent);
+  color: var(--paper);
+}
+
+button,
+input,
+textarea,
+select {
+  font: inherit;
+}
+
+.vi-display {
+  font-family: var(--font-display);
+  font-weight: 500;
+  letter-spacing: 0;
+  line-height: 1.08;
+}
+
+.vi-mono {
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+}
+
+.vi-kicker {
+  color: var(--muted);
+  font-size: 0.68rem;
+  font-weight: 650;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+}
+
+.vi-panel {
+  background: var(--surface);
+  border: 1px solid var(--rule);
+  border-radius: 8px;
+}
+
+.vi-panel-paper {
+  background: var(--paper);
+  border: 1px solid var(--rule);
+  border-radius: 8px;
+}
+
+.vi-rule {
+  border-color: var(--rule);
+}
+
+.vi-button-primary,
+.vi-button-secondary,
+.vi-button-danger,
+.vi-icon-button {
+  align-items: center;
+  border-radius: 8px;
+  display: inline-flex;
+  font-size: 0.875rem;
+  font-weight: 650;
+  gap: 0.5rem;
+  justify-content: center;
+  min-height: 2.5rem;
+  transition:
+    background-color 120ms ease,
+    border-color 120ms ease,
+    color 120ms ease,
+    transform 120ms ease;
+}
+
+.vi-button-primary {
+  background: var(--accent);
+  color: var(--paper);
+  padding: 0.625rem 1rem;
+}
+
+.vi-button-primary:hover {
+  background: var(--color-primary-hover);
+}
+
+.vi-button-secondary {
+  background: transparent;
+  border: 1px solid var(--ink);
+  color: var(--ink);
+  padding: 0.575rem 0.95rem;
+}
+
+.vi-button-secondary:hover {
+  background: var(--ink);
+  color: var(--paper);
+}
+
+.vi-button-danger {
+  background: transparent;
+  border: 1px solid rgba(159, 47, 36, 0.35);
+  color: var(--danger);
+  padding: 0.575rem 0.95rem;
+}
+
+.vi-button-danger:hover {
+  background: rgba(159, 47, 36, 0.07);
+}
+
+.vi-icon-button {
+  border: 1px solid var(--rule-strong);
+  color: var(--muted);
+  height: 2.25rem;
+  min-height: 2.25rem;
+  padding: 0;
+  width: 2.25rem;
+}
+
+.vi-icon-button:hover {
+  background: var(--rule-soft);
+  color: var(--ink);
+}
+
+.vi-input,
+.vi-textarea,
+.vi-select {
+  background: transparent;
+  border: 0;
+  border-bottom: 1px solid var(--rule-strong);
+  color: var(--ink);
+  display: block;
+  outline: none;
+  padding: 0.625rem 0;
+  width: 100%;
+}
+
+.vi-input:focus,
+.vi-textarea:focus,
+.vi-select:focus {
+  border-bottom-color: var(--accent);
+}
+
+.vi-label {
+  color: var(--muted);
+  display: block;
+  font-size: 0.7rem;
+  font-weight: 650;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+}
+
+.vi-link {
+  color: var(--accent);
+  text-decoration-color: rgba(192, 81, 47, 0.4);
+  text-decoration-line: underline;
+  text-underline-offset: 4px;
+}
+
+.vi-link:hover {
+  background: rgba(192, 81, 47, 0.08);
+  text-decoration-color: transparent;
+}
+
+.vi-muted {
+  color: var(--muted);
+}
+
+.vi-soft-shadow:hover {
+  box-shadow: 0 2px 16px rgba(28, 26, 23, 0.06);
+}
+
+.vi-rich-tool {
+  align-items: center;
+  border-radius: 6px;
+  color: var(--muted);
+  display: inline-flex;
+  height: 2rem;
+  justify-content: center;
+  width: 2rem;
+}
+
+.vi-rich-tool:hover {
+  background: var(--rule-soft);
+  color: var(--ink);
+}
+
+.vi-rich-text .tiptap {
+  color: var(--ink);
+  line-height: 1.65;
+  outline: none;
+}
+
+.vi-rich-editor .tiptap {
+  min-height: 10rem;
+  padding: 0.875rem;
+}
+
+.vi-rich-text .tiptap > * + * {
+  margin-top: 0.75rem;
+}
+
+.vi-rich-text .tiptap h1,
+.vi-rich-text .tiptap h2,
+.vi-rich-text .tiptap h3 {
+  font-family: var(--font-display);
+  font-weight: 500;
+  line-height: 1.15;
+}
+
+.vi-rich-text .tiptap h1 {
+  font-size: 1.8rem;
+}
+
+.vi-rich-text .tiptap h2 {
+  font-size: 1.45rem;
+}
+
+.vi-rich-text .tiptap h3 {
+  font-size: 1.2rem;
+}
+
+.vi-rich-text .tiptap ul,
+.vi-rich-text .tiptap ol {
+  padding-left: 1.5rem;
+}
+
+.vi-rich-text .tiptap ul {
+  list-style: disc;
+}
+
+.vi-rich-text .tiptap ol {
+  list-style: decimal;
+}
+
+.vi-rich-text .tiptap blockquote {
+  border-left: 3px solid var(--accent);
+  color: var(--muted);
+  padding-left: 0.875rem;
+}
+
+.vi-rich-text .tiptap a {
+  color: var(--accent);
+  cursor: pointer;
+  text-decoration: underline;
+  text-decoration-color: rgba(192, 81, 47, 0.45);
+  text-underline-offset: 3px;
+}
+
+.vi-rich-text .tiptap a:hover {
+  text-decoration-color: var(--accent);
+}
+
+.vi-rich-text .tiptap pre {
+  background: var(--ink);
+  border-radius: 6px;
+  color: var(--paper);
+  font-family: var(--font-mono);
+  overflow-x: auto;
+  padding: 0.75rem;
+}
+
+.vi-rich-text .tiptap img {
+  border-radius: 8px;
+  display: block;
+  height: auto;
+  max-width: 100%;
+}
+
+.vi-rich-text .tiptap p.is-editor-empty:first-child::before {
+  color: var(--muted);
+  content: attr(data-placeholder);
+  float: left;
+  height: 0;
+  pointer-events: none;
+}
+
+.vi-rich-compact .tiptap {
+  display: -webkit-box;
+  font-size: 0.875rem;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 5;
+  overflow: hidden;
+}
+
+.vi-rich-compact .tiptap img {
+  max-height: 8rem;
+  object-fit: contain;
+  object-position: left;
+}
