@@ -143,6 +143,7 @@
     "export": {
       "action": "Export for local player",
       "preparing": "Preparing export...",
+      "downloading": "Downloaded {{received}} / {{total}}",
       "hint": "Downloads one portable package containing the video and all annotations.",
       "started": "VideoInsight package saved.",
       "failed": "Export could not be prepared."

@@ -118,6 +118,7 @@
     "export": {
       "action": "导出到本地播放器",
       "preparing": "正在准备导出...",
+      "downloading": "已下载 {{received}} / {{total}}",
       "hint": "下载一个包含视频和全部批注的便携包。",
       "started": "VideoInsight 便携包已保存。",
       "failed": "无法准备导出文件。"

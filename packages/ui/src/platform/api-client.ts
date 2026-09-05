@@ -103,7 +103,21 @@ function isAbortError(error: unknown): boolean {
   return error instanceof DOMException && error.name === "AbortError";
 }
 
-async function download(path: string, suggestedName: string, contentType: string) {
+function triggerBrowserDownload(blob: Blob, suggestedName: string) {
+  const objectUrl = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  link.href = objectUrl;
+  link.download = suggestedName;
+  link.click();
+  window.setTimeout(() => URL.revokeObjectURL(objectUrl), 1_000);
+}
+
+async function download(
+  path: string,
+  suggestedName: string,
+  contentType: string,
+  onProgress?: (receivedBytes: number) => void,
+) {
   const picker = (window as SaveFilePickerWindow).showSaveFilePicker;
   let writable: FileSystemWritableFileStream | undefined;
   if (picker) {
@@ -131,22 +145,42 @@ async function download(path: string, suggestedName: string, contentType: string
       throw error;
     }
     if (!response.ok) return await handleResponse<never>(response);
-    if (writable) {
-      if (response.body) {
-        await response.body.pipeTo(writable);
-      } else {
-        await writable.write(await response.blob());
+    let received = 0;
+    if (response.body) {
+      const reader = response.body.getReader();
+      if (writable) {
+        try {
+          while (true) {
+            const { done, value } = await reader.read();
+            if (done) break;
+            received += value.byteLength;
+            onProgress?.(received);
+            await writable.write(value);
+          }
+        } catch (error) {
+          reader.cancel().catch(() => {});
+          throw error;
+        }
         await writable.close();
+      } else {
+        const chunks: Uint8Array[] = [];
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) break;
+          received += value.byteLength;
+          onProgress?.(received);
+          chunks.push(value);
+        }
+        triggerBrowserDownload(new Blob(chunks as BlobPart[], { type: contentType }), suggestedName);
       }
       return;
     }
-    const blob = await response.blob();
-    const objectUrl = URL.createObjectURL(blob);
-    const link = document.createElement("a");
-    link.href = objectUrl;
-    link.download = suggestedName;
-    link.click();
-    window.setTimeout(() => URL.revokeObjectURL(objectUrl), 1_000);
+    if (writable) {
+      await writable.write(await response.blob());
+      await writable.close();
+      return;
+    }
+    triggerBrowserDownload(await response.blob(), suggestedName);
   } catch (error) {
     if (writable) {
       // Remove the partial file so a failed export never looks complete.

@@ -200,12 +200,17 @@ export function deleteVideo(id: string) {
   return apiClient.delete<void>(`/api/videos/${id}`);
 }
 
-export function exportVideo(input: { id: string; filename: string }) {
+export function exportVideo(input: {
+  id: string;
+  filename: string;
+  onProgress?: (receivedBytes: number) => void;
+}) {
   const stem = input.filename.replace(/\.[^./\\]+$/, "") || "video";
   return apiClient.download(
     `/api/videos/${input.id}/export`,
     `${stem}.vinsight`,
     "application/vnd.videoinsight.package+zip",
+    input.onProgress,
   );
 }
 

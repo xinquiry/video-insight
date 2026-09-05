@@ -545,7 +545,12 @@ function VideoDetailPage() {
           >
             <Download className="h-4 w-4" />
             {exportVideo.isPending
-              ? t("videoDetail.export.preparing")
+              ? exportVideo.receivedBytes !== null
+                ? t("videoDetail.export.downloading", {
+                    received: formatBytes(exportVideo.receivedBytes),
+                    total: formatBytes(video.size_bytes),
+                  })
+                : t("videoDetail.export.preparing")
               : t("videoDetail.export.action")}
           </button>
           <button

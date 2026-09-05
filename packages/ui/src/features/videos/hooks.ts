@@ -114,7 +114,16 @@ export function useDeleteVideo() {
 }
 
 export function useVideoExport() {
-  return useMutation({ mutationFn: exportVideo });
+  const [receivedBytes, setReceivedBytes] = useState<number | null>(null);
+  const mutation = useMutation({
+    mutationFn: (input: { id: string; filename: string }) =>
+      exportVideo({
+        ...input,
+        onProgress: setReceivedBytes,
+      }),
+    onSettled: () => setReceivedBytes(null),
+  });
+  return { ...mutation, receivedBytes };
 }
 
 export function useAnnotations(videoId: string) {
