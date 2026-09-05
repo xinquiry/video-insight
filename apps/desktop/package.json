@@ -1,6 +1,6 @@
 {
   "name": "@videoinsight/class-button-desktop",
-  "version": "0.1.0",
+  "version": "0.1.3",
   "private": true,
   "description": "Electron classroom player for VideoInsight Class Button",
   "author": "VideoInsight",
@@ -51,7 +51,9 @@
       {
         "from": "build-resources/bin",
         "to": "bin",
-        "filter": ["**/*"]
+        "filter": [
+          "**/*"
+        ]
       },
       {
         "from": "../../class-button/config/classroom.example.json",
@@ -60,10 +62,16 @@
     ],
     "mac": {
       "category": "public.app-category.education",
-      "target": ["dir", "zip"]
+      "target": [
+        "dir",
+        "zip"
+      ]
     },
     "win": {
-      "target": ["portable", "zip"]
+      "target": [
+        "portable",
+        "zip"
+      ]
     }
   }
 }
