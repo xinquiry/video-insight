@@ -1,8 +1,10 @@
 @import "tailwindcss";
 
-/* 共享包被多个 app 复用:显式声明扫描源,否则宿主构建时
-   Tailwind 只扫宿主目录,ui 组件里的布局工具类不会生成。 */
-@source ".";
+/* 共享包被多个 app 复用:显式声明扫描源。Tailwind 4 的 @source 相对于
+   编译 base(CSS 所在目录)解析,而跨包/容器构建时 base 可能落在宿主侧,
+   导致本包任意值类(如 h-[18rem])不生成、布局塌陷。用 ../../ 显式锚定到
+   monorepo 根,确保 packages/ui 与宿主 app 的类都被稳定扫描。 */
+@source "../..";
 
 :root {
   --paper: #faf7f2;
