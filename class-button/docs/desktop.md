@@ -6,7 +6,10 @@ Electron 桌面应用是 VideoInsight 的只读课堂播放端。批注仍由 Sa
 
 ## 技术边界
 
-- UI 使用 React 19 和 Vite，由 Electron 提供桌面窗口与原生文件选择器。
+- UI 复用仓库根 pnpm monorepo 中的共享 `@videoinsight/ui`（React 19 + Vite），
+  由 Electron 提供桌面窗口与原生文件选择器；桌面差异（媒体离线缓存、本地
+  `.vinsight` 打开、按钮事件）经 `apps/desktop/src/renderer/platform/host.desktop.ts`
+  注入。未配置后端 URL 时为纯离线课堂模式，配置后可登录解锁完整在线 UI。
 - 视频使用 Chromium HTML `<video>`；推荐 MP4/H.264/AAC 或 WebM。其他容器和
   编码需要在目标平台的打包版本中验证。
 - Rust sidecar 负责串口、localhost 兼容服务、课程包安全校验和批注规范化，

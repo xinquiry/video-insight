@@ -6,8 +6,8 @@
 - Frontend: React 19 + TanStack Router + TanStack Query + TailwindCSS 4, built with Vite in a pnpm monorepo (`packages/ui` shared by `apps/web` and `apps/desktop`).
 - Classroom: an Electron + React + Vite desktop player in `apps/desktop/`
   backed by a nested Rust workspace for the sidecar, serial host tools, protocol,
-  and browser adapter. ESP32-S3 firmware is a separate nested workspace so its
-  ESP-IDF target does not affect host builds.
+  and browser adapter. ESP32-S3/ESP32-C3 firmware is a separate nested workspace
+  so its ESP-IDF target does not affect host builds.
 - Storage: PostgreSQL 16 plus MinIO locally or Cloudflare R2 in production.
 - Orchestration: layered Docker Compose driven by `scripts/dev.sh` and `scripts/deploy-prod.sh`.
 
@@ -32,6 +32,7 @@ just check unit             # run all unit suites only
 just check web              # verify backend and frontend
 just check desktop          # verify Rust host and Electron application
 just fix                    # format supported products
+just release <version>      # bump, tag, and push a desktop release
 just deploy                 # pull backend/frontend images and deploy
 ```
 
@@ -101,8 +102,6 @@ Production nginx serves the web bundle and proxies `/api` to the Go service.
 - `crates/class-button-sidecar/` — headless Rust runtime for package validation,
   annotation normalization, serial events, and the localhost compatibility
   server. It communicates with Electron main through versioned JSON lines.
-- `desktop/` — Electron main/preload processes and the React/Vite classroom
-  player. The sandboxed renderer only receives a narrow typed preload API.
 - `player-adapter/` — compatibility adapter for pausing browser video through the
   localhost WebSocket service. Student identity intentionally stays in the native
   process and is not sent to arbitrary webpages.
@@ -110,9 +109,15 @@ Production nginx serves the web bundle and proxies `/api` to the Go service.
   built for both chips.
 - `firmware/esp32s3/` and `firmware/esp32c3/` — standalone ESP-IDF Cargo
   packages (xtensa and riscv32imc targets) that build the shared sources for
-  each chip. The BOOT button is GPIO0 on ESP32-S3 and GPIO9 on ESP32-C3,
-  selected by the `board_esp32c3` cargo feature. Do not add them to the host
+  each chip. The S3 board uses its BOOT button (GPIO0); the C3 button uses an
+  external active-low button on GPIO3 and sleeps between presses
+  (deep sleep + GPIO wake), selected by the `board_esp32c3` cargo feature.
+  Do not add them to the host
   workspace or run host-wide Cargo commands from these directories.
+
+The Electron application itself lives in `apps/desktop/` (see Frontend
+monorepo above); `class-button/` contains only the Rust workspace, firmware,
+packaging scripts, and the browser adapter.
 
 Electron main owns process lifecycle, file dialogs, the allowlisted custom-media
 protocol, and the Rust sidecar. Keep `nodeIntegration` disabled, context isolation
@@ -147,10 +152,12 @@ intended role and chip explicitly.
 - `hardware/models/key_top.py` — top shell: cover with lid, flat top with
   button hole (Ø25.6 for the cap waist; the cap flange seats on the flat top),
   and the matching rabbet groove.
-- `hardware/print/` — printable STLs (`key_bottom`, `key_top`, `key_cap`).
+- `hardware/print/` — generated printable STLs (`key_bottom`, `key_top`,
+  `key_cap`; untracked, rebuilt from the CadQuery sources).
   `key_cap.stl` is the button cap from `obj_1_arrows.stl` (Ø29.65 dome,
   Ø25 waist that slides into the top hole).
-- `hardware/key_assembly.blend` / `.step` — assembled model for inspection.
+- `hardware/key_assembly.blend` / `.step` — generated assembled model for
+  inspection (untracked).
 - `hardware/.venv/` — local CadQuery environment (git-ignored).
 
 Edit dimensions in the `参数` block at the top of each script, then regenerate:
@@ -173,7 +180,7 @@ dimensions (waist Ø25, four Ø4 recesses at r=8) in sync with the physical cap.
 - Only frontend port 8080 is bound to the host. Cloudflared publishes the app; R2 or browser-reachable MinIO serves object URLs.
 - Preserve `GO_SEED_ADMIN_ON_STARTUP=false` after the first production bootstrap.
 - Desktop packages are produced by `class-button/scripts/package-macos.sh` or
-  `class-button/scripts/package-windows.ps1`; generated `target/` and `dist/`
-  trees stay ignored.
+  `class-button/scripts/package-windows.ps1` into `apps/dist/electron`;
+  generated `target/` and `dist/` trees stay ignored.
 
 See `docs/deployment.md` for the runbook.

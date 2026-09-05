@@ -7,8 +7,10 @@
 - **Class Button Key（学生按钮）**：只需要独立供电，通过 ESP-NOW 与 Hub 通信，
   不需要连接教师电脑，也不依赖教室 Wi-Fi。
 
-当前两块 ESP32-S3 调试板已经分别烧录为 Hub 和 Key。Key 运行期间短按
-BOOT/GPIO0 即可发送一次请求。
+当前调试硬件：Class Button Hub 为 ESP32-S3；Class Button Key 为 ESP32-C3，
+外接 GPIO3 按键并运行深度睡眠固件。Key 睡眠时 USB-Serial-JTAG 掉线、
+设备管理器中的端口消失属正常现象；按下按键即唤醒并发送一次请求。
+详见 [`hardware.md`](hardware.md)。
 
 ## 运行
 
@@ -47,7 +49,7 @@ Key 不应出现在 Windows 设备管理器中，因为正常使用时它只连�
 .\scripts\package-windows.ps1
 ```
 
-默认在 `dist\electron` 生成 x64 便携程序和 ZIP。Windows on ARM 可以运行：
+默认在 `apps\dist\electron` 生成 x64 便携程序和 ZIP。Windows on ARM 可以运行：
 
 ```powershell
 .\scripts\package-windows.ps1 -Architecture arm64

@@ -16,15 +16,19 @@ Rust workspace 包括：
 - `class-button-cli`：端口检查、真实串口监听和无硬件事件模拟。
 - `class-button-sidecar`：Hub 串口、事件去重、课程包校验、批注规范化和浏览器
   兼容服务，通过私有 IPC 服务 Electron 播放器。
-- `desktop/`：Electron main/preload 与 React 播放器、批注时间轴和学生提示界面。
 - `player-adapter`：保留的在线网站兼容适配器，不是当前本地课堂主路径。
 
-当前调试接收器为 ESP32-S3（16 MB Flash），详见
-[`docs/hardware.md`](docs/hardware.md)。正式学生按钮仍以 XIAO ESP32-C3 为目标。
+Electron 播放器本体位于仓库根的 `apps/desktop/`，渲染层复用共享
+`@videoinsight/ui` 前端；本目录只包含 Rust、固件、打包脚本与浏览器适配器。
 
-2026-08-18 已使用两块 ESP32-S3 完成真实 ESP-NOW 双向联调：按钮事件被接收器
-接收，ACK 在第一次发送后返回，主机正确显示 `测试学生 1`。当前调试按钮使用
-板载 BOOT/GPIO0，运行期间短按即可触发事件。
+当前调试硬件：Class Button Hub 为 ESP32-S3（16 MB Flash），Class Button Key
+为 XIAO ESP32-C3（外接 GPIO3 按键，深度睡眠固件），详见
+[`docs/hardware.md`](docs/hardware.md)。
+
+联调进展：2026-08-18 用两块 ESP32-S3 完成真实 ESP-NOW 双向联调；2026-08-27
+完成 S3 接收器 + C3 按钮跨芯片互通；2026-09-05 按钮固件改为深度睡眠 +
+GPIO 唤醒（冷启动零误触发，按下即唤醒发送，USB 掉线属正常现象）。
+主机正确显示 `测试学生 1`。
 
 ## 运行方式
 
@@ -41,10 +45,10 @@ just desktop
 just desktop demo # 启动后模拟一次学生按键
 ```
 
-首次运行前安装 Electron 依赖：
+首次运行前从仓库根目录安装依赖（Electron 应用与 web 共享 pnpm workspace）：
 
 ```bash
-pnpm --dir class-button/desktop install
+pnpm install
 ```
 
 启动时打开指定视频：
@@ -57,7 +61,7 @@ just desktop open /path/to/lesson.mp4
 
 ```bash
 ./class-button/scripts/package-macos.sh
-# 产物位于 class-button/dist/electron/
+# 产物位于 apps/dist/electron/
 ```
 
 Windows 版本为免安装 `.exe` 便携包。在 Windows PowerShell 中执行：

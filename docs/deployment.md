@@ -10,9 +10,9 @@ just dev
 
 This uses `docker/docker-compose.base.yaml` plus
 `docker/docker-compose.dev.yaml`. PostgreSQL and MinIO persist in Docker
-volumes, while `backend/` and `frontend/` are bind-mounted into their dev
-containers. Defaults live in `docker/.env.example`; optional local overrides
-live in the ignored `docker/.env.dev`.
+volumes, while `backend/`, `apps/web/`, and `packages/` are bind-mounted into
+their dev containers. Defaults live in `docker/.env.example`; optional local
+overrides live in the ignored `docker/.env.dev`.
 
 Useful development commands:
 

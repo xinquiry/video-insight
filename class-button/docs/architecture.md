@@ -6,13 +6,13 @@ The classroom player is split into three trust and runtime boundaries:
    configuration, Hub serial discovery, retry deduplication, the pause-only
    localhost compatibility server, `.vinsight` validation/extraction, legacy
    annotation sidecars, and normalized rich-content blocks.
-2. `desktop/src/main/` is Electron's privileged main process. It launches the
+2. `apps/desktop/src/main/` is Electron's privileged main process. It launches the
    sidecar, validates its versioned JSON-lines events, handles native file dialogs,
    leases validated media through an opaque `vinsight-media://` URL, controls the
    window, and validates renderer IPC senders.
-3. `desktop/src/renderer/` is a sandboxed React renderer. It owns player state and
+3. `apps/desktop/src/renderer/` is a sandboxed React renderer. It owns player state and
    presentation but has no Node.js, filesystem, serial, or raw Electron access.
-   `desktop/src/preload/` exposes only typed open-file, dropped-file, fullscreen,
+   `apps/desktop/src/preload/` exposes only typed open-file, dropped-file, fullscreen,
    and event-subscription operations through `contextBridge`.
 
 ## Data flow
@@ -49,10 +49,15 @@ sidecar releases its extracted video directory.
 
 ## UI system
 
-`App.tsx` is the container and reducer owner. Timeline, annotation content, upcoming
-rows, empty state, and overlay elements are presentational projections of that
-state. The palette mirrors the SaaS product (`paper #faf7f2`, `surface #fffdf9`,
-`ink #1c1a17`, `muted #8a817a`, `accent #c0512f`).
+The renderer is a thin entry that mounts the shared `@videoinsight/ui`
+application root with the desktop host implementation
+(`apps/desktop/src/renderer/platform/host.desktop.ts`). Player state, the
+annotation timeline, and the student overlay are owned by that shared React
+application; the injected `HostServices` add media caching (offline playback),
+local `.vinsight` open, and classroom button events, so the desktop differs
+from the web only through the host. The palette mirrors the SaaS product
+(`paper #faf7f2`, `surface #fffdf9`, `ink #1c1a17`, `muted #8a817a`,
+`accent #c0512f`).
 
 The renderer uses Chromium's HTML video element. MP4 with H.264/AAC and WebM are the
 supported baseline. Other extensions may be selectable for legacy parity but must
