@@ -144,8 +144,9 @@ intended role and chip explicitly.
 
 - `hardware/models/key_bottom.py` — bottom shell: hollow rounded box, rabbet
   (止口) boss, and the post that the microswitch rests against.
-- `hardware/models/key_top.py` — top shell: cover with lid, button hole
-  (Ø25.6 for the cap waist), retaining rim, and the matching rabbet groove.
+- `hardware/models/key_top.py` — top shell: cover with lid, flat top with
+  button hole (Ø25.6 for the cap waist; the cap flange seats on the flat top),
+  and the matching rabbet groove.
 - `hardware/print/` — printable STLs (`key_bottom`, `key_top`, `key_cap`).
   `key_cap.stl` is the button cap from `obj_1_arrows.stl` (Ø29.65 dome,
   Ø25 waist that slides into the top hole).
