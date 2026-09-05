@@ -20,5 +20,10 @@ docker/.env.prod
 # Hardware (3D models)
 hardware/.venv/
 hardware/**/__pycache__/
-hardware/*.blend1
+# Generated artifacts — rebuild from hardware/models/*.py, do not commit
+hardware/print/
 hardware/out/
+hardware/*.blend
+hardware/*.blend1
+hardware/*.step
+hardware/*.stl
