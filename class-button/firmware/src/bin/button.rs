@@ -1,6 +1,5 @@
 use std::{
     sync::{mpsc, Arc},
-    thread,
     time::{Duration, Instant},
 };
 
@@ -13,7 +12,12 @@ use esp_idf_svc::{
         peripherals::Peripherals,
     },
     nvs::EspDefaultNvsPartition,
-    sys::{esp_mac_type_t_ESP_MAC_WIFI_STA, esp_random, esp_read_mac},
+    sys::{
+        esp_deep_sleep_enable_gpio_wakeup, esp_deep_sleep_start, esp_mac_type_t_ESP_MAC_WIFI_STA,
+        esp_random, esp_read_mac, esp_sleep_get_wakeup_cause, esp_wifi_set_ps,
+        esp_deepsleep_gpio_wake_up_mode_t_ESP_GPIO_WAKEUP_GPIO_LOW,
+        esp_sleep_source_t_ESP_SLEEP_WAKEUP_GPIO, wifi_ps_type_t_WIFI_PS_NONE,
+    },
     wifi::{ClientConfiguration, Configuration, EspWifi},
 };
 
@@ -23,14 +27,14 @@ const DEVICE_ID: u32 = 1001;
 const BATTERY_UNKNOWN_MV: u16 = 0;
 const MAX_ATTEMPTS: u8 = 4;
 const ACK_TIMEOUT: Duration = Duration::from_millis(120);
-const DEBOUNCE: Duration = Duration::from_millis(40);
 
-// 按钮输入：C3 使用外接按键（GPIO3，低电平按下，板上拉）。
-// S3 开发板仍使用 BOOT 键（GPIO0）。
+// 按钮输入:C3 外接按键(GPIO3,低电平按下);S3 开发板用 BOOT 键(GPIO0)。
+// 两者都是 RTC IO,可作深度睡眠唤醒源。低电平唤醒时建议在 GPIO 到 3V3 间
+// 加 10kΩ 外部上拉(比内部上拉更省电、更抗干扰)。
 #[cfg(feature = "board_esp32c3")]
-const BOOT_BUTTON_GPIO: &str = "gpio3";
+const WAKEUP_GPIO: u8 = 3;
 #[cfg(not(feature = "board_esp32c3"))]
-const BOOT_BUTTON_GPIO: &str = "gpio0";
+const WAKEUP_GPIO: u8 = 0;
 
 #[derive(Debug, Clone, Copy)]
 struct Ack {
@@ -43,21 +47,35 @@ fn main() -> anyhow::Result<()> {
     esp_idf_svc::sys::link_patches();
     esp_idf_svc::log::EspLogger::initialize_default();
 
+    // 深度睡眠唤醒 = 复位重启。只有被按钮(GPIO 低电平)唤醒才发帧;
+    // 冷启动(上电/烧录/普通复位)直接回去睡,从根上杜绝上电误触发。
+    let wakeup_cause = unsafe { esp_sleep_get_wakeup_cause() };
+    if wakeup_cause != esp_sleep_source_t_ESP_SLEEP_WAKEUP_GPIO {
+        println!("INFO cold-boot cause={wakeup_cause:?} -> sleep");
+        enter_deep_sleep();
+    }
+
     let peripherals = Peripherals::take()?;
     let system_loop = EspSystemEventLoop::take()?;
     let nvs = EspDefaultNvsPartition::take()?;
 
     #[cfg(feature = "board_esp32c3")]
-    let boot_button = PinDriver::input(peripherals.pins.gpio3, Pull::Up)?;
+    let mut boot_button = PinDriver::input(peripherals.pins.gpio3, Pull::Up)?;
     #[cfg(not(feature = "board_esp32c3"))]
-    let boot_button = PinDriver::input(peripherals.pins.gpio0, Pull::Up)?;
+    let mut boot_button = PinDriver::input(peripherals.pins.gpio0, Pull::Up)?;
 
     let mut wifi = EspWifi::new(peripherals.modem, system_loop, Some(nvs))?;
     wifi.set_configuration(&Configuration::Client(ClientConfiguration::default()))?;
     wifi.start()?;
     set_radio_channel();
+    // 唤醒是短促的「发一帧 + 等 ACK」,关掉 modem sleep 以压缩本次唤醒时长。
+    unsafe {
+        esp_wifi_set_ps(wifi_ps_type_t_WIFI_PS_NONE);
+    }
 
     let mac = station_mac()?;
+    // 每次唤醒随机 session、sequence=1。主机按 (session, sequence) 去重,
+    // 新 session 会重置设备历史,因此无需 RTC 内存/NVS 持久化,也避开 flash 磨损。
     let session_id = unsafe { esp_random() };
     let espnow = Arc::new(EspNow::take()?);
     add_broadcast_peer(&espnow)?;
@@ -76,63 +94,47 @@ fn main() -> anyhow::Result<()> {
     })?;
 
     println!(
-        "INFO button-ready device={DEVICE_ID} mac={} session={session_id} channel={CHANNEL}",
+        "INFO woke-press device={DEVICE_ID} mac={} session={session_id} channel={CHANNEL}",
         mac_hex(&mac)
     );
-    println!("INFO trigger-with-boot-{BOOT_BUTTON_GPIO}");
+    send_press(&espnow, &ack_rx, session_id);
 
-    let mut sequence = 0_u32;
-    let mut was_pressed = false;
-    let mut pressed_since = None;
-    let mut last_heartbeat = Instant::now();
+    // 释放去抖:发帧后等按键确实松开(GPIO 回到高电平并稳定)再睡,
+    // 否则长按会在睡眠期间被电平反复唤醒、连发多帧。期间短暂等待,
+    // 对一次点按只增加约一个去抖窗口的唤醒时长。
+    wait_for_release(&mut boot_button);
 
+    println!("INFO done -> sleep");
+    enter_deep_sleep();
+}
+
+const RELEASE_STABLE: Duration = Duration::from_millis(60);
+
+fn wait_for_release(boot_button: &mut PinDriver<'_, esp_idf_svc::hal::gpio::Input>) {
+    // 先等到不再是低电平,再要求持续稳定 RELEASE_STABLE,覆盖机械抖动。
     loop {
-        let gpio_pressed = boot_button.is_low();
-        if gpio_pressed != was_pressed {
-            was_pressed = gpio_pressed;
-            pressed_since = Some(Instant::now());
-        }
-
-        if last_heartbeat.elapsed() >= Duration::from_secs(30) {
-            last_heartbeat = Instant::now();
-            unsafe {
-                println!(
-                    "INFO heap free={} min={}",
-                    esp_idf_svc::sys::esp_get_free_heap_size(),
-                    esp_idf_svc::sys::esp_get_minimum_free_heap_size()
-                );
+        if boot_button.is_high() {
+            std::thread::sleep(RELEASE_STABLE);
+            if boot_button.is_high() {
+                return;
             }
+        } else {
+            std::thread::sleep(Duration::from_millis(5));
         }
-
-        let stable_gpio_press = gpio_pressed
-            && pressed_since.is_some_and(|changed_at| changed_at.elapsed() >= DEBOUNCE);
-        if stable_gpio_press {
-            sequence = sequence.wrapping_add(1);
-            send_press(&espnow, &ack_rx, session_id, sequence);
-
-            if stable_gpio_press {
-                while boot_button.is_low() {
-                    thread::sleep(Duration::from_millis(10));
-                }
-                was_pressed = false;
-                pressed_since = None;
-            }
-        }
-
-        thread::sleep(Duration::from_millis(10));
     }
 }
 
-fn send_press(espnow: &EspNow<'_>, ack_rx: &mpsc::Receiver<Ack>, session_id: u32, sequence: u32) {
+fn send_press(espnow: &EspNow<'_>, ack_rx: &mpsc::Receiver<Ack>, session_id: u32) {
+    const SEQUENCE: u32 = 1;
     while ack_rx.try_recv().is_ok() {}
 
-    let message = Message::press(DEVICE_ID, session_id, sequence, BATTERY_UNKNOWN_MV);
+    let message = Message::press(DEVICE_ID, session_id, SEQUENCE, BATTERY_UNKNOWN_MV);
     for attempt in 1..=MAX_ATTEMPTS {
         if let Err(error) = espnow.send(BROADCAST, &message.encode()) {
-            println!("ERR press-send sequence={sequence} attempt={attempt} error={error:?}");
+            println!("ERR press-send attempt={attempt} error={error:?}");
             continue;
         }
-        println!("INFO press-sent sequence={sequence} attempt={attempt}");
+        println!("INFO press-sent attempt={attempt}");
 
         let deadline = Instant::now() + ACK_TIMEOUT;
         while Instant::now() < deadline {
@@ -141,9 +143,9 @@ fn send_press(espnow: &EspNow<'_>, ack_rx: &mpsc::Receiver<Ack>, session_id: u32
                 Ok(ack)
                     if ack.device_id == DEVICE_ID
                         && ack.session_id == session_id
-                        && ack.sequence == sequence =>
+                        && ack.sequence == SEQUENCE =>
                 {
-                    println!("INFO press-acked sequence={sequence} attempt={attempt}");
+                    println!("INFO press-acked attempt={attempt}");
                     return;
                 }
                 Ok(_) => continue,
@@ -151,7 +153,16 @@ fn send_press(espnow: &EspNow<'_>, ack_rx: &mpsc::Receiver<Ack>, session_id: u32
             }
         }
     }
-    println!("ERR press-unacked sequence={sequence} attempts={MAX_ATTEMPTS}");
+    println!("ERR press-unacked attempts={MAX_ATTEMPTS}");
+}
+
+// 配置 GPIO 低电平唤醒并进入深度睡眠;此函数不返回。
+fn enter_deep_sleep() -> ! {
+    unsafe {
+        let mask = 1_u64 << WAKEUP_GPIO;
+        esp_deep_sleep_enable_gpio_wakeup(mask, esp_deepsleep_gpio_wake_up_mode_t_ESP_GPIO_WAKEUP_GPIO_LOW);
+        esp_deep_sleep_start();
+    }
 }
 
 fn set_radio_channel() {
