@@ -6,7 +6,9 @@ pub const DOCUMENT_VERSION: u64 = 1;
 pub const TRACK_FORMAT: &str = "videoinsight.annotation-track";
 pub const TRACK_VERSION: u64 = 1;
 pub const ASSET_SCHEME: &str = "vinsight-asset://";
-pub const MAX_IMAGE_BYTES: u64 = 3 * 1024 * 1024;
+// 与 backend/internal/annotations MaxEmbeddedImageBytes(50 MiB)对齐:
+// 写入端放行的图片,读取端必须也能载入,否则导出包批注会被拒。
+pub const MAX_IMAGE_BYTES: u64 = 50 * 1024 * 1024;
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum ImageFormat {
@@ -81,7 +83,7 @@ pub fn decode_image_data_url(source: &str) -> Result<Option<DecodedImage>, Strin
             .decode(encoded)
             .map_err(|error| format!("图片数据不是有效 Base64：{error}"))?;
         if data.len() as u64 > MAX_IMAGE_BYTES {
-            return Err("批注图片超过 3 MiB".into());
+            return Err("批注图片超过 50 MiB".into());
         }
         if !format.has_valid_signature(&data) {
             return Err(format!("批注图片内容与 {} 不匹配", format.mime_type()));
