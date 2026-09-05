@@ -1,8 +1,11 @@
 #!/bin/sh
 set -eu
 
-project_root=$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd)
+repo_root=$(CDPATH= cd -- "$(dirname -- "$0")/../.." && pwd)
 
-pnpm --dir "$project_root/desktop" package:mac
+# The desktop app is part of the pnpm monorepo; install without --frozen-lockfile
+# so the optional mac-only dependency (dmg-license) resolves on Linux/Windows too.
+pnpm --dir "$repo_root" install
+pnpm --dir "$repo_root/apps/desktop" package:mac
 
-printf '%s\n' "$project_root/dist/electron"
+printf '%s\n' "$repo_root/apps/dist/electron"

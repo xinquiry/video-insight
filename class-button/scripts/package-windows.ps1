@@ -5,7 +5,8 @@ param(
 
 $ErrorActionPreference = "Stop"
 $ProjectRoot = Split-Path -Parent $PSScriptRoot
-$DesktopRoot = Join-Path $ProjectRoot "desktop"
+$RepoRoot = Split-Path -Parent $ProjectRoot
+$DesktopRoot = Join-Path $RepoRoot "apps\desktop"
 $TargetTriple = if ($Architecture -eq "arm64") {
     "aarch64-pc-windows-msvc"
 } else {
@@ -28,7 +29,10 @@ if (Test-Path $StagedDirectory) {
 }
 New-Item -ItemType Directory -Force $StagedDirectory | Out-Null
 Copy-Item -Force $Sidecar $StagedSidecar
+# The desktop app is part of the pnpm monorepo; install without --frozen-lockfile
+# so the optional mac-only dependency (dmg-license) resolves on Windows too.
+pnpm --dir $RepoRoot install
 pnpm --dir $DesktopRoot build
 pnpm --dir $DesktopRoot exec electron-builder --win portable zip $ElectronArch
 
-Write-Output (Join-Path $ProjectRoot "dist\electron")
+Write-Output (Join-Path $RepoRoot "apps\dist\electron")
