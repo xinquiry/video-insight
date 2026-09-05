@@ -89,6 +89,10 @@ desktop action="run" target="":
         ;;
     esac
 
+# Tag a desktop release: bump version, commit, tag, and push
+release version:
+    @exec ./scripts/release-desktop.sh {{ quote(version) }}
+
 # Verify supported products: all, unit, web, or desktop
 check scope="all":
     #!/usr/bin/env bash
