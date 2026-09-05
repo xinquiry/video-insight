@@ -50,8 +50,8 @@ jobs:
             dockerfile: ./backend/Dockerfile
             image_suffix: backend
           - service: frontend
-            context: ./frontend
-            dockerfile: ./frontend/Dockerfile
+            context: .
+            dockerfile: ./apps/web/Dockerfile
             image_suffix: frontend
 
     steps:
