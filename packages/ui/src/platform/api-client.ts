@@ -194,6 +194,45 @@ async function download(
   }
 }
 
+/**
+ * 把已就绪的 Blob 存到本地。优先用 File System Access 弹保存对话框;
+ * 不支持时回退到 <a download>。用户取消对话框时静默返回(不算失败)。
+ */
+async function saveBlob(
+  blob: Blob,
+  suggestedName: string,
+  contentType: string,
+): Promise<"saved" | "cancelled"> {
+  const picker = (window as SaveFilePickerWindow).showSaveFilePicker;
+  if (!picker) {
+    triggerBrowserDownload(blob, suggestedName);
+    return "saved";
+  }
+  let handle: SaveFileHandle;
+  try {
+    handle = await picker.call(window, {
+      suggestedName,
+      types: [{ description: "VideoInsight package", accept: { [contentType]: [".vinsight"] } }],
+    });
+  } catch (error) {
+    if (isAbortError(error)) return "cancelled";
+    throw error;
+  }
+  const writable = await handle.createWritable();
+  try {
+    await writable.write(blob);
+    await writable.close();
+  } catch (error) {
+    try {
+      await writable.abort();
+    } catch {
+      // Preserve the write error if cleanup also fails.
+    }
+    throw error;
+  }
+  return "saved";
+}
+
 export const apiClient = {
   tokenKey: TOKEN_KEY,
 
@@ -240,4 +279,5 @@ export const apiClient = {
   },
 
   download,
+  saveBlob,
 };

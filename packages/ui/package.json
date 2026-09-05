@@ -17,6 +17,7 @@
     "@tiptap/react": "catalog:",
     "@tiptap/starter-kit": "catalog:",
     "clsx": "catalog:",
+    "fflate": "catalog:",
     "i18next": "catalog:",
     "i18next-browser-languagedetector": "catalog:",
     "lucide-react": "catalog:",

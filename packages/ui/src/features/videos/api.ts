@@ -1,4 +1,10 @@
 import { apiClient } from "@/platform/api-client";
+import { downloadObject } from "@/platform/chunked-download";
+import {
+  buildVinsightPackage,
+  PACKAGE_EXTENSION,
+  PACKAGE_MIME,
+} from "@/platform/vinsight-package";
 import type {
   Annotation,
   AnnotationComment,
@@ -200,18 +206,44 @@ export function deleteVideo(id: string) {
   return apiClient.delete<void>(`/api/videos/${id}`);
 }
 
-export function exportVideo(input: {
+/**
+ * 前端导出 .vinsight。
+ *
+ * 不再走 /export 一次性流式 zip(生产隧道在大文件长连接下会掐断)。改为:
+ * 视频经 media 通道的预签名 URL 做 Range 分块下载(每块独立重试,断流只
+ * 重传当前小块),批注经 app 通道取小 JSON,前端按同一契约组 zip。进度回调
+ * 传入视频已下载字节(分母即 video.size_bytes)。
+ */
+export async function exportVideo(input: {
   id: string;
   filename: string;
-  onProgress?: (receivedBytes: number) => void;
-}) {
+  onProgress?: (receivedBytes: number, totalBytes: number) => void;
+  signal?: AbortSignal;
+}): Promise<"saved" | "cancelled"> {
+  const [video, annotations] = await Promise.all([fetchVideo(input.id), fetchAnnotations(input.id)]);
+  if (!video.playback_url) {
+    throw new Error("video has no playback URL to download from");
+  }
+  if (video.processing_status !== "ready") {
+    throw new Error("video is not ready for export");
+  }
+
+  const media = await downloadObject(video.playback_url, {
+    onProgress: input.onProgress,
+    signal: input.signal,
+  });
+  if (media.length !== video.size_bytes) {
+    throw new Error(
+      `downloaded size ${media.length} does not match video size ${video.size_bytes}`,
+    );
+  }
+
+  const packageBytes = await buildVinsightPackage({ video, annotations, media });
   const stem = input.filename.replace(/\.[^./\\]+$/, "") || "video";
-  return apiClient.download(
-    `/api/videos/${input.id}/export`,
-    `${stem}.vinsight`,
-    "application/vnd.videoinsight.package+zip",
-    input.onProgress,
-  );
+  const blob = new Blob([packageBytes.slice().buffer as ArrayBuffer], {
+    type: PACKAGE_MIME,
+  });
+  return apiClient.saveBlob(blob, `${stem}${PACKAGE_EXTENSION}`, PACKAGE_MIME);
 }
 
 export function fetchAnnotations(videoId: string) {

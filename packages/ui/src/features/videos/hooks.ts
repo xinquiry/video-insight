@@ -119,7 +119,7 @@ export function useVideoExport() {
     mutationFn: (input: { id: string; filename: string }) =>
       exportVideo({
         ...input,
-        onProgress: setReceivedBytes,
+        onProgress: (received) => setReceivedBytes(received),
       }),
     onSettled: () => setReceivedBytes(null),
   });
