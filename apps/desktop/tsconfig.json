@@ -2,7 +2,11 @@
   "compilerOptions": {
     "target": "ES2023",
     "useDefineForClassFields": true,
-    "lib": ["ES2023", "DOM", "DOM.Iterable"],
+    "lib": [
+      "ES2023",
+      "DOM",
+      "DOM.Iterable"
+    ],
     "module": "ESNext",
     "skipLibCheck": true,
     "moduleResolution": "Bundler",
@@ -17,7 +21,20 @@
     "noUnusedParameters": true,
     "noFallthroughCasesInSwitch": true,
     "noUncheckedIndexedAccess": true,
-    "types": ["node", "electron-vite/node"]
+    "ignoreDeprecations": "6.0",
+    "types": [
+      "node",
+      "electron-vite/node"
+    ],
+    "paths": {
+      "@/*": [
+        "../../packages/ui/src/*"
+      ]
+    },
+    "baseUrl": "."
   },
-  "include": ["electron.vite.config.ts", "src"]
+  "include": [
+    "electron.vite.config.ts",
+    "src"
+  ]
 }

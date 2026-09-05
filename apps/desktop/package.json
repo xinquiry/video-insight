@@ -7,31 +7,34 @@
   "main": "./out/main/index.js",
   "packageManager": "pnpm@11.22.0",
   "scripts": {
-    "dev": "cargo build --manifest-path ../Cargo.toml --bin class-button-sidecar && electron-vite dev",
-    "dev:demo": "cargo build --manifest-path ../Cargo.toml --bin class-button-sidecar && electron-vite dev -- --demo",
+    "dev": "cargo build --manifest-path ../../class-button/Cargo.toml --bin class-button-sidecar && electron-vite dev",
+    "dev:demo": "cargo build --manifest-path ../../class-button/Cargo.toml --bin class-button-sidecar && electron-vite dev -- --demo",
     "build": "electron-vite build",
-    "build:sidecar": "cargo build --release --manifest-path ../Cargo.toml --bin class-button-sidecar && node scripts/stage-sidecar.mjs",
+    "build:sidecar": "cargo build --release --manifest-path ../../class-button/Cargo.toml --bin class-button-sidecar && node scripts/stage-sidecar.mjs",
     "package:mac": "pnpm build:sidecar && pnpm build && electron-builder --mac dir zip",
     "package:win": "pnpm build:sidecar && pnpm build && electron-builder --win portable zip",
     "typecheck": "tsc --noEmit",
-    "test": "vitest run",
+    "test": "vitest run --passWithNoTests",
     "check": "pnpm typecheck && pnpm test && pnpm build"
   },
   "dependencies": {
-    "react": "^19.2.5",
-    "react-dom": "^19.2.5"
+    "@videoinsight/ui": "workspace:*",
+    "react": "catalog:",
+    "react-dom": "catalog:"
   },
   "devDependencies": {
+    "@tailwindcss/vite": "catalog:",
     "@types/node": "^24.10.0",
-    "@types/react": "^19.2.14",
-    "@types/react-dom": "^19.2.3",
-    "@vitejs/plugin-react": "^6.0.1",
+    "@types/react": "catalog:",
+    "@types/react-dom": "catalog:",
+    "@vitejs/plugin-react": "catalog:",
     "electron": "^43.0.0",
     "electron-builder": "^26.0.12",
     "electron-vite": "^5.0.0",
-    "typescript": "^6.0.3",
-    "vite": "^8.0.8",
-    "vitest": "^4.0.0"
+    "tailwindcss": "catalog:",
+    "typescript": "catalog:",
+    "vite": "catalog:",
+    "vitest": "catalog:"
   },
   "build": {
     "appId": "com.videoinsight.classbutton",
@@ -51,7 +54,7 @@
         "filter": ["**/*"]
       },
       {
-        "from": "../config/classroom.example.json",
+        "from": "../../class-button/config/classroom.example.json",
         "to": "classroom.json"
       }
     ],

@@ -2,7 +2,7 @@ import { chmod, copyFile, mkdir, rm } from "node:fs/promises";
 import path from "node:path";
 
 const executable = process.platform === "win32" ? "class-button-sidecar.exe" : "class-button-sidecar";
-const source = path.resolve("..", "target", "release", executable);
+const source = path.resolve("..", "..", "class-button", "target", "release", executable);
 const destinationDirectory = path.resolve("build-resources", "bin");
 const destination = path.join(destinationDirectory, executable);
 

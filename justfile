@@ -64,7 +64,7 @@ desktop action="run" target="":
           echo "Usage: just desktop [run|demo] or just desktop open <video>" >&2
           exit 2
         fi
-        cd class-button/desktop
+        cd apps/desktop
         exec pnpm dev
         ;;
       demo)
@@ -72,7 +72,7 @@ desktop action="run" target="":
           echo "Usage: just desktop demo" >&2
           exit 2
         fi
-        cd class-button/desktop
+        cd apps/desktop
         exec pnpm dev:demo
         ;;
       open)
@@ -80,7 +80,7 @@ desktop action="run" target="":
           echo "Usage: just desktop open <video>" >&2
           exit 2
         fi
-        cd class-button/desktop
+        cd apps/desktop
         exec pnpm dev -- --video "$target"
         ;;
       *)
@@ -101,24 +101,24 @@ check scope="all":
       (cd backend && test -z "$(gofmt -l .)")
       (cd backend && go vet ./...)
       (cd backend && go test -race ./...)
-      (cd frontend && pnpm lint)
-      (cd frontend && pnpm test)
-      (cd frontend && pnpm build)
+      (cd apps/web && pnpm lint)
+      (cd apps/web && pnpm test)
+      (cd apps/web && pnpm build)
     }
 
     check_desktop() {
       echo "Checking classroom application..."
       (cd class-button && cargo fmt --all -- --check)
       (cd class-button && cargo test --workspace)
-      (cd class-button/desktop && pnpm check)
+      (cd apps/desktop && pnpm check)
     }
 
     check_unit() {
       echo "Running unit tests..."
       (cd backend && go test -race ./...)
-      (cd frontend && pnpm test)
+      (cd apps/web && pnpm test)
       (cd class-button && cargo test --workspace)
-      (cd class-button/desktop && pnpm test)
+      (cd apps/desktop && pnpm test)
     }
 
     case "$scope" in
@@ -144,8 +144,8 @@ fix scope="all":
 
     fix_web() {
       (cd backend && gofmt -w .)
-      (cd frontend && pnpm lint:fix)
-      (cd frontend && pnpm format)
+      (cd apps/web && pnpm lint:fix)
+      (cd apps/web && pnpm format)
     }
 
     fix_desktop() {

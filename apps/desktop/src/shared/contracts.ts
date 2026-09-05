@@ -40,6 +40,24 @@ export type RawSidecarEvent =
   | { type: "media_opened"; request_id: number; media: RawPlayerMedia }
   | { type: "error"; message: string; request_id?: number };
 
+export type CacheState = "none" | "cached";
+
+export type CacheVideoRequest = {
+  videoId: string;
+  downloadUrl: string;
+  displayName: string;
+  annotations: PlayerAnnotation[];
+};
+
+export type CachedVideoMeta = {
+  videoId: string;
+  displayName: string;
+  contentType: string;
+  cachedAt: string;
+  sizeBytes: number;
+  sourceUrl: string;
+};
+
 export type DesktopEvent =
   | Exclude<RawSidecarEvent, { type: "media_opened" }>
   | { type: "media_opened"; request_id: number; media: PlayerMedia }
@@ -49,6 +67,10 @@ export type ClassButtonApi = {
   openFile: () => Promise<boolean>;
   openDroppedFile: (file: File) => Promise<boolean>;
   setFullscreen: (fullscreen: boolean) => Promise<boolean>;
+  cacheVideo: (payload: CacheVideoRequest) => Promise<{ ok: boolean; state: CacheState }>;
+  cacheStatus: (videoId: string) => Promise<CacheState>;
+  listCached: () => Promise<CachedVideoMeta[]>;
+  openCached: (videoId: string) => Promise<boolean>;
   onEvent: (listener: (event: DesktopEvent) => void) => void;
   clearEventListeners: () => void;
 };

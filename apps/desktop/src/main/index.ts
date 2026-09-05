@@ -1,8 +1,9 @@
 import { randomUUID } from "node:crypto";
-import { existsSync, statSync } from "node:fs";
-import { readFile } from "node:fs/promises";
+import { createReadStream, createWriteStream, existsSync, readFileSync, statSync } from "node:fs";
+import { mkdir, readdir, readFile, rename, rm, stat, writeFile } from "node:fs/promises";
+import { Readable } from "node:stream";
+import { pipeline } from "node:stream/promises";
 import path from "node:path";
-import { pathToFileURL } from "node:url";
 import { spawn, type ChildProcessWithoutNullStreams } from "node:child_process";
 import { createInterface } from "node:readline";
 
@@ -17,7 +18,11 @@ import {
 } from "electron";
 
 import type {
+  CacheState,
+  CachedVideoMeta,
+  CacheVideoRequest,
   DesktopEvent,
+  PlayerAnnotation,
   PlayerMedia,
   RawPlayerMedia,
   RawSidecarEvent,
@@ -25,6 +30,7 @@ import type {
 
 const APP_SCHEME = "class-button";
 const MEDIA_SCHEME = "vinsight-media";
+const CACHE_MEDIA_HOST_PREFIX = "cache-";
 const SIDECAR_PROTOCOL = 1;
 const allowedMediaExtensions = new Set([
   ".vinsight",
@@ -69,6 +75,7 @@ let rendererReady = false;
 let requestId = 0;
 let pendingEvents: DesktopEvent[] = [];
 const mediaFiles = new Map<string, string>();
+const activeCacheDownloads = new Set<string>();
 
 function isPathInside(root: string, candidate: string): boolean {
   const relative = path.relative(root, candidate);
@@ -112,10 +119,88 @@ function registerProtocols(): void {
 
   protocol.handle(MEDIA_SCHEME, (request) => {
     const requestUrl = new URL(request.url);
+    if (requestUrl.host.startsWith(CACHE_MEDIA_HOST_PREFIX)) {
+      const videoId = requestUrl.host.slice(CACHE_MEDIA_HOST_PREFIX.length);
+      const cachedPath = cachedVideoPath(videoId);
+      if (!cachedPath) return new Response("Media not cached", { status: 404 });
+      return serveLocalFile(cachedPath, request);
+    }
     const mediaPath = mediaFiles.get(requestUrl.host);
     if (!mediaPath) return new Response("Media lease expired", { status: 404 });
-    return net.fetch(pathToFileURL(mediaPath).toString(), { headers: request.headers });
+    return serveLocalFile(mediaPath, request);
   });
+}
+
+// 直接以文件流 + 手动 Range 响应服务本地视频。
+// net.fetch(file://) 对 Range 请求处理不可靠,会导致 Chromium 无法 seek(进度条拖不动)。
+function serveLocalFile(filePath: string, request: Request): Response {
+  let size: number;
+  try {
+    size = statSync(filePath).size;
+  } catch {
+    return new Response("Media missing", { status: 404 });
+  }
+  const contentType = mediaContentType(filePath);
+  const range = request.headers.get("range");
+
+  if (range) {
+    const match = /^bytes=(\d*)-(\d*)$/.exec(range.trim());
+    if (match && (match[1] !== "" || match[2] !== "")) {
+      const start = match[1] === "" ? Math.max(0, size - Number(match[2])) : Number(match[1]);
+      const end = match[2] === "" || match[1] === "" ? size - 1 : Math.min(Number(match[2]), size - 1);
+      if (start >= size || start > end) {
+        return new Response(null, {
+          status: 416,
+          headers: { "Content-Range": `bytes */${size}` },
+        });
+      }
+      const stream = createReadStream(filePath, { start, end });
+      return new Response(Readable.toWeb(stream) as ReadableStream, {
+        status: 206,
+        headers: {
+          "Content-Type": contentType,
+          "Content-Length": String(end - start + 1),
+          "Content-Range": `bytes ${start}-${end}/${size}`,
+          "Accept-Ranges": "bytes",
+        },
+      });
+    }
+  }
+
+  const stream = createReadStream(filePath);
+  return new Response(Readable.toWeb(stream) as ReadableStream, {
+    status: 200,
+    headers: {
+      "Content-Type": contentType,
+      "Content-Length": String(size),
+      "Accept-Ranges": "bytes",
+    },
+  });
+}
+
+function mediaContentType(filePath: string): string {
+  switch (path.extname(filePath).toLowerCase()) {
+    case ".mp4":
+    case ".m4v":
+      return "video/mp4";
+    case ".webm":
+      return "video/webm";
+    case ".mov":
+      return "video/quicktime";
+    case ".mkv":
+      return "video/x-matroska";
+    case ".avi":
+      return "video/x-msvideo";
+    case ".wmv":
+      return "video/x-ms-wmv";
+    case ".mpg":
+    case ".mpeg":
+      return "video/mpeg";
+    case ".m3u8":
+      return "application/vnd.apple.mpegurl";
+    default:
+      return "application/octet-stream";
+  }
 }
 
 function createWindow(): void {
@@ -189,7 +274,8 @@ function emit(event: DesktopEvent): void {
 function sidecarExecutable(): string {
   const executable = process.platform === "win32" ? "class-button-sidecar.exe" : "class-button-sidecar";
   if (app.isPackaged) return path.join(process.resourcesPath, "bin", executable);
-  return path.resolve(app.getAppPath(), "..", "target", "debug", executable);
+  // apps/desktop -> 仓库根 -> class-button/target/debug
+  return path.resolve(app.getAppPath(), "..", "..", "class-button", "target", "debug", executable);
 }
 
 function forwardedSidecarArguments(): string[] {
@@ -231,7 +317,7 @@ function startSidecar(): void {
   }
 
   sidecar = spawn(executable, forwardedSidecarArguments(), {
-    cwd: app.isPackaged ? process.resourcesPath : path.resolve(app.getAppPath(), ".."),
+    cwd: app.isPackaged ? process.resourcesPath : path.resolve(app.getAppPath(), "..", "..", "class-button"),
     stdio: ["pipe", "pipe", "pipe"],
   });
   const lines = createInterface({ input: sidecar.stdout });
@@ -269,6 +355,91 @@ function handleSidecarEvent(event: RawSidecarEvent): void {
 
   const media = exposeMedia(event.media);
   if (media) emit({ ...event, media });
+}
+
+function sanitizeVideoId(value: unknown): string | null {
+  if (typeof value !== "string") return null;
+  const videoId = value.trim();
+  return /^[A-Za-z0-9][A-Za-z0-9_-]{0,127}$/.test(videoId) ? videoId : null;
+}
+
+function cacheRoot(): string {
+  return path.join(app.getPath("userData"), "cache", "videos");
+}
+
+function cacheDir(videoId: string): string {
+  return path.join(cacheRoot(), videoId);
+}
+
+function cachedVideoPath(videoId: string): string | null {
+  try {
+    const meta = JSON.parse(readFileSync(path.join(cacheDir(videoId), "meta.json"), "utf8")) as { videoFile?: unknown };
+    if (typeof meta.videoFile !== "string" || meta.videoFile === "") return null;
+    const videoPath = path.join(cacheDir(videoId), meta.videoFile);
+    return statSync(videoPath).isFile() ? videoPath : null;
+  } catch {
+    return null;
+  }
+}
+
+function cachedMediaPayload(videoId: string): PlayerMedia | null {
+  const videoPath = cachedVideoPath(videoId);
+  if (!videoPath) return null;
+  const directory = cacheDir(videoId);
+  let meta: CachedVideoMeta;
+  let annotations: PlayerAnnotation[];
+  try {
+    meta = JSON.parse(readFileSync(path.join(directory, "meta.json"), "utf8")) as CachedVideoMeta;
+    annotations = JSON.parse(readFileSync(path.join(directory, "annotations.json"), "utf8")) as PlayerAnnotation[];
+  } catch {
+    return null;
+  }
+  return {
+    source: `${MEDIA_SCHEME}://${CACHE_MEDIA_HOST_PREFIX}${videoId}/video`,
+    display_name: meta.displayName,
+    annotations,
+    annotation_status: "本地缓存",
+  };
+}
+
+async function cacheVideo(payload: CacheVideoRequest): Promise<{ ok: boolean; state: CacheState }> {
+  const state = (): { ok: boolean; state: CacheState } => ({
+    ok: cachedVideoPath(payload.videoId) !== null,
+    state: cachedVideoPath(payload.videoId) !== null ? "cached" : "none",
+  });
+  if (activeCacheDownloads.has(payload.videoId)) return state();
+  activeCacheDownloads.add(payload.videoId);
+  const directory = cacheDir(payload.videoId);
+  const staging = `${directory}.download-${randomUUID()}`;
+  try {
+    const parsed = new URL(payload.downloadUrl);
+    if (parsed.protocol !== "http:" && parsed.protocol !== "https:") return state();
+    const response = await net.fetch(payload.downloadUrl);
+    if (!response.ok || !response.body) return state();
+    await mkdir(staging, { recursive: true });
+    const videoPath = path.join(staging, "video.bin");
+    await pipeline(Readable.fromWeb(response.body as import("node:stream/web").ReadableStream), createWriteStream(videoPath));
+    const sizeBytes = (await stat(videoPath)).size;
+    const meta: CachedVideoMeta = {
+      videoId: payload.videoId,
+      displayName: payload.displayName,
+      contentType: response.headers.get("Content-Type") ?? "application/octet-stream",
+      cachedAt: new Date().toISOString(),
+      sizeBytes,
+      sourceUrl: payload.downloadUrl,
+    };
+    await writeFile(path.join(staging, "annotations.json"), JSON.stringify(payload.annotations));
+    await writeFile(path.join(staging, "meta.json"), JSON.stringify({ ...meta, videoFile: "video.bin" }));
+    await rm(directory, { recursive: true, force: true });
+    await rename(staging, directory);
+    return { ok: true, state: "cached" };
+  } catch (error) {
+    emit({ type: "error", message: `缓存视频失败：${String(error)}` });
+    return state();
+  } finally {
+    activeCacheDownloads.delete(payload.videoId);
+    await rm(staging, { recursive: true, force: true }).catch(() => undefined);
+  }
 }
 
 function exposeMedia(media: RawPlayerMedia): PlayerMedia | null {
@@ -327,6 +498,64 @@ function registerIpc(): void {
     if (!validateSender(event.senderFrame) || typeof fullscreen !== "boolean" || !mainWindow) return false;
     mainWindow.setFullScreen(fullscreen);
     return mainWindow.isFullScreen();
+  });
+
+  ipcMain.handle("desktop:cache-video", async (event, payload: unknown) => {
+    if (!validateSender(event.senderFrame) || typeof payload !== "object" || payload === null) {
+      return { ok: false, state: "none" };
+    }
+    const candidate = payload as Partial<CacheVideoRequest>;
+    const videoId = sanitizeVideoId(candidate.videoId);
+    if (
+      !videoId ||
+      typeof candidate.downloadUrl !== "string" ||
+      typeof candidate.displayName !== "string" ||
+      !Array.isArray(candidate.annotations)
+    ) {
+      return { ok: false, state: "none" };
+    }
+    return cacheVideo({
+      videoId,
+      downloadUrl: candidate.downloadUrl,
+      displayName: candidate.displayName,
+      annotations: candidate.annotations,
+    });
+  });
+
+  ipcMain.handle("desktop:cache-status", (event, value: unknown): CacheState => {
+    const videoId = sanitizeVideoId(value);
+    if (!validateSender(event.senderFrame) || !videoId) return "none";
+    return cachedVideoPath(videoId) !== null ? "cached" : "none";
+  });
+
+  ipcMain.handle("desktop:list-cached", async (event): Promise<CachedVideoMeta[]> => {
+    if (!validateSender(event.senderFrame)) return [];
+    const result: CachedVideoMeta[] = [];
+    try {
+      for (const entry of await readdir(cacheRoot(), { withFileTypes: true })) {
+        if (!entry.isDirectory()) continue;
+        const videoId = sanitizeVideoId(entry.name);
+        if (!videoId || cachedVideoPath(videoId) === null) continue;
+        try {
+          result.push(JSON.parse(readFileSync(path.join(cacheDir(videoId), "meta.json"), "utf8")) as CachedVideoMeta);
+        } catch {
+          continue;
+        }
+      }
+    } catch {
+      return result;
+    }
+    return result;
+  });
+
+  ipcMain.handle("desktop:open-cached", (event, value: unknown) => {
+    const videoId = sanitizeVideoId(value);
+    if (!validateSender(event.senderFrame) || !videoId) return false;
+    const media = cachedMediaPayload(videoId);
+    if (!media) return false;
+    requestId += 1;
+    emit({ type: "media_opened", request_id: requestId, media });
+    return true;
   });
 }
 

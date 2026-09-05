@@ -14,6 +14,13 @@ const api: ClassButtonApi = {
   },
   setFullscreen: (fullscreen) =>
     ipcRenderer.invoke("desktop:set-fullscreen", fullscreen) as Promise<boolean>,
+  cacheVideo: (payload) =>
+    ipcRenderer.invoke("desktop:cache-video", payload) as ReturnType<ClassButtonApi["cacheVideo"]>,
+  cacheStatus: (videoId) =>
+    ipcRenderer.invoke("desktop:cache-status", videoId) as ReturnType<ClassButtonApi["cacheStatus"]>,
+  listCached: () => ipcRenderer.invoke("desktop:list-cached") as ReturnType<ClassButtonApi["listCached"]>,
+  openCached: (videoId) =>
+    ipcRenderer.invoke("desktop:open-cached", videoId) as ReturnType<ClassButtonApi["openCached"]>,
   onEvent: (listener) => {
     const wrapped = (_event: Electron.IpcRendererEvent, value: DesktopEvent) => listener(value);
     listeners.set(listener, wrapped);
