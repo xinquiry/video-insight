@@ -99,19 +99,37 @@ type SaveFilePickerWindow = Window & {
   }) => Promise<SaveFileHandle>;
 };
 
+function isAbortError(error: unknown): boolean {
+  return error instanceof DOMException && error.name === "AbortError";
+}
+
 async function download(path: string, suggestedName: string, contentType: string) {
   const picker = (window as SaveFilePickerWindow).showSaveFilePicker;
   let writable: FileSystemWritableFileStream | undefined;
   if (picker) {
-    const handle = await picker.call(window, {
-      suggestedName,
-      types: [{ description: "VideoInsight package", accept: { [contentType]: [".vinsight"] } }],
-    });
+    let handle: SaveFileHandle;
+    try {
+      handle = await picker.call(window, {
+        suggestedName,
+        types: [{ description: "VideoInsight package", accept: { [contentType]: [".vinsight"] } }],
+      });
+    } catch (error) {
+      // The user dismissed the save dialog; there is nothing to report.
+      if (isAbortError(error)) return;
+      throw error;
+    }
     writable = await handle.createWritable();
   }
 
   try {
-    const response = await fetch(url(path), { headers: authHeaders() });
+    let response: Response;
+    try {
+      response = await fetch(url(path), { headers: authHeaders() });
+    } catch (error) {
+      // Fetch rejects with TypeError when the connection drops mid-handshake.
+      if (error instanceof TypeError) throw new TypeError("Network request failed");
+      throw error;
+    }
     if (!response.ok) return await handleResponse<never>(response);
     if (writable) {
       if (response.body) {
@@ -130,10 +148,13 @@ async function download(path: string, suggestedName: string, contentType: string
     link.click();
     window.setTimeout(() => URL.revokeObjectURL(objectUrl), 1_000);
   } catch (error) {
-    try {
-      await writable?.abort();
-    } catch {
-      // Preserve the download error if cleanup also fails.
+    if (writable) {
+      // Remove the partial file so a failed export never looks complete.
+      try {
+        await writable.abort();
+      } catch {
+        // Preserve the download error if cleanup also fails.
+      }
     }
     throw error;
   }

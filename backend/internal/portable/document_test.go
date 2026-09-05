@@ -3,6 +3,7 @@ package portable
 import (
 	"archive/zip"
 	"bytes"
+	"encoding/base64"
 	"encoding/json"
 	"io"
 	"os"
@@ -131,5 +132,28 @@ func TestNewBundleExternalizesAndDeduplicatesAnnotationImages(t *testing.T) {
 	}
 	if original, _ := content["content"].([]any)[0].(map[string]any)["attrs"].(map[string]any)["src"].(string); original != source {
 		t.Fatal("export mutated the database model content")
+	}
+}
+
+func TestNewBundleAcceptsImagesLargerThanThreeMiB(t *testing.T) {
+	t.Parallel()
+	// Annotation upload accepts embedded images up to 50 MiB; export must not
+	// reject images that passed validation when they were saved.
+	png := append([]byte("\x89PNG\r\n\x1a\n"), bytes.Repeat([]byte{0xAB}, 4*1024*1024)...)
+	source := "data:image/png;base64," + base64.StdEncoding.EncodeToString(png)
+	content := map[string]any{
+		"type":    "doc",
+		"content": []any{map[string]any{"type": "image", "attrs": map[string]any{"src": source}}},
+	}
+	bundle, err := NewBundle(model.Video{
+		ID: uuid.New(), OriginalFilename: "lesson.mp4", ContentType: "video/mp4",
+	}, "media/lesson.mp4", []model.Annotation{{
+		ID: uuid.New(), TimestampSeconds: 1, DurationSeconds: 1, Content: content,
+	}}, time.Now())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(bundle.Assets) != 1 || !bytes.Equal(bundle.Assets[0].Data, png) {
+		t.Fatalf("asset = %d bytes, want original %d-byte image", len(bundle.Assets[0].Data), len(png))
 	}
 }

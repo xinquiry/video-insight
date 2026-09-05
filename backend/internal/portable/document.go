@@ -264,7 +264,9 @@ func assetFromDataURL(source string) (Asset, bool, error) {
 		if err != nil {
 			return Asset{}, false, fmt.Errorf("decode annotation image: %w", err)
 		}
-		if len(data) > 3*1024*1024 {
+		// Keep in sync with annotations.MaxEmbeddedImageBytes so every image
+		// accepted when an annotation is saved can also be exported.
+		if len(data) > 50*1024*1024 {
 			return Asset{}, false, fmt.Errorf("annotation image exceeds package limit")
 		}
 		if !validImageSignature(imageType.contentType, data) {
