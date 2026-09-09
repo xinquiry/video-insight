@@ -25,19 +25,23 @@ cargo build --release --bin button
 > export PATH=/usr/bin:$PATH
 > ```
 
-当前调试角色（目前仅一块 C3，先用作 button；receiver 仍由 S3 担任）：
+当前调试角色（多块 C3：一块固定作 receiver，其余作 button）：
 
-| 角色 | 端口 | MAC |
-| --- | --- | --- |
-| button | `/dev/cu.usbmodem101` | `44:b1:76:01:f1:1c` |
+| 角色 | MAC |
+| --- | --- |
+| receiver | `44:b1:76:01:f1:1c` |
+| button | `90:da:72:88:cc:c8` |
+| button | `90:da:72:88:be:c8` |
 
 板卡为 ESP32-C3 rev 0.4、4MB flash。两个固件固定使用 ESP-NOW channel 1，
-与 S3 版本互通。按钮的调试 `device_id` 为 `1001`，与
-`config/classroom.example.json` 对应。电池 ADC 尚未接入时上报 `0 mV`。
+与 S3 版本互通。按钮固件以 ESP-NOW 广播发送（无需配置 receiver MAC），
+receiver 广播回 ACK，因此新增 button 直接烧录即可。按钮的调试 `device_id`
+为 `1001`，与 `config/classroom.example.json` 对应。电池 ADC 尚未接入时
+上报 `0 mV`。
 
-烧录：
+烧录（按角色选择 `receiver` 或 `button`）：
 
 ```bash
 espflash flash --port /dev/cu.usbmodem101 \
-  target/riscv32imc-esp-espidf/release/button
+  target/riscv32imc-esp-espidf/release/receiver
 ```

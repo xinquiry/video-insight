@@ -23,7 +23,15 @@ use esp_idf_svc::{
 
 const CHANNEL: u8 = 1;
 const BROADCAST: [u8; 6] = [0xff; 6];
-const DEVICE_ID: u32 = 1001;
+// device_id 在烧录时经环境变量 DEVICE_ID 注入（见 scripts/flash-c3.sh），
+// 未注入时回落到调试值 1001。
+const DEVICE_ID: u32 = match option_env!("DEVICE_ID") {
+    Some(raw) => match u32::from_str_radix(raw, 10) {
+        Ok(id) => id,
+        Err(_) => panic!("DEVICE_ID must be a decimal u32"),
+    },
+    None => 1001,
+};
 const BATTERY_UNKNOWN_MV: u16 = 0;
 const MAX_ATTEMPTS: u8 = 4;
 const ACK_TIMEOUT: Duration = Duration::from_millis(120);
