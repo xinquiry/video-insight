@@ -42,10 +42,7 @@ const WIFI_START_TIMEOUT: Duration = Duration::from_secs(3);
 
 // 按钮输入: C3 外接按键(GPIO3, 低电平按下), RTC IO, 可作深度睡眠唤醒源。
 // 低电平唤醒时建议在 GPIO 到 3V3 间加 10kΩ 外部上拉。
-#[cfg(feature = "board_esp32c3")]
 const WAKEUP_GPIO: u8 = 3;
-#[cfg(not(feature = "board_esp32c3"))]
-const WAKEUP_GPIO: u8 = 0;
 
 const BROADCAST: [u8; 6] = [0xff; 6];
 
@@ -128,10 +125,7 @@ fn main() -> anyhow::Result<()> {
     let system_loop = EspSystemEventLoop::take()?;
     let nvs = EspDefaultNvsPartition::take()?;
 
-    #[cfg(feature = "board_esp32c3")]
     let mut boot_button = PinDriver::input(peripherals.pins.gpio3, Pull::Up)?;
-    #[cfg(not(feature = "board_esp32c3"))]
-    let mut boot_button = PinDriver::input(peripherals.pins.gpio0, Pull::Up)?;
 
     let mut wifi = EspWifi::new(peripherals.modem, system_loop.clone(), Some(nvs))?;
     wifi.set_configuration(&Configuration::Client(ClientConfiguration::default()))?;

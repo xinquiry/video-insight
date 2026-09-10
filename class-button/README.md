@@ -21,12 +21,12 @@ Rust workspace 包括：
 Electron 播放器本体位于仓库根的 `apps/desktop/`，渲染层复用共享
 `@videoinsight/ui` 前端；本目录只包含 Rust、固件、打包脚本与浏览器适配器。
 
-当前调试硬件：Class Button Hub 为 ESP32-S3（16 MB Flash），Class Button Key
-为 XIAO ESP32-C3（外接 GPIO3 按键，深度睡眠固件），详见
+当前调试硬件：Class Button Hub 与 Class Button Key 均为 ESP32-C3（按钮外接
+GPIO3 按键，深度睡眠固件），详见
 [`docs/hardware.md`](docs/hardware.md)。
 
-联调进展：2026-08-18 用两块 ESP32-S3 完成真实 ESP-NOW 双向联调；2026-08-27
-完成 S3 接收器 + C3 按钮跨芯片互通；2026-09-05 按钮固件改为深度睡眠 +
+联调进展：2026-09-10 完成全 C3 单播 ESP-NOW 联调（按钮连按 10 次全部送达、
+ACK 10/10 真实回执）；2026-09-05 按钮固件改为深度睡眠 +
 GPIO 唤醒（冷启动零误触发，按下即唤醒发送，USB 掉线属正常现象）。
 主机正确显示 `测试学生 1`。
 
