@@ -7,8 +7,8 @@
 - **Class Button Key（学生按钮）**：只需要独立供电，通过 ESP-NOW 与 Hub 通信，
   不需要连接教师电脑，也不依赖教室 Wi-Fi。
 
-当前调试硬件：Class Button Hub 为 ESP32-S3；Class Button Key 为 ESP32-C3，
-外接 GPIO3 按键并运行深度睡眠固件。Key 睡眠时 USB-Serial-JTAG 掉线、
+当前调试硬件：Class Button Hub 与 Class Button Key 均为 ESP32-C3，
+外接 GPIO3 按钮运行深度睡眠固件。Key 睡眠时 USB-Serial-JTAG 掉线、
 设备管理器中的端口消失属正常现象；按下按键即唤醒并发送一次请求。
 详见 [`hardware.md`](hardware.md)。
 

@@ -2,26 +2,53 @@
 
 ## 当前接入设备
 
-2026-08-18 在开发机上通过 `espflash board-info` 确认两块 ESP32-S3 开发板；
-2026-08-27 接入一块 ESP32-C3，将 button 角色迁移到 C3：
+2026-09-10 起全面切换到 **全 C3** 方案：
 
-| 角色 | 芯片 | Flash | MAC | macOS 调试端口 |
-| --- | --- | --- | --- | --- |
-| Class Button Hub（教师接收器） | ESP32-S3 rev 0.2 | 16 MB | `e0:72:a1:d2:62:d8` | `/dev/cu.usbserial-A5069RR4` |
-| Class Button Key（学生按钮） | ESP32-C3 rev 0.4 | 4 MB | `44:b1:76:01:f1:1c` | `/dev/cu.usbmodem101` |
-| 备用 S3（原 receiver 调试板） | ESP32-S3 rev 0.2 | 16 MB | `e8:3d:c1:f1:ad:24` | `/dev/cu.usbmodem5C4C1417221` |
+| 角色 | 芯片 | Flash | MAC | 烧录参数 | macOS 调试端口 |
+| --- | --- | --- | --- | --- | --- |
+| Class Button Hub（教师接收器） | ESP32-C3 rev 0.4 | 4 MB | `44:b1:76:01:f1:1c` | `flash-c3.sh receiver` | `/dev/cu.usbmodem101` |
+| Class Button Key 1（device 1001） | ESP32-C3 rev 0.4 | 4 MB | `90:da:72:88:cc:c8` | `flash-c3.sh button 1001 44b17601f11c` | `usbmodem*`（深度睡眠时会消失，属正常） |
+| Class Button Key 2（device 1002） | ESP32-C3 rev 0.4 | 4 MB | `90:da:72:88:be:c8` | `flash-c3.sh button 1002 44b17601f11c` | 同上 |
+| Class Button Key 3（device 1003） | ESP32-C3 rev 0.4 | 4 MB | `48:f6:ee:17:36:bc` | `flash-c3.sh button 1003 44b17601f11c` | 同上 |
 
+按钮只携带数字 `device_id`，学生姓名/座位/班级由主机侧配置文件映射
+（`config/classroom.example.json`，桌面端同源），固件不需重刷即可改。
+接收器从 Press 帧动态学习按钮 MAC（零配置新增学生）。
+设备均为 C3，走芯片内置 USB-Serial-JTAG（`cu.usbmodem*`）。
 端口名称可能因 USB 接口或电脑变化，程序不应硬编码；可使用 `class-button ports` 重新发现。
+C3 可通过 `espflash board-info --port <端口>` 用芯片 MAC 与上表核对身份。
+按钮 1、2 的 MAC 仅末字节不同（`cc:c8` / `be:c8`），按钮 3 为 `48:f6…` 前缀，
+核对时勿看错。
 
 ## 固件策略
 
-双端固件源码共享，放在 `firmware/src/bin`，由两个独立的 ESP-IDF Cargo 工程
-分别构建：`firmware/esp32s3`（xtensa 目标）与 `firmware/esp32c3`
-（riscv32imc 目标），沿用 OpenSDL 的 `esp-idf-svc` 技术路线。
-它们依赖主 workspace 中的 `class-button-protocol`，但不会加入主 workspace，
-避免 ESP-IDF 目标影响主机端的常规 `cargo test`。两块芯片的 ESP-NOW 帧互通，
-按钮输入通过 cargo feature 区分：S3 使用板上 BOOT 键（GPIO0），C3 使用
-外接按键（GPIO3，低电平按下，靠内部上拉）。
+双端固件源码共享，放在 `firmware/src/bin`，由独立的 ESP-IDF Cargo 工程
+`firmware/esp32c3`（riscv32imc 目标）构建，沿用 OpenSDL 的 `esp-idf-svc` 技术路线。
+它依赖主 workspace 中的 `class-button-protocol`，但不会加入主 workspace，
+避免 ESP-IDF 目标影响主机端的常规 `cargo test`。
+接收器与按钮都烧 `firmware/esp32c3` 构建（receiver / button 两个 bin）。
+按钮输入使用外接按键（GPIO3，低电平按下，靠内部上拉）。
+
+## ESP-NOW 可靠性：单播 + 动态学习
+
+旧版固件双方向都用广播地址（FF:FF:…）盲发：802.11 广播帧没有 MAC 层确认
+和硬件重传，每次发送都是一次性，可靠性全靠按钮侧 4 次应用层重试，
+是「偶发丢包」的主要来源。2026-09-10 起改为：
+
+- **按钮 → 接收器：单播**。接收器 MAC 在烧录时经 `RECEIVER_MAC` 环境变量
+  编译进固件（如 `44b17601f11c`），单播帧自动获得 MAC 层重传；
+  未注入时回落到广播盲发（仅调试用，会打印 WARNING）。
+- **接收器 → 按钮：单播 + 动态学习**。接收器从 Press 帧的 `src_addr`
+  学到按钮 MAC，首次见到就 `add_peer`（已存在则刷新），后续 ACK 单播回去。
+  新增学生按钮零配置。
+- **两端的 ESP-NOW peer 信道均设 0**（跟随当前信道），信道只由
+  `set_radio_channel`（channel 1）单点决定，避免双处配置漂移。
+- **信道设置时序**：`wifi.start()` 后事件驱动地等 `WIFI_STA_START`
+  再设信道，失败硬报错（旧版只 warn 后继续，存在竞态）。
+- **TX 状态回调**：注册 `esp_now_send` 回调，空中失败/重传耗尽会打
+  `INFO tx-status ... status=fail` 日志，不再只能看到「已入队」。
+- 按钮 ACK 过滤只信来自指定接收器 MAC 的帧，忽略信道上其他 ESP 噪声。
+- 应用层 ACK + 主机 `(session, sequence)` 去重保持不变。
 
 ## 按钮低功耗：深度睡眠 + GPIO 唤醒
 
@@ -49,6 +76,23 @@ C3 按钮固件为电池供电设计，不再常开轮询，改为**事件驱动
 手动进下载模式——**按住 BOOT 键不放，点按一下 RST（或重新上电），再松开 BOOT**，
 芯片停在下载模式后即可正常 `espflash flash`。
 
+## 2026-09-10 联调结果（全 C3 + 单播固件）
+
+- 接收器 `44:b1:76:01:f1:1c`（`usbmodem101`）、按钮 1 `90:da:72:88:cc:c8`
+  （device 1001）、按钮 2 `90:da:72:88:be:c8`（device 1002），
+  均为 ESP32-C3 rev 0.4。
+- 按钮固件烧入 `RECEIVER_MAC=44b17601f11c`，单播发送；`device_id` 分别为
+  1001 / 1002，学生姓名/座位由主机配置映射（固件不含姓名）。
+- 按钮 1 连按 10 次全部收到 EV 帧，接收器 10/10 单播 ACK 真实送达
+  （`tx-status status=ok`），无一次应用层重发。接收器首帧即学习到按钮
+  MAC（`peer-learned`）。
+- 验证通过：信道时序修复（等 WIFI_STA_START 再设信道，失败硬报错）+
+  单播化后链路稳定。注意：事件回调订阅必须在 `wifi.start()` 之前，
+  否则错过事件（曾导致接收器卡在等待 STA 启动）。
+- 按钮烧录后如停在下载模式，单独点 RST 即可正常启动回睡。
+- 多按钮共用同一个接收器，`class-button listen` 能同时区分两个
+  device_id 的事件；两块按钮的构建目录按 device-id/mcu-mac 隔离。
+
 ## 2026-08-18 联调结果
 
 - 接收器和按钮固件均以 release 模式成功构建并烧录。
@@ -56,16 +100,15 @@ C3 按钮固件为电池供电设计，不再常开轮询，改为**事件驱动
 - 按钮两次测试均在第 1 次发送后收到应用层 ACK。
 - 接收器两次输出合法 `EV` 帧，主机均映射为设备 `1001`、学生“测试学生 1”。
 - 按钮每次启动使用随机 session ID，sequence 从 1 开始；主机可正确区分重启与重发。
-- 最终按钮固件只接受物理按键输入（S3 为 BOOT/GPIO0，C3 为外接 GPIO3），已移除会造成控制台回显的串口触发入口。
+- 最终按钮固件只接受物理按键输入（外接 GPIO3），已移除会造成控制台回显的串口触发入口。
 - 电池 ADC 尚未连接，目前上报 `0 mV`。
 
-## 2026-08-27 联调结果（S3 receiver + C3 button）
+## 2026-08-27 联调结果（C3 receiver + C3 button）
 
-- 接收器改由备用 S3（`e0:72:a1:d2:62:d8`）担任，烧录 esp32s3 receiver 固件；
-  C3 烧录 esp32c3 button 固件，按键改接 GPIO3（杜邦线 + 微动开关，低电平按下）。
+- 接收器与按钮均烧录 esp32c3 固件，按键接 GPIO3（杜邦线 + 微动开关，低电平按下）。
 - 8 次按键均在第 1 次发送后收到应用层 ACK，无重发。
 - 主机 `class-button listen` 全部映射为设备 `1001`、学生“测试学生 1”，
-  session/sequence 连续，跨芯片 ESP-NOW 互通验证通过。
+  session/sequence 连续。
 - 测试环境 channel 1 上存在其他 ESP 设备广播噪声（两个陌生 MAC 的短帧），
   固件按预期拒收，不影响按钮链路。
 
@@ -82,12 +125,12 @@ C3 按钮固件为电池供电设计，不再常开轮询，改为**事件驱动
 
 ```bash
 cargo run --bin class-button -- listen \
-  --port /dev/cu.usbserial-A5069RR4 \
+  --port /dev/cu.usbmodem101 \
   --config config/classroom.example.json
 ```
 
-监听启动后，短按按钮即可产生事件（S3 板按 BOOT 键，C3 按外接 GPIO3 按键）。
-不要按住 S3 的 BOOT 后复位，否则芯片会进入下载模式而不是正常启动固件。
+监听启动后，短按按钮即可产生事件（C3 按外接 GPIO3 按键）。
+烧录时进入下载模式的操作见上节“烧录注意”。
 
 ## C3 串口观察
 

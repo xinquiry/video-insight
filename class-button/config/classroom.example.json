@@ -10,6 +10,11 @@
       "device_id": 1002,
       "student": "测试学生 2",
       "seat": "A2"
+    },
+    {
+      "device_id": 1003,
+      "student": "测试学生 3",
+      "seat": "A3"
     }
   ]
 }

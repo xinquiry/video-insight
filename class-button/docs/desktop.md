@@ -16,7 +16,7 @@ Electron 桌面应用是 VideoInsight 的只读课堂播放端。批注仍由 Sa
   通过带版本的 JSON-lines 协议把事件交给 Electron main。
 - Electron renderer 开启 sandbox 与 context isolation，不启用 Node.js；preload
   只暴露打开文件、拖放文件、全屏和事件订阅 API。
-- ESP32-S3 固件仍是独立 Cargo workspace；桌面构建不需要 ESP-IDF 工具链。
+- ESP32-C3 固件仍是独立 Cargo workspace；桌面构建不需要 ESP-IDF 工具链。
 - React reducer 集中保存播放/课堂状态，组件只负责播放器、批注、时间轴和提示层
   的呈现。
 

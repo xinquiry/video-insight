@@ -6,7 +6,7 @@
 - Frontend: React 19 + TanStack Router + TanStack Query + TailwindCSS 4, built with Vite in a pnpm monorepo (`packages/ui` shared by `apps/web` and `apps/desktop`).
 - Classroom: an Electron + React + Vite desktop player in `apps/desktop/`
   backed by a nested Rust workspace for the sidecar, serial host tools, protocol,
-  and browser adapter. ESP32-S3/ESP32-C3 firmware is a separate nested workspace
+  and browser adapter. ESP32-C3 firmware is a separate nested workspace
   so its ESP-IDF target does not affect host builds.
 - Storage: PostgreSQL 16 plus MinIO locally or Cloudflare R2 in production.
 - Orchestration: layered Docker Compose driven by `scripts/dev.sh` and `scripts/deploy-prod.sh`.
@@ -106,14 +106,12 @@ Production nginx serves the web bundle and proxies `/api` to the Go service.
   localhost WebSocket service. Student identity intentionally stays in the native
   process and is not sent to arbitrary webpages.
 - `firmware/src/bin/` — shared `button` and `receiver` firmware sources,
-  built for both chips.
-- `firmware/esp32s3/` and `firmware/esp32c3/` — standalone ESP-IDF Cargo
-  packages (xtensa and riscv32imc targets) that build the shared sources for
-  each chip. The S3 board uses its BOOT button (GPIO0); the C3 button uses an
-  external active-low button on GPIO3 and sleeps between presses
-  (deep sleep + GPIO wake), selected by the `board_esp32c3` cargo feature.
-  Do not add them to the host
-  workspace or run host-wide Cargo commands from these directories.
+  built for ESP32-C3.
+- `firmware/esp32c3/` — the standalone ESP-IDF Cargo package (riscv32imc
+  target) that builds the shared sources. Both the receiver (Hub) and button
+  (Key) run ESP32-C3 boards; the button uses an external active-low button on
+  GPIO3 and sleeps between presses (deep sleep + GPIO wake). Do not add it to
+  the host workspace or run host-wide Cargo commands from this directory.
 
 The Electron application itself lives in `apps/desktop/` (see Frontend
 monorepo above); `class-button/` contains only the Rust workspace, firmware,
