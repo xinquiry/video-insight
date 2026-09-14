@@ -53,6 +53,27 @@ services:
       timeout: 5s
       retries: 3
 
+  tbox-webdav:
+    profiles: ["drive-export"]
+    build:
+      context: ..
+      dockerfile: docker/tbox-webdav.Dockerfile
+      target: production
+    image: videoinsight-tbox-webdav:1.0.1
+    restart: unless-stopped
+    env_file:
+      - .env.example
+      - .env.prod
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          "curl --fail --silent --output /dev/null --request PROPFIND --header 'Depth: 0' --user \"$${DRIVE_EXPORT_USERNAME}:$${DRIVE_EXPORT_PASSWORD}\" http://127.0.0.1:65472/",
+        ]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+
   minio:
     image: minio/minio:RELEASE.2025-09-07T16-13-09Z
     restart: unless-stopped

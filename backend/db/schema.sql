@@ -44,6 +44,27 @@ CREATE INDEX ix_videos_group_id ON videos (group_id);
 CREATE INDEX ix_videos_processing_queue
     ON videos (processing_status, processing_available_at);
 
+CREATE TABLE drive_exports (
+    video_id uuid NOT NULL UNIQUE REFERENCES videos(id) ON DELETE CASCADE,
+    group_id uuid NOT NULL REFERENCES groups(id) ON DELETE CASCADE,
+    requested_by uuid NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    status varchar DEFAULT 'pending' NOT NULL,
+    destination_path varchar NOT NULL,
+    size_bytes bigint,
+    error varchar,
+    attempts integer DEFAULT 0 NOT NULL,
+    started_at timestamp without time zone,
+    available_at timestamp without time zone DEFAULT now() NOT NULL,
+    completed_at timestamp without time zone,
+    id uuid DEFAULT gen_random_uuid() NOT NULL PRIMARY KEY,
+    created_at timestamp without time zone DEFAULT now() NOT NULL,
+    updated_at timestamp without time zone DEFAULT now()
+);
+ALTER TABLE drive_exports ADD CONSTRAINT ck_drive_exports_status
+    CHECK (status IN ('pending', 'preparing', 'uploading', 'completed', 'failed'));
+CREATE INDEX ix_drive_exports_queue ON drive_exports (status, available_at);
+CREATE INDEX ix_drive_exports_group_id ON drive_exports (group_id);
+
 CREATE TABLE annotations (
     video_id uuid NOT NULL REFERENCES videos(id) ON DELETE CASCADE,
     timestamp_seconds double precision NOT NULL,

@@ -148,6 +148,16 @@
       "started": "VideoInsight package saved.",
       "failed": "Export could not be prepared."
     },
+    "driveExport": {
+      "action": "Export to drive",
+      "pending": "Drive export queued",
+      "preparing": "Packaging for drive…",
+      "uploading": "Uploading to drive…",
+      "retry": "Retry drive export",
+      "again": "Export to drive again",
+      "hint": "Creates the portable package on the server and uploads it to the configured drive.",
+      "failed": "Drive export failed."
+    },
     "videoUnavailable": "Video URL unavailable.",
     "processing": {
       "inProgress": "Optimizing this video for reliable browser playback…",

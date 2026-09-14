@@ -260,6 +260,9 @@ func (s *Service) Delete(ctx context.Context, videoID, groupID uuid.UUID) error 
 		if found && current.ProcessingStatus == model.VideoProcessingProcessing {
 			return apperror.New(http.StatusConflict, "Video is currently being processed")
 		}
+		if found {
+			return apperror.New(http.StatusConflict, "Video is currently being exported to the drive")
+		}
 		return apperror.New(http.StatusNotFound, "Video not found")
 	}
 	return s.storage.DeleteObject(ctx, video.ObjectKey)

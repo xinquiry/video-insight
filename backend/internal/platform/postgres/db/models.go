@@ -40,6 +40,23 @@ type AnnotationComment struct {
 	UpdatedAt    pgtype.Timestamp `json:"updated_at"`
 }
 
+type DriveExport struct {
+	VideoID         uuid.UUID        `json:"video_id"`
+	GroupID         uuid.UUID        `json:"group_id"`
+	RequestedBy     uuid.UUID        `json:"requested_by"`
+	Status          string           `json:"status"`
+	DestinationPath string           `json:"destination_path"`
+	SizeBytes       *int64           `json:"size_bytes"`
+	Error           *string          `json:"error"`
+	Attempts        int32            `json:"attempts"`
+	StartedAt       pgtype.Timestamp `json:"started_at"`
+	AvailableAt     pgtype.Timestamp `json:"available_at"`
+	CompletedAt     pgtype.Timestamp `json:"completed_at"`
+	ID              uuid.UUID        `json:"id"`
+	CreatedAt       pgtype.Timestamp `json:"created_at"`
+	UpdatedAt       pgtype.Timestamp `json:"updated_at"`
+}
+
 type Group struct {
 	Name      string           `json:"name"`
 	ID        uuid.UUID        `json:"id"`

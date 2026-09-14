@@ -6,11 +6,13 @@ import {
   createAnnotationComment,
   deleteAnnotation,
   deleteVideo,
+  exportVideo,
   fetchAnnotations,
   fetchAnnotationComments,
+  fetchDriveExport,
   fetchVideo,
   fetchVideos,
-  exportVideo,
+  queueDriveExport,
   updateAnnotation,
   updateVideo,
   uploadVideo,
@@ -124,6 +126,31 @@ export function useVideoExport() {
     onSettled: () => setReceivedBytes(null),
   });
   return { ...mutation, receivedBytes };
+}
+
+export function useDriveExport(videoId: string) {
+  const queryClient = useQueryClient();
+  const status = useQuery({
+    queryKey: ["drive-export", videoId],
+    queryFn: () => fetchDriveExport(videoId),
+    refetchOnWindowFocus: false,
+    refetchInterval: (query) => {
+      const state = query.state.data?.export?.status;
+      return state === "pending" || state === "preparing" || state === "uploading"
+        ? 2_000
+        : false;
+    },
+  });
+  const queue = useMutation({
+    mutationFn: () => queueDriveExport(videoId),
+    onSuccess: (job) => {
+      queryClient.setQueryData(["drive-export", videoId], {
+        enabled: true,
+        export: job,
+      });
+    },
+  });
+  return { status, queue };
 }
 
 export function useAnnotations(videoId: string) {

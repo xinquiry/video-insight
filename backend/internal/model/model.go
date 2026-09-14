@@ -51,6 +51,33 @@ type Video struct {
 	UpdatedAt             *time.Time
 }
 
+type DriveExportStatus string
+
+const (
+	DriveExportPending   DriveExportStatus = "pending"
+	DriveExportPreparing DriveExportStatus = "preparing"
+	DriveExportUploading DriveExportStatus = "uploading"
+	DriveExportCompleted DriveExportStatus = "completed"
+	DriveExportFailed    DriveExportStatus = "failed"
+)
+
+type DriveExport struct {
+	ID              uuid.UUID
+	VideoID         uuid.UUID
+	GroupID         uuid.UUID
+	RequestedBy     uuid.UUID
+	Status          DriveExportStatus
+	DestinationPath string
+	SizeBytes       *int64
+	Error           *string
+	Attempts        int
+	StartedAt       *time.Time
+	AvailableAt     time.Time
+	CompletedAt     *time.Time
+	CreatedAt       time.Time
+	UpdatedAt       *time.Time
+}
+
 type Annotation struct {
 	ID               uuid.UUID
 	VideoID          uuid.UUID

@@ -8,6 +8,8 @@ import {
 import type {
   Annotation,
   AnnotationComment,
+  DriveExport,
+  DriveExportStatus,
   PaginatedResponse,
   RichTextDocument,
   Video,
@@ -204,6 +206,14 @@ export function updateVideo(id: string, data: { title?: string; description?: st
 
 export function deleteVideo(id: string) {
   return apiClient.delete<void>(`/api/videos/${id}`);
+}
+
+export function fetchDriveExport(id: string) {
+  return apiClient.get<DriveExportStatus>(`/api/videos/${id}/drive-export`);
+}
+
+export function queueDriveExport(id: string) {
+  return apiClient.post<DriveExport>(`/api/videos/${id}/drive-export`, {});
 }
 
 /**

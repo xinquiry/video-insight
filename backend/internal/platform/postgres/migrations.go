@@ -89,6 +89,44 @@ CREATE INDEX IF NOT EXISTS ix_videos_processing_queue
     ON videos (processing_status, processing_available_at);
 `
 
+const driveExportsMigration = `
+CREATE TABLE IF NOT EXISTS drive_exports (
+    video_id uuid NOT NULL UNIQUE REFERENCES videos(id) ON DELETE CASCADE,
+    group_id uuid NOT NULL REFERENCES groups(id) ON DELETE CASCADE,
+    requested_by uuid NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    status varchar DEFAULT 'pending' NOT NULL,
+    destination_path varchar NOT NULL,
+    size_bytes bigint,
+    error varchar,
+    attempts integer DEFAULT 0 NOT NULL,
+    started_at timestamp without time zone,
+    available_at timestamp without time zone DEFAULT now() NOT NULL,
+    completed_at timestamp without time zone,
+    id uuid DEFAULT gen_random_uuid() NOT NULL PRIMARY KEY,
+    created_at timestamp without time zone DEFAULT now() NOT NULL,
+    updated_at timestamp without time zone DEFAULT now()
+);
+
+DO $migration$
+BEGIN
+    IF NOT EXISTS (
+        SELECT 1
+        FROM pg_constraint
+        WHERE conname = 'ck_drive_exports_status'
+          AND conrelid = 'drive_exports'::regclass
+    ) THEN
+        ALTER TABLE drive_exports ADD CONSTRAINT ck_drive_exports_status
+            CHECK (status IN ('pending', 'preparing', 'uploading', 'completed', 'failed'));
+    END IF;
+END
+$migration$;
+
+CREATE INDEX IF NOT EXISTS ix_drive_exports_queue
+    ON drive_exports (status, available_at);
+CREATE INDEX IF NOT EXISTS ix_drive_exports_group_id
+    ON drive_exports (group_id);
+`
+
 type migration struct {
 	version string
 	sql     string
@@ -99,6 +137,7 @@ type migration struct {
 var migrations = []migration{
 	{version: "202608200001_rich_text_annotations_and_comments", sql: annotationRichTextMigration},
 	{version: "202608210001_video_processing", sql: videoProcessingMigration},
+	{version: "202609140001_drive_exports", sql: driveExportsMigration},
 }
 
 func runMigrations(ctx context.Context, pool *pgxpool.Pool) error {

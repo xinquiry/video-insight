@@ -39,3 +39,24 @@ func TestLoadCanDisableStartupAdminSeed(t *testing.T) {
 		t.Fatal("startup admin seed should be disabled")
 	}
 }
+
+func TestLoadDriveExportConfiguration(t *testing.T) {
+	t.Setenv("DRIVE_EXPORT_ENABLED", "true")
+	t.Setenv("DRIVE_EXPORT_WEBDAV_URL", "http://tbox-webdav:65472")
+	t.Setenv("DRIVE_EXPORT_USERNAME", "videoinsight")
+	t.Setenv("DRIVE_EXPORT_PASSWORD", "drive-secret")
+	cfg, err := Load()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !cfg.DriveExportEnabled || cfg.DriveExportDestinationRoot != "VideoInsight" {
+		t.Fatalf("drive export config: %+v", cfg)
+	}
+}
+
+func TestLoadRejectsIncompleteDriveExportConfiguration(t *testing.T) {
+	t.Setenv("DRIVE_EXPORT_ENABLED", "true")
+	if _, err := Load(); err == nil {
+		t.Fatal("expected missing drive export password to fail validation")
+	}
+}

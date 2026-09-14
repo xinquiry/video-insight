@@ -27,6 +27,24 @@ export interface Video {
   updated_at: string | null;
 }
 
+export interface DriveExport {
+  id: string;
+  video_id: string;
+  status: "pending" | "preparing" | "uploading" | "completed" | "failed";
+  destination_path: string;
+  size_bytes: number | null;
+  error: string | null;
+  attempts: number;
+  created_at: string;
+  updated_at: string | null;
+  completed_at: string | null;
+}
+
+export interface DriveExportStatus {
+  enabled: boolean;
+  export: DriveExport | null;
+}
+
 export interface Group {
   id: string;
   name: string;

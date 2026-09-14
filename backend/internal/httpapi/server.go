@@ -19,6 +19,7 @@ import (
 
 	"github.com/xinquiry/video-insight/backend/internal/annotations"
 	"github.com/xinquiry/video-insight/backend/internal/auth"
+	"github.com/xinquiry/video-insight/backend/internal/driveexports"
 	"github.com/xinquiry/video-insight/backend/internal/groups"
 	"github.com/xinquiry/video-insight/backend/internal/model"
 	"github.com/xinquiry/video-insight/backend/internal/portable"
@@ -29,14 +30,15 @@ import (
 type Pinger interface{ Ping(context.Context) error }
 
 type Server struct {
-	auth        *auth.Service
-	groups      *groups.Service
-	videos      *videos.Service
-	annotations *annotations.Service
-	tokens      *auth.TokenManager
-	ready       Pinger
-	logger      *slog.Logger
-	origins     map[string]struct{}
+	auth         *auth.Service
+	groups       *groups.Service
+	videos       *videos.Service
+	annotations  *annotations.Service
+	driveExports *driveexports.Service
+	tokens       *auth.TokenManager
+	ready        Pinger
+	logger       *slog.Logger
+	origins      map[string]struct{}
 }
 
 type contextKey string
@@ -53,6 +55,7 @@ func New(
 	groupService *groups.Service,
 	videoService *videos.Service,
 	annotationService *annotations.Service,
+	driveExportService *driveexports.Service,
 	tokens *auth.TokenManager,
 	ready Pinger,
 	logger *slog.Logger,
@@ -60,7 +63,8 @@ func New(
 ) http.Handler {
 	server := &Server{
 		auth: authService, groups: groupService, videos: videoService, annotations: annotationService,
-		tokens: tokens, ready: ready, logger: logger, origins: make(map[string]struct{}, len(corsOrigins)),
+		driveExports: driveExportService,
+		tokens:       tokens, ready: ready, logger: logger, origins: make(map[string]struct{}, len(corsOrigins)),
 	}
 	for _, origin := range corsOrigins {
 		server.origins[origin] = struct{}{}
@@ -88,6 +92,8 @@ func New(
 			protected.Post("/videos", server.completeUpload)
 			protected.Get("/videos/{videoID}", server.getVideo)
 			protected.Get("/videos/{videoID}/export", server.exportVideo)
+			protected.Get("/videos/{videoID}/drive-export", server.getDriveExport)
+			protected.Post("/videos/{videoID}/drive-export", server.queueDriveExport)
 			protected.Patch("/videos/{videoID}", server.updateVideo)
 			protected.Delete("/videos/{videoID}", server.deleteVideo)
 			protected.Get("/videos/{videoID}/annotations", server.listAnnotations)
@@ -304,6 +310,33 @@ func (s *Server) exportVideo(w http.ResponseWriter, r *http.Request) {
 	if err := portable.WritePackage(w, bundle, result.Media); err != nil {
 		s.logger.Error("stream video export", "request_id", middleware.GetReqID(r.Context()), "video_id", videoID, "error", err)
 	}
+}
+
+func (s *Server) getDriveExport(w http.ResponseWriter, r *http.Request) {
+	videoID, ok := pathUUID(w, r, "videoID")
+	if !ok {
+		return
+	}
+	status, err := s.driveExports.Status(r.Context(), videoID, currentUser(r).GroupID)
+	if err != nil {
+		s.writeError(w, r, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, driveExportStatusDTO(status))
+}
+
+func (s *Server) queueDriveExport(w http.ResponseWriter, r *http.Request) {
+	videoID, ok := pathUUID(w, r, "videoID")
+	if !ok {
+		return
+	}
+	user := currentUser(r)
+	job, err := s.driveExports.Queue(r.Context(), videoID, user.GroupID, user.ID)
+	if err != nil {
+		s.writeError(w, r, err)
+		return
+	}
+	writeJSON(w, http.StatusAccepted, driveExportDTO(job))
 }
 
 func (s *Server) updateVideo(w http.ResponseWriter, r *http.Request) {

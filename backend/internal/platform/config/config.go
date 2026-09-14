@@ -4,7 +4,9 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"net/url"
 	"os"
+	"path/filepath"
 	"strconv"
 	"strings"
 	"time"
@@ -37,6 +39,16 @@ type Config struct {
 	VideoProcessingTempDir      string
 	VideoProcessingPollInterval time.Duration
 	VideoProcessingMaxAttempts  int
+	DriveExportEnabled          bool
+	DriveExportWebDAVURL        string
+	DriveExportUsername         string
+	DriveExportPassword         string
+	DriveExportDestinationRoot  string
+	DriveExportTempDir          string
+	DriveExportPollInterval     time.Duration
+	DriveExportMaxAttempts      int
+	DriveExportTimeout          time.Duration
+	DriveExportMaxBytes         int64
 }
 
 func Load() (Config, error) {
@@ -84,9 +96,30 @@ func Load() (Config, error) {
 	if err != nil {
 		return Config{}, err
 	}
+	driveExportEnabled, err := envBool("DRIVE_EXPORT_ENABLED", false)
+	if err != nil {
+		return Config{}, err
+	}
+	driveExportPollSeconds, err := envInt64("DRIVE_EXPORT_POLL_SECONDS", 5)
+	if err != nil {
+		return Config{}, err
+	}
+	driveExportMaxAttempts, err := envInt("DRIVE_EXPORT_MAX_ATTEMPTS", 3)
+	if err != nil {
+		return Config{}, err
+	}
+	driveExportTimeoutMinutes, err := envInt64("DRIVE_EXPORT_TIMEOUT_MINUTES", 360)
+	if err != nil {
+		return Config{}, err
+	}
+	driveExportMaxBytes, err := envInt64("DRIVE_EXPORT_MAX_BYTES", 20*1024*1024*1024)
+	if err != nil {
+		return Config{}, err
+	}
 
 	endpoint := env("MINIO_ENDPOINT", "localhost:9000")
 	publicEndpoint := env("MINIO_PUBLIC_ENDPOINT", endpoint)
+	processingTempDir := env("VIDEO_PROCESSING_TEMP_DIR", "/var/tmp/video-insight")
 	cfg := Config{
 		Address:                     env("GO_BACKEND_ADDRESS", ":8000"),
 		DatabaseURL:                 env("GO_DATABASE_URL", "postgres://videoinsight:videoinsight@localhost:5432/videoinsight"),
@@ -111,9 +144,19 @@ func Load() (Config, error) {
 		UploadConcurrency:           max(1, concurrency),
 		VideoProcessingEnabled:      processingEnabled,
 		VideoProcessingFFmpegPath:   env("VIDEO_PROCESSING_FFMPEG_PATH", "ffmpeg"),
-		VideoProcessingTempDir:      env("VIDEO_PROCESSING_TEMP_DIR", "/var/tmp/video-insight"),
+		VideoProcessingTempDir:      processingTempDir,
 		VideoProcessingPollInterval: time.Duration(processingPollSeconds) * time.Second,
 		VideoProcessingMaxAttempts:  processingMaxAttempts,
+		DriveExportEnabled:          driveExportEnabled,
+		DriveExportWebDAVURL:        env("DRIVE_EXPORT_WEBDAV_URL", "http://tbox-webdav:65472"),
+		DriveExportUsername:         env("DRIVE_EXPORT_USERNAME", "videoinsight"),
+		DriveExportPassword:         os.Getenv("DRIVE_EXPORT_PASSWORD"),
+		DriveExportDestinationRoot:  env("DRIVE_EXPORT_DESTINATION_ROOT", "VideoInsight"),
+		DriveExportTempDir:          env("DRIVE_EXPORT_TEMP_DIR", filepath.Join(processingTempDir, "drive-exports")),
+		DriveExportPollInterval:     time.Duration(driveExportPollSeconds) * time.Second,
+		DriveExportMaxAttempts:      driveExportMaxAttempts,
+		DriveExportTimeout:          time.Duration(driveExportTimeoutMinutes) * time.Minute,
+		DriveExportMaxBytes:         driveExportMaxBytes,
 	}
 	if err := cfg.Validate(); err != nil {
 		return Config{}, err
@@ -140,6 +183,27 @@ func (c Config) Validate() error {
 		}
 		if c.VideoProcessingFFmpegPath == "" || c.VideoProcessingTempDir == "" {
 			return errors.New("video processing ffmpeg path and temp directory must not be empty")
+		}
+	}
+	if c.DriveExportEnabled {
+		if c.DriveExportUsername == "" || c.DriveExportPassword == "" {
+			return errors.New("DRIVE_EXPORT_USERNAME and DRIVE_EXPORT_PASSWORD must not be empty when drive export is enabled")
+		}
+		if strings.Contains(c.DriveExportUsername, ":") || strings.Contains(c.DriveExportPassword, ":") {
+			return errors.New("DRIVE_EXPORT_USERNAME and DRIVE_EXPORT_PASSWORD must not contain ':'")
+		}
+		endpoint, err := url.Parse(c.DriveExportWebDAVURL)
+		if err != nil || endpoint.Host == "" || (endpoint.Scheme != "http" && endpoint.Scheme != "https") {
+			return errors.New("DRIVE_EXPORT_WEBDAV_URL must be an absolute http or https URL")
+		}
+		if strings.Trim(c.DriveExportDestinationRoot, "/") == "" || c.DriveExportTempDir == "" {
+			return errors.New("drive export destination root and temp directory must not be empty")
+		}
+		if c.DriveExportPollInterval <= 0 || c.DriveExportTimeout <= 0 || c.DriveExportMaxBytes <= 0 {
+			return errors.New("drive export poll interval, timeout, and maximum size must be positive")
+		}
+		if c.DriveExportMaxAttempts < 1 || c.DriveExportMaxAttempts > 10 {
+			return errors.New("DRIVE_EXPORT_MAX_ATTEMPTS must be between 1 and 10")
 		}
 	}
 	return nil

@@ -6,6 +6,7 @@ DOCKER_DIR="$ROOT_DIR/docker"
 PROJECT_NAME="videoinsight"
 DEFAULT_ENV_FILE="$DOCKER_DIR/.env.example"
 PROD_ENV_FILE="$DOCKER_DIR/.env.prod"
+ACTIVE_PROFILES="${COMPOSE_PROFILES:-}"
 
 if [ ! -f "$DEFAULT_ENV_FILE" ]; then
   echo "Missing $DEFAULT_ENV_FILE." >&2
@@ -17,12 +18,17 @@ if [ ! -f "$PROD_ENV_FILE" ]; then
   exit 1
 fi
 
+if [ -z "$ACTIVE_PROFILES" ]; then
+  ACTIVE_PROFILES="$(sed -n 's/^[[:space:]]*COMPOSE_PROFILES=//p' "$PROD_ENV_FILE" | tail -n 1)"
+  ACTIVE_PROFILES="${ACTIVE_PROFILES%\"}"
+  ACTIVE_PROFILES="${ACTIVE_PROFILES#\"}"
+fi
+
 compose() {
-  docker compose -p "$PROJECT_NAME" \
+  COMPOSE_PROFILES="$ACTIVE_PROFILES" docker compose -p "$PROJECT_NAME" \
     --env-file "$DEFAULT_ENV_FILE" \
     --env-file "$PROD_ENV_FILE" \
     -f "$DOCKER_DIR/docker-compose.prod.yaml" \
-    ${COMPOSE_PROFILES:+--profile "$COMPOSE_PROFILES"} \
     "$@"
 }
 
@@ -48,6 +54,13 @@ wait_for_healthy() {
   return 1
 }
 
+profile_enabled() {
+  case ",$ACTIVE_PROFILES," in
+    *,"$1",*) return 0 ;;
+    *) return 1 ;;
+  esac
+}
+
 case "${1:-up}" in
   up)
     echo "Pulling production images..."
@@ -56,9 +69,16 @@ case "${1:-up}" in
     echo "Starting stateful dependencies..."
     compose up -d postgresql
     wait_for_healthy postgresql
-    if [ "${COMPOSE_PROFILES:-}" = "selfhosted-minio" ]; then
+    if profile_enabled selfhosted-minio; then
       compose up -d minio
       wait_for_healthy minio
+    fi
+
+    if profile_enabled drive-export; then
+      echo "Building and starting the private TboxWebdav sidecar..."
+      compose build tbox-webdav
+      compose up -d tbox-webdav
+      wait_for_healthy tbox-webdav
     fi
 
     echo "Starting Go backend and applying pending database migrations..."

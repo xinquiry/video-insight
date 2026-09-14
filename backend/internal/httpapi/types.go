@@ -4,6 +4,7 @@ import (
 	"time"
 
 	"github.com/xinquiry/video-insight/backend/internal/annotations"
+	"github.com/xinquiry/video-insight/backend/internal/driveexports"
 	"github.com/xinquiry/video-insight/backend/internal/model"
 	"github.com/xinquiry/video-insight/backend/internal/shared/optional"
 	"github.com/xinquiry/video-insight/backend/internal/videos"
@@ -51,6 +52,24 @@ type videoResponse struct {
 	ProcessingError  *string `json:"processing_error"`
 	CreatedAt        string  `json:"created_at"`
 	UpdatedAt        *string `json:"updated_at"`
+}
+
+type driveExportResponse struct {
+	ID              string  `json:"id"`
+	VideoID         string  `json:"video_id"`
+	Status          string  `json:"status"`
+	DestinationPath string  `json:"destination_path"`
+	SizeBytes       *int64  `json:"size_bytes"`
+	Error           *string `json:"error"`
+	Attempts        int     `json:"attempts"`
+	CreatedAt       string  `json:"created_at"`
+	UpdatedAt       *string `json:"updated_at"`
+	CompletedAt     *string `json:"completed_at"`
+}
+
+type driveExportStatusResponse struct {
+	Enabled bool                 `json:"enabled"`
+	Export  *driveExportResponse `json:"export"`
 }
 
 type annotationResponse struct {
@@ -208,6 +227,24 @@ func videoDTO(read videos.Read) videoResponse {
 		ContentType: read.Video.ContentType, SizeBytes: read.Video.SizeBytes, PlaybackURL: read.PlaybackURL,
 		ProcessingStatus: string(read.Video.ProcessingStatus), ProcessingError: read.Video.ProcessingError,
 		CreatedAt: formatTime(read.Video.CreatedAt), UpdatedAt: formatOptionalTime(read.Video.UpdatedAt),
+	}
+}
+
+func driveExportStatusDTO(status driveexports.Status) driveExportStatusResponse {
+	response := driveExportStatusResponse{Enabled: status.Enabled}
+	if status.Job != nil {
+		exported := driveExportDTO(*status.Job)
+		response.Export = &exported
+	}
+	return response
+}
+
+func driveExportDTO(export model.DriveExport) driveExportResponse {
+	return driveExportResponse{
+		ID: export.ID.String(), VideoID: export.VideoID.String(), Status: string(export.Status),
+		DestinationPath: export.DestinationPath, SizeBytes: export.SizeBytes, Error: export.Error,
+		Attempts: export.Attempts, CreatedAt: formatTime(export.CreatedAt),
+		UpdatedAt: formatOptionalTime(export.UpdatedAt), CompletedAt: formatOptionalTime(export.CompletedAt),
 	}
 }
 

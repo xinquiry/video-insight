@@ -25,7 +25,16 @@ RETURNING *;
 
 -- name: DeleteVideo :execrows
 DELETE FROM videos
-WHERE id = $1 AND group_id = $2 AND processing_status <> 'processing';
+WHERE
+    videos.id = $1
+    AND videos.group_id = $2
+    AND videos.processing_status <> 'processing'
+    AND NOT EXISTS (
+        SELECT 1
+        FROM drive_exports
+        WHERE drive_exports.video_id = videos.id
+          AND drive_exports.status IN ('preparing', 'uploading')
+    );
 
 -- name: RequeueInterruptedVideoProcessing :execrows
 UPDATE videos

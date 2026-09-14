@@ -23,6 +23,7 @@ type fakeStore struct {
 	createErr    error
 	created      model.Video
 	deleteCalled bool
+	deleteOK     bool
 }
 
 func (f *fakeStore) GetVideoByIDForGroup(context.Context, uuid.UUID, uuid.UUID) (model.Video, bool, error) {
@@ -50,7 +51,7 @@ func (f *fakeStore) UpdateVideo(_ context.Context, video model.Video) (model.Vid
 
 func (f *fakeStore) DeleteVideo(context.Context, uuid.UUID, uuid.UUID) (bool, error) {
 	f.deleteCalled = true
-	return true, nil
+	return f.deleteOK, nil
 }
 
 type fakeStorage struct {
@@ -198,6 +199,22 @@ func TestDeleteRejectsVideoBeingProcessed(t *testing.T) {
 	}
 	if store.deleteCalled {
 		t.Fatal("processing video reached database deletion")
+	}
+}
+
+func TestDeleteRejectsVideoBeingExported(t *testing.T) {
+	t.Parallel()
+	store := &fakeStore{found: true, video: model.Video{
+		ID: uuid.New(), GroupID: uuid.New(), ProcessingStatus: model.VideoProcessingReady,
+	}}
+	service := NewService(store, &fakeStorage{}, Config{})
+	err := service.Delete(context.Background(), store.video.ID, store.video.GroupID)
+	appErr, ok := apperror.As(err)
+	if !ok || appErr.Status != http.StatusConflict {
+		t.Fatalf("delete error = %v, want HTTP 409", err)
+	}
+	if !store.deleteCalled {
+		t.Fatal("ready video did not reach guarded database deletion")
 	}
 }
 

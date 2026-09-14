@@ -8,6 +8,7 @@ import (
 
 	"github.com/xinquiry/video-insight/backend/internal/annotations"
 	"github.com/xinquiry/video-insight/backend/internal/auth"
+	"github.com/xinquiry/video-insight/backend/internal/driveexports"
 	"github.com/xinquiry/video-insight/backend/internal/groups"
 	"github.com/xinquiry/video-insight/backend/internal/httpapi"
 	"github.com/xinquiry/video-insight/backend/internal/platform/config"
@@ -18,10 +19,12 @@ import (
 )
 
 type App struct {
-	Handler         http.Handler
-	store           *postgres.Store
-	processorCancel context.CancelFunc
-	processorDone   <-chan struct{}
+	Handler           http.Handler
+	store             *postgres.Store
+	processorCancel   context.CancelFunc
+	processorDone     <-chan struct{}
+	driveExportCancel context.CancelFunc
+	driveExportDone   <-chan struct{}
 }
 
 func New(ctx context.Context, cfg config.Config, logger *slog.Logger) (*App, error) {
@@ -61,7 +64,13 @@ func New(ctx context.Context, cfg config.Config, logger *slog.Logger) (*App, err
 		ProcessingEnabled: cfg.VideoProcessingEnabled,
 	})
 	annotationService := annotations.NewService(store)
-	handler := httpapi.New(authService, groupService, videoService, annotationService, tokens, store, logger, cfg.CORSOrigins)
+	driveExportService := driveexports.NewService(store, driveexports.ServiceConfig{
+		Enabled: cfg.DriveExportEnabled, DestinationRoot: cfg.DriveExportDestinationRoot,
+	})
+	handler := httpapi.New(
+		authService, groupService, videoService, annotationService, driveExportService,
+		tokens, store, logger, cfg.CORSOrigins,
+	)
 	application := &App{Handler: handler, store: store}
 	if cfg.VideoProcessingEnabled {
 		optimizer, err := media.NewFFmpegOptimizer(
@@ -86,10 +95,50 @@ func New(ctx context.Context, cfg config.Config, logger *slog.Logger) (*App, err
 			processor.Run(processorCtx)
 		}()
 	}
+	if cfg.DriveExportEnabled {
+		recovered, err := store.RequeueInterruptedDriveExports(ctx)
+		if err != nil {
+			application.Close()
+			return nil, fmt.Errorf("recover interrupted drive export jobs: %w", err)
+		}
+		if recovered > 0 {
+			logger.Info("requeued interrupted drive export jobs", "count", recovered)
+		}
+		uploader, err := driveexports.NewWebDAVClient(driveexports.WebDAVConfig{
+			BaseURL: cfg.DriveExportWebDAVURL, Username: cfg.DriveExportUsername,
+			Password: cfg.DriveExportPassword, Timeout: cfg.DriveExportTimeout,
+		})
+		if err != nil {
+			application.Close()
+			return nil, fmt.Errorf("initialize drive export WebDAV client: %w", err)
+		}
+		exporter, err := driveexports.NewPackageExporter(
+			videoService, annotationService, uploader, cfg.DriveExportTempDir, cfg.DriveExportMaxBytes,
+		)
+		if err != nil {
+			application.Close()
+			return nil, fmt.Errorf("initialize drive exporter: %w", err)
+		}
+		processor := driveexports.NewProcessor(store, exporter, logger, driveexports.ProcessorConfig{
+			PollInterval: cfg.DriveExportPollInterval, MaxAttempts: cfg.DriveExportMaxAttempts,
+		})
+		processorCtx, cancel := context.WithCancel(ctx)
+		done := make(chan struct{})
+		application.driveExportCancel = cancel
+		application.driveExportDone = done
+		go func() {
+			defer close(done)
+			processor.Run(processorCtx)
+		}()
+	}
 	return application, nil
 }
 
 func (a *App) Close() {
+	if a.driveExportCancel != nil {
+		a.driveExportCancel()
+		<-a.driveExportDone
+	}
 	if a.processorCancel != nil {
 		a.processorCancel()
 		<-a.processorDone

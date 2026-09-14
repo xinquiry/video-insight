@@ -180,6 +180,70 @@ func (s *Store) MarkVideoProcessingFailed(
 	return rows > 0, err
 }
 
+func (s *Store) GetDriveExportByVideoForGroup(
+	ctx context.Context,
+	videoID, groupID uuid.UUID,
+) (model.DriveExport, bool, error) {
+	value, err := s.queries.GetDriveExportByVideoForGroup(ctx, db.GetDriveExportByVideoForGroupParams{
+		VideoID: videoID,
+		GroupID: groupID,
+	})
+	if ok, foundErr := found(err); !ok || foundErr != nil {
+		return model.DriveExport{}, ok, foundErr
+	}
+	return driveExportModel(value), true, nil
+}
+
+func (s *Store) QueueDriveExport(
+	ctx context.Context,
+	videoID, groupID, requestedBy uuid.UUID,
+	destinationPath string,
+) (model.DriveExport, error) {
+	value, err := s.queries.QueueDriveExport(ctx, db.QueueDriveExportParams{
+		VideoID: videoID, GroupID: groupID, RequestedBy: requestedBy,
+		DestinationPath: destinationPath,
+	})
+	return driveExportModel(value), err
+}
+
+func (s *Store) RequeueInterruptedDriveExports(ctx context.Context) (int64, error) {
+	return s.queries.RequeueInterruptedDriveExports(ctx)
+}
+
+func (s *Store) ClaimDriveExport(ctx context.Context) (model.DriveExport, bool, error) {
+	value, err := s.queries.ClaimDriveExport(ctx)
+	if ok, foundErr := found(err); !ok || foundErr != nil {
+		return model.DriveExport{}, ok, foundErr
+	}
+	return driveExportModel(value), true, nil
+}
+
+func (s *Store) MarkDriveExportUploading(ctx context.Context, exportID uuid.UUID, sizeBytes int64) (bool, error) {
+	rows, err := s.queries.MarkDriveExportUploading(ctx, db.MarkDriveExportUploadingParams{
+		ID: exportID, SizeBytes: &sizeBytes,
+	})
+	return rows > 0, err
+}
+
+func (s *Store) MarkDriveExportCompleted(ctx context.Context, exportID uuid.UUID) (bool, error) {
+	rows, err := s.queries.MarkDriveExportCompleted(ctx, exportID)
+	return rows > 0, err
+}
+
+func (s *Store) MarkDriveExportFailed(
+	ctx context.Context,
+	exportID uuid.UUID,
+	status model.DriveExportStatus,
+	message string,
+	nextAttemptAt time.Time,
+) (bool, error) {
+	rows, err := s.queries.MarkDriveExportFailed(ctx, db.MarkDriveExportFailedParams{
+		ID: exportID, Status: string(status), Error: &message,
+		AvailableAt: pgtype.Timestamp{Time: nextAttemptAt, Valid: true},
+	})
+	return rows > 0, err
+}
+
 func (s *Store) UpdateVideo(ctx context.Context, video model.Video) (model.Video, error) {
 	value, err := s.queries.UpdateVideo(ctx, db.UpdateVideoParams{
 		ID: video.ID, GroupID: video.GroupID, Title: video.Title, Description: video.Description,
@@ -323,6 +387,17 @@ func videoModel(value db.Video) model.Video {
 		ProcessingStartedAt:   optionalTime(value.ProcessingStartedAt),
 		ProcessingAvailableAt: value.ProcessingAvailableAt.Time,
 		CreatedAt:             value.CreatedAt.Time, UpdatedAt: optionalTime(value.UpdatedAt),
+	}
+}
+
+func driveExportModel(value db.DriveExport) model.DriveExport {
+	return model.DriveExport{
+		ID: value.ID, VideoID: value.VideoID, GroupID: value.GroupID, RequestedBy: value.RequestedBy,
+		Status: model.DriveExportStatus(value.Status), DestinationPath: value.DestinationPath,
+		SizeBytes: value.SizeBytes, Error: value.Error, Attempts: int(value.Attempts),
+		StartedAt: optionalTime(value.StartedAt), AvailableAt: value.AvailableAt.Time,
+		CompletedAt: optionalTime(value.CompletedAt), CreatedAt: value.CreatedAt.Time,
+		UpdatedAt: optionalTime(value.UpdatedAt),
 	}
 }
 

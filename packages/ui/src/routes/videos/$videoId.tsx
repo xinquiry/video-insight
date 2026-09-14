@@ -11,6 +11,7 @@ import {
   Plus,
   Send,
   Trash2,
+  Upload,
 } from "lucide-react";
 import { motion } from "motion/react";
 import {
@@ -30,6 +31,7 @@ import {
   useCreateAnnotationComment,
   useDeleteAnnotation,
   useDeleteVideo,
+  useDriveExport,
   useUpdateAnnotation,
   useVideo,
   useVideoExport,
@@ -146,6 +148,12 @@ function VideoDetailPage() {
   };
   const deleteVideo = useDeleteVideo();
   const exportVideo = useVideoExport();
+  const driveExport = useDriveExport(videoId);
+  const driveExportJob = driveExport.status.data?.export ?? null;
+  const driveExportActive =
+    driveExportJob?.status === "pending" ||
+    driveExportJob?.status === "preparing" ||
+    driveExportJob?.status === "uploading";
   const [currentVideoTime, setCurrentVideoTime] = useState(0);
   const [durationSeconds, setDurationSeconds] = useState(0);
   const [hoveredAnnotationId, setHoveredAnnotationId] = useState<string | null>(null);
@@ -536,6 +544,43 @@ function VideoDetailPage() {
           {cacheError && (
             <span className="hidden text-xs text-[var(--danger)] lg:inline">{cacheError}</span>
           )}
+          {driveExport.status.data?.enabled && (
+            <button
+              type="button"
+              onClick={() => driveExport.queue.mutate()}
+              disabled={
+                video.processing_status !== "ready" ||
+                driveExportActive ||
+                driveExport.queue.isPending
+              }
+              className="vi-button-secondary disabled:opacity-60"
+              title={driveExportJob?.destination_path ?? t("videoDetail.driveExport.hint")}
+            >
+              <Upload className="h-4 w-4" />
+              {driveExportJob?.status === "pending"
+                ? t("videoDetail.driveExport.pending")
+                : driveExportJob?.status === "preparing"
+                  ? t("videoDetail.driveExport.preparing")
+                  : driveExportJob?.status === "uploading"
+                    ? t("videoDetail.driveExport.uploading")
+                    : driveExportJob?.status === "failed"
+                      ? t("videoDetail.driveExport.retry")
+                      : driveExportJob?.status === "completed"
+                        ? t("videoDetail.driveExport.again")
+                        : t("videoDetail.driveExport.action")}
+            </button>
+          )}
+          {(driveExportJob?.status === "failed" || driveExport.queue.isError) && (
+            <span
+              className="hidden max-w-48 truncate text-xs text-[var(--danger)] lg:inline"
+              title={
+                driveExportJob?.error ??
+                getErrorMessage(driveExport.queue.error, t, "videoDetail.driveExport.failed")
+              }
+            >
+              {t("videoDetail.driveExport.failed")}
+            </span>
+          )}
           <button
             type="button"
             onClick={() => exportVideo.mutate({ id: videoId, filename: video.original_filename })}
@@ -556,7 +601,7 @@ function VideoDetailPage() {
           <button
             type="button"
             onClick={handleDeleteVideo}
-            disabled={deleteVideo.isPending}
+            disabled={deleteVideo.isPending || driveExportActive}
             className="vi-button-danger disabled:opacity-60"
           >
             <Trash2 className="h-4 w-4" />
