@@ -65,6 +65,9 @@ case "${1:-up}" in
   up)
     echo "Pulling production images..."
     compose pull postgresql backend frontend
+    if profile_enabled drive-export; then
+      compose pull tbox-webdav
+    fi
 
     echo "Starting stateful dependencies..."
     compose up -d postgresql
@@ -75,8 +78,7 @@ case "${1:-up}" in
     fi
 
     if profile_enabled drive-export; then
-      echo "Building and starting the private TboxWebdav sidecar..."
-      compose build tbox-webdav
+      echo "Starting the private TboxWebdav sidecar..."
       compose up -d tbox-webdav
       wait_for_healthy tbox-webdav
     fi

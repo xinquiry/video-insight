@@ -34,6 +34,7 @@ vet, and race-enabled tests must pass before the workflow publishes:
 ```text
 ghcr.io/OWNER/video-insight-backend:latest
 ghcr.io/OWNER/video-insight-frontend:latest
+ghcr.io/OWNER/video-insight-tbox-webdav:latest
 ```
 
 Every image also receives an immutable `sha-...` tag. Production should pin an
@@ -156,8 +157,8 @@ and retries failed jobs up to three times. Keep free temporary disk space at
 least as large as the biggest video in addition to the space needed by video
 processing.
 
-TboxWebdav is pinned to v1.0.1, built from its published Linux binary, kept
-inside the Compose network, and configured with `NoDelete` access. Do not
+TboxWebdav is pinned to v1.0.1, built in CI from its published Linux
+binary, kept inside the Compose network, and configured with `NoDelete` access. Do not
 publish port 65472. Its source and GPL-2.0 license are available at
 <https://github.com/1357310795/TboxWebdav>.
 
@@ -198,8 +199,8 @@ Deploy normally:
 just deploy
 ```
 
-The first enabled deployment builds the pinned TboxWebdav sidecar and may take
-several minutes. After both containers are healthy, open a ready video and use
+The first enabled deployment pulls the pinned TboxWebdav sidecar image and may
+take several minutes. After both containers are healthy, open a ready video and use
 **Export to drive**. The button progresses through queued, packaging, and
 uploading states. A completed job exposes its destination path as the button
 tooltip; download the package from the SJTU Drive website or a WebDAV mount.

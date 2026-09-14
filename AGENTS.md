@@ -33,7 +33,7 @@ just check web              # verify backend and frontend
 just check desktop          # verify Rust host and Electron application
 just fix                    # format supported products
 just release <version>      # bump, tag, and push a desktop release
-just deploy                 # pull backend/frontend images and deploy
+just deploy                 # pull backend/frontend/tbox-webdav images and deploy
 ```
 
 The root Justfile exposes workflows, not component-level wrappers. Use Go,
@@ -174,7 +174,8 @@ dimensions (waist Ø25, four Ø4 recesses at r=8) in sync with the physical cap.
 ## Deployment
 
 - Local: `just dev` builds the Go dev image and starts bundled MinIO.
-- Production: `just deploy` pulls immutable `video-insight-backend` and `video-insight-frontend` images.
+- Production: `just deploy` pulls immutable `video-insight-backend`, `video-insight-frontend`,
+  and (with the `drive-export` profile) `video-insight-tbox-webdav` images.
 - Only frontend port 8080 is bound to the host. Cloudflared publishes the app; R2 or browser-reachable MinIO serves object URLs.
 - Preserve `GO_SEED_ADMIN_ON_STARTUP=false` after the first production bootstrap.
 - Desktop packages are produced by `class-button/scripts/package-macos.sh` or

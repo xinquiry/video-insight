@@ -53,6 +53,10 @@ jobs:
             context: .
             dockerfile: ./apps/web/Dockerfile
             image_suffix: frontend
+          - service: tbox-webdav
+            context: .
+            dockerfile: ./docker/tbox-webdav.Dockerfile
+            image_suffix: tbox-webdav
 
     steps:
       - name: Checkout

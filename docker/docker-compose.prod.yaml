@@ -55,11 +55,7 @@ services:
 
   tbox-webdav:
     profiles: ["drive-export"]
-    build:
-      context: ..
-      dockerfile: docker/tbox-webdav.Dockerfile
-      target: production
-    image: videoinsight-tbox-webdav:1.0.1
+    image: ${IMAGE_REPOSITORY:?set IMAGE_REPOSITORY in docker/.env.prod}-tbox-webdav:${IMAGE_TAG:-latest}
     restart: unless-stopped
     env_file:
       - .env.example
