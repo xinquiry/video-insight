@@ -16,13 +16,15 @@ RUN apt-get update \
          *) echo "Unsupported architecture: ${TARGETARCH}" >&2; exit 1 ;; \
        esac \
     && archive="TboxWebdav.Server.AspNetCore-linux-${archive_arch}-no-runtime.zip" \
-    && curl -L --fail --silent --show-error \
+    && curl -L --fail --silent --show-error --http1.1 \
+         --retry 5 --retry-delay 2 --retry-all-errors --connect-timeout 20 \
          "https://github.com/1357310795/TboxWebdav/releases/download/v${TBOX_WEBDAV_VERSION}/${archive}" \
          -o /tmp/tbox.zip \
     && echo "${archive_sha}  /tmp/tbox.zip" | sha256sum -c - \
     && mkdir -p /opt/tbox /usr/share/licenses/TboxWebdav \
     && unzip -q /tmp/tbox.zip -d /opt/tbox \
-    && curl -L --fail --silent --show-error \
+    && curl -L --fail --silent --show-error --http1.1 \
+         --retry 5 --retry-delay 2 --retry-all-errors --connect-timeout 20 \
          "https://raw.githubusercontent.com/1357310795/TboxWebdav/4537e22adf241158783fe26661b8081f9bc45e94/LICENSE.txt" \
          -o /usr/share/licenses/TboxWebdav/LICENSE.txt \
     && chmod +x /opt/tbox/TboxWebdav.Server.AspNetCore \
