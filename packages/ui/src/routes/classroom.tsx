@@ -1,7 +1,7 @@
 import { createRoute } from "@tanstack/react-router";
 import { Clock, FolderOpen, MessageSquare, Minimize2, Radio } from "lucide-react";
 import { motion } from "motion/react";
-import { type DragEvent, useEffect, useMemo, useRef, useState } from "react";
+import { type DragEvent, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { rootRoute } from "./__root";
 import { type PlaybackRate, VideoControls } from "@/components/player/VideoControls";
@@ -13,6 +13,8 @@ export const classroomRoute = createRoute({
   path: "/classroom",
   component: ClassroomPage,
 });
+
+const KEYBOARD_SEEK_STEP_SECONDS = 5;
 
 type OpenedMedia = {
   displayName: string;
@@ -101,6 +103,42 @@ function ClassroomPage() {
     element.currentTime = Math.max(0, seconds);
     setCurrentSeconds(element.currentTime);
   };
+
+  const seekBy = useCallback((deltaSeconds: number) => {
+    const element = videoRef.current;
+    if (!element) return;
+    const duration = Number.isFinite(element.duration) ? element.duration : 0;
+    const maxTime = duration > 0 ? duration : Number.POSITIVE_INFINITY;
+    const nextTime = Math.min(Math.max(element.currentTime + deltaSeconds, 0), maxTime);
+    element.currentTime = nextTime;
+    setCurrentSeconds(element.currentTime);
+  }, []);
+
+  // 左右箭头快退/快进,与在线播放页的键盘快捷键保持一致。
+  useEffect(() => {
+    const handleKeyboardSeek = (event: KeyboardEvent) => {
+      if (
+        event.defaultPrevented ||
+        event.altKey ||
+        event.ctrlKey ||
+        event.metaKey ||
+        event.shiftKey ||
+        isEditableKeyboardTarget(event.target)
+      ) {
+        return;
+      }
+      if (event.key !== "ArrowLeft" && event.key !== "ArrowRight") return;
+      if (!videoRef.current) return;
+
+      event.preventDefault();
+      seekBy(
+        event.key === "ArrowRight" ? KEYBOARD_SEEK_STEP_SECONDS : -KEYBOARD_SEEK_STEP_SECONDS,
+      );
+    };
+
+    document.addEventListener("keydown", handleKeyboardSeek, { capture: true });
+    return () => document.removeEventListener("keydown", handleKeyboardSeek, { capture: true });
+  }, [seekBy]);
 
   const togglePlayback = () => {
     const element = videoRef.current;
@@ -401,4 +439,11 @@ function AnnotationPanel({
       </div>
     </motion.aside>
   );
+}
+
+function isEditableKeyboardTarget(target: EventTarget | null) {
+  if (!(target instanceof HTMLElement)) return false;
+  if (target.isContentEditable) return true;
+  const tagName = target.tagName.toLowerCase();
+  return tagName === "input" || tagName === "textarea" || tagName === "select";
 }
