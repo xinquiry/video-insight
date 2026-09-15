@@ -1,6 +1,6 @@
 {
   "name": "@videoinsight/class-button-desktop",
-  "version": "0.1.4",
+  "version": "0.1.5",
   "private": true,
   "description": "Electron classroom player for VideoInsight Class Button",
   "author": "VideoInsight",
