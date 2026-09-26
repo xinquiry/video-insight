@@ -153,27 +153,30 @@ func (c *Client) EnsureDirectory(ctx context.Context, dir string) error {
 // at most 50 part numbers per call. StartUpload obeys the same limit.
 const MaxPartNumbersPerRequest = 50
 
-// startUploadBatch is the shared part-signature request for both start and
-// renew. partNumberRange must enumerate individual part numbers
-// (comma-separated, e.g. "1,2,3"), not a "first,last" range — SMH
-// interprets the latter as exactly two part numbers.
-func (c *Client) startUploadBatch(ctx context.Context, endpoint, body string) (*UploadSession, error) {
+// startUploadBatch issues the part-signature request for START (path of
+// the target file, ?multipart) and EXTEND (confirmKey path, ?renew — the
+// flag matters: ?multipart on a confirmKey silently mints a NEW session
+// whose parts never attach, while ?renew extends the original session's
+// part registry in place).
+// partNumberRange must enumerate individual part numbers (comma-separated,
+// e.g. "1,2,3"), not a "first,last" range — SMH reads the latter as exactly
+// two part numbers.
+func (c *Client) startUploadBatch(ctx context.Context, endpoint, body string, renew bool) (*UploadSession, error) {
 	creds, err := c.cred(ctx)
 	if err != nil {
 		return nil, err
 	}
-	q := url.Values{
-		"multipart":    {""}, // bare query flag; url.Values drops nil values
-		"access_token": {creds.AccessToken},
-	}
-	if endpoint == "" {
+	q := url.Values{"access_token": {creds.AccessToken}}
+	if renew {
+		q.Set("renew", "")
+	} else {
+		q.Set("multipart", "")
 		q.Set("conflict_resolution_strategy", "rename")
 	}
-	path := endpoint
-	if path == "" {
+	if endpoint == "" {
 		return nil, errors.New("smh: empty upload endpoint")
 	}
-	raw, err := c.call(ctx, http.MethodPost, fmt.Sprintf("/api/v1/file/%s/%s/%s", creds.LibraryID, creds.SpaceID, escapePath(path)), strings.NewReader(body), q)
+	raw, err := c.call(ctx, http.MethodPost, fmt.Sprintf("/api/v1/file/%s/%s/%s", creds.LibraryID, creds.SpaceID, escapePath(endpoint)), strings.NewReader(body), q)
 	if err != nil {
 		return nil, err
 	}
@@ -210,7 +213,7 @@ func (c *Client) StartUpload(ctx context.Context, path string, partNumbers []int
 		return nil, errors.New("smh: no part numbers requested")
 	}
 	first := partNumbers[:min(startBatchLimit, len(partNumbers))]
-	session, err := c.startUploadBatch(ctx, path, rangeBody(first))
+	session, err := c.startUploadBatch(ctx, path, rangeBody(first), false)
 	if err != nil {
 		return nil, err
 	}
@@ -223,7 +226,7 @@ func (c *Client) StartUpload(ctx context.Context, path string, partNumbers []int
 	collect(resolved, session)
 	for start := startBatchLimit; start < len(partNumbers); start += MaxPartNumbersPerRequest {
 		batch := partNumbers[start:min(start+MaxPartNumbersPerRequest, len(partNumbers))]
-		renewed, renewErr := c.startUploadBatch(ctx, session.ConfirmKey, rangeBody(batch))
+		renewed, renewErr := c.startUploadBatch(ctx, session.ConfirmKey, rangeBody(batch), true)
 		if renewErr != nil {
 			return nil, renewErr
 		}
@@ -241,7 +244,7 @@ func (c *Client) RenewUpload(ctx context.Context, confirmKey string, partNumbers
 	var resolved *ResolvedSession
 	for start := 0; start < len(partNumbers); start += MaxPartNumbersPerRequest {
 		batch := partNumbers[start:min(start+MaxPartNumbersPerRequest, len(partNumbers))]
-		session, err := c.startUploadBatch(ctx, confirmKey, rangeBody(batch))
+		session, err := c.startUploadBatch(ctx, confirmKey, rangeBody(batch), true)
 		if err != nil {
 			return nil, err
 		}
@@ -287,7 +290,7 @@ func collect(resolved *ResolvedSession, session *UploadSession) {
 
 // renewBatch re-signs up to 50 part numbers for an existing confirmKey.
 func (c *Client) renewBatch(ctx context.Context, confirmKey string, batch []int) (*UploadSession, error) {
-	return c.startUploadBatch(ctx, confirmKey, rangeBody(batch))
+	return c.startUploadBatch(ctx, confirmKey, rangeBody(batch), true)
 }
 
 // Confirm finalizes an upload. SMH verifies the assembled object's crc64 when
