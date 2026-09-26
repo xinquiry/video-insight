@@ -44,6 +44,24 @@ type UploadSession struct {
 	Expiration time.Time
 }
 
+// Part is a fully-addressed upload part: the COS PUT URL is complete
+// (query included); no session context is needed to use it.
+type Part struct {
+	PartNumber int
+	URL        string
+	Headers    PartHeaders
+}
+
+// ResolvedSession merges the start response and any renew responses into
+// one view: every part carries its own complete addressing because SMH
+// renewals mint a new uploadId and path.
+type ResolvedSession struct {
+	ConfirmKey string
+	UploadID   string // the original uploadId; renew parts keep their own
+	Parts      map[int]Part
+	Expiration time.Time
+}
+
 // Client talks to pan.sjtu.edu.cn. It refreshes the space access token
 // automatically; the UserToken is long-lived (30 days) and must be rotated
 // out-of-band when it expires.
@@ -179,33 +197,51 @@ func (c *Client) startUploadBatch(ctx context.Context, endpoint, body string) (*
 }
 
 // StartUpload requests presigned part headers for the given part numbers.
-// SMH signs at most 50 numbers per request, and each start request mints a
-// fresh session — so the first batch starts the upload and every further
-// batch renews against the first session's confirmKey. All parts are merged
-// into the one original session.
-func (c *Client) StartUpload(ctx context.Context, path string, partNumbers []int) (*UploadSession, error) {
+// SMH signs an arbitrary number of parts in one request; only renewals are
+// capped at 50 numbers per call. Each returned part carries its own
+// complete PUT URL so callers never see session internals.
+func (c *Client) StartUpload(ctx context.Context, path string, partNumbers []int) (*ResolvedSession, error) {
 	if len(partNumbers) == 0 {
 		return nil, errors.New("smh: no part numbers requested")
 	}
-	first := partNumbers[:min(MaxPartNumbersPerRequest, len(partNumbers))]
-	session, err := c.startUploadBatch(ctx, path, rangeBody(first))
+	session, err := c.startUploadBatch(ctx, path, rangeBody(partNumbers))
 	if err != nil {
 		return nil, err
 	}
-	for start := MaxPartNumbersPerRequest; start < len(partNumbers); start += MaxPartNumbersPerRequest {
+	resolved := &ResolvedSession{
+		ConfirmKey: session.ConfirmKey,
+		UploadID:   session.UploadID,
+		Parts:      make(map[int]Part, len(partNumbers)),
+		Expiration: session.Expiration,
+	}
+	collect(resolved, session)
+	return resolved, nil
+}
+
+// RenewUpload re-signs part numbers for an existing confirmKey. Renewals
+// return a new uploadId and COS path; parts are resolved individually.
+func (c *Client) RenewUpload(ctx context.Context, confirmKey string, partNumbers []int) (*ResolvedSession, error) {
+	var resolved *ResolvedSession
+	for start := 0; start < len(partNumbers); start += MaxPartNumbersPerRequest {
 		batch := partNumbers[start:min(start+MaxPartNumbersPerRequest, len(partNumbers))]
-		renewed, renewErr := c.renewBatch(ctx, session.ConfirmKey, batch)
-		if renewErr != nil {
-			return nil, renewErr
+		session, err := c.startUploadBatch(ctx, confirmKey, rangeBody(batch))
+		if err != nil {
+			return nil, err
 		}
-		for key, part := range renewed.Parts {
-			session.Parts[key] = part
+		if resolved == nil {
+			resolved = &ResolvedSession{
+				ConfirmKey: confirmKey,
+				UploadID:   session.UploadID,
+				Parts:      make(map[int]Part, len(partNumbers)),
+				Expiration: session.Expiration,
+			}
 		}
-		if !renewed.Expiration.IsZero() {
-			session.Expiration = renewed.Expiration
+		collect(resolved, session)
+		if !session.Expiration.IsZero() {
+			resolved.Expiration = session.Expiration
 		}
 	}
-	return session, nil
+	return resolved, nil
 }
 
 func rangeBody(partNumbers []int) string {
@@ -216,27 +252,20 @@ func rangeBody(partNumbers []int) string {
 	return fmt.Sprintf(`{"partNumberRange":["%s"]}`, strings.Join(numbers, ","))
 }
 
-// RenewUpload re-requests part headers for an in-flight confirmKey.
-func (c *Client) RenewUpload(ctx context.Context, confirmKey string, partNumbers []int) (*UploadSession, error) {
-	var session *UploadSession
-	for start := 0; start < len(partNumbers); start += MaxPartNumbersPerRequest {
-		batch := partNumbers[start:min(start+MaxPartNumbersPerRequest, len(partNumbers))]
-		next, err := c.renewBatch(ctx, confirmKey, batch)
+// collect folds one wire session's parts into a ResolvedSession, building
+// complete PUT URLs from the session that actually signed each part.
+func collect(resolved *ResolvedSession, session *UploadSession) {
+	for key, value := range session.Parts {
+		number, err := strconv.Atoi(key)
 		if err != nil {
-			return nil, err
+			continue
 		}
-		if session == nil {
-			session = next
-		} else {
-			for key, part := range next.Parts {
-				session.Parts[key] = part
-			}
-			if !next.Expiration.IsZero() {
-				session.Expiration = next.Expiration
-			}
+		resolved.Parts[number] = Part{
+			PartNumber: number,
+			URL:        fmt.Sprintf("https://%s%s?partNumber=%d&uploadId=%s", session.Domain, session.Path, number, session.UploadID),
+			Headers:    value.Headers,
 		}
 	}
-	return session, nil
 }
 
 // renewBatch re-signs up to 50 part numbers for an existing confirmKey.

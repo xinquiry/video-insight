@@ -7,11 +7,9 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
-	"fmt"
 	"log/slog"
 	"net/http"
 	"path"
-	"strconv"
 	"strings"
 	"time"
 
@@ -148,14 +146,14 @@ func (s *Server) startUpload(w http.ResponseWriter, r *http.Request) {
 	}
 	parts := make([]partOut, 0, len(session.Parts))
 	for n := first; n <= last; n++ {
-		part, ok := session.Parts[strconv.Itoa(n)]
+		part, ok := session.Parts[n]
 		if !ok {
 			writeError(w, http.StatusBadGateway, "storage backend omitted part signatures")
 			return
 		}
 		parts = append(parts, partOut{
 			PartNumber: n,
-			URL:        partURL(session, n),
+			URL:        part.URL,
 			Headers:    part.Headers,
 		})
 	}
@@ -212,13 +210,13 @@ func (s *Server) renewUpload(w http.ResponseWriter, r *http.Request) {
 	}
 	parts := make([]partOut, 0, len(session.Parts))
 	for n := first; n <= last; n++ {
-		part, ok := session.Parts[strconv.Itoa(n)]
+		part, ok := session.Parts[n]
 		if !ok {
 			continue
 		}
 		parts = append(parts, partOut{
 			PartNumber: n,
-			URL:        partURL(session, n),
+			URL:        part.URL,
 			Headers:    part.Headers,
 		})
 	}
@@ -355,13 +353,6 @@ func (s *Server) deleteObject(w http.ResponseWriter, r *http.Request) {
 }
 
 // ---- helpers ------------------------------------------------------------------
-
-// partURL builds the fully-addressed COS PUT URL for one part, including
-// the partNumber and uploadId query the client must send.
-func partURL(session *smh.UploadSession, partNumber int) string {
-	return fmt.Sprintf("https://%s%s?partNumber=%d&uploadId=%s",
-		session.Domain, session.Path, partNumber, session.UploadID)
-}
 
 // confirmKeyFromUploadID extracts the confirmKey half of the composite
 // "uploadId|confirmKey" token issued by startUpload.
