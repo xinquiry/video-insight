@@ -89,7 +89,7 @@ func New(
 			protected.Post("/videos", server.completeUpload)
 			protected.Get("/videos/{videoID}", server.getVideo)
 			protected.Get("/videos/{videoID}/drive-export", server.getDriveExport)
-			protected.Post("/videos/{videoID}/drive-export", server.queueDriveExport)
+			protected.Get("/videos/{videoID}/package-manifest", server.packageManifest)
 			protected.Patch("/videos/{videoID}", server.updateVideo)
 			protected.Delete("/videos/{videoID}", server.deleteVideo)
 			protected.Get("/videos/{videoID}/annotations", server.listAnnotations)
@@ -279,20 +279,6 @@ func (s *Server) getDriveExport(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	writeJSON(w, http.StatusOK, driveExportStatusDTO(status))
-}
-
-func (s *Server) queueDriveExport(w http.ResponseWriter, r *http.Request) {
-	videoID, ok := pathUUID(w, r, "videoID")
-	if !ok {
-		return
-	}
-	user := currentUser(r)
-	job, err := s.driveExports.Queue(r.Context(), videoID, user.GroupID, user.ID)
-	if err != nil {
-		s.writeError(w, r, err)
-		return
-	}
-	writeJSON(w, http.StatusAccepted, driveExportDTO(job))
 }
 
 func (s *Server) updateVideo(w http.ResponseWriter, r *http.Request) {

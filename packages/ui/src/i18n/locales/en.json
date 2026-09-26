@@ -142,12 +142,12 @@
     "deleteVideo": "Delete Video",
     "driveExport": {
       "action": "Download package",
-      "pending": "Preparing download…",
-      "preparing": "Packaging…",
-      "uploading": "Uploading to drive…",
-      "retry": "Retry download",
-      "download": "Download package",
-      "hint": "Packages the video with all annotations and downloads it (served directly from the drive).",
+      "pending": "Publishing…",
+      "preparing": "Publishing…",
+      "uploading": "Publishing…",
+      "downloading": "Downloading {{received}} / {{total}}",
+      "retry": "Download package",
+      "hint": "Packages the video with all annotations and saves it; video bytes stream directly from the drive.",
       "failed": "Package download failed."
     },
     "videoUnavailable": "Video URL unavailable.",

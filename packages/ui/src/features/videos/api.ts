@@ -2,8 +2,8 @@ import { apiClient } from "@/platform/api-client";
 import type {
   Annotation,
   AnnotationComment,
-  DriveExport,
   DriveExportStatus,
+  PackageManifest,
   PaginatedResponse,
   RichTextDocument,
   Video,
@@ -206,8 +206,8 @@ export function fetchDriveExport(id: string) {
   return apiClient.get<DriveExportStatus>(`/api/videos/${id}/drive-export`);
 }
 
-export function queueDriveExport(id: string) {
-  return apiClient.post<DriveExport>(`/api/videos/${id}/drive-export`, {});
+export function fetchPackageManifest(id: string) {
+  return apiClient.get<PackageManifest>(`/api/videos/${id}/package-manifest`);
 }
 
 export function fetchAnnotations(videoId: string) {

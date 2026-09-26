@@ -32,11 +32,16 @@ type ProcessorConfig struct {
 	MaxAttempts  int
 }
 
+// PublishHook is invoked once a video becomes ready. The drive publish
+// pipeline registers itself to enqueue the CDN copy automatically.
+type PublishHook func(ctx context.Context, video model.Video)
+
 type Processor struct {
 	store     ProcessingStore
 	optimizer ObjectOptimizer
 	logger    *slog.Logger
 	config    ProcessorConfig
+	publish   PublishHook
 }
 
 func NewProcessor(
@@ -44,6 +49,7 @@ func NewProcessor(
 	optimizer ObjectOptimizer,
 	logger *slog.Logger,
 	config ProcessorConfig,
+	publish PublishHook,
 ) *Processor {
 	if config.PollInterval <= 0 {
 		config.PollInterval = 5 * time.Second
@@ -51,7 +57,7 @@ func NewProcessor(
 	if config.MaxAttempts < 1 {
 		config.MaxAttempts = 3
 	}
-	return &Processor{store: store, optimizer: optimizer, logger: logger, config: config}
+	return &Processor{store: store, optimizer: optimizer, logger: logger, config: config, publish: publish}
 }
 
 func (p *Processor) Run(ctx context.Context) {
@@ -97,6 +103,9 @@ func (p *Processor) processOne(ctx context.Context, video model.Video) {
 			return
 		}
 		p.logger.Info("video optimized", "video_id", video.ID, "bytes", sizeBytes, "duration", time.Since(started))
+		if p.publish != nil {
+			p.publish(ctx, video)
+		}
 		return
 	}
 	if errors.Is(err, context.Canceled) || errors.Is(err, context.DeadlineExceeded) || ctx.Err() != nil {

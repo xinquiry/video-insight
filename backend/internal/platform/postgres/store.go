@@ -210,6 +210,20 @@ func (s *Store) RequeueInterruptedDriveExports(ctx context.Context) (int64, erro
 	return s.queries.RequeueInterruptedDriveExports(ctx)
 }
 
+// ListReadyVideosWithoutCompletedExport returns ready videos lacking a
+// published copy — the auto-publish backfill set.
+func (s *Store) ListReadyVideosWithoutCompletedExport(ctx context.Context) ([]model.Video, error) {
+	values, err := s.queries.ListReadyVideosWithoutCompletedExport(ctx)
+	if err != nil {
+		return nil, err
+	}
+	videos := make([]model.Video, 0, len(values))
+	for _, value := range values {
+		videos = append(videos, videoModel(value))
+	}
+	return videos, nil
+}
+
 func (s *Store) ClaimDriveExport(ctx context.Context) (model.DriveExport, bool, error) {
 	value, err := s.queries.ClaimDriveExport(ctx)
 	if ok, foundErr := found(err); !ok || foundErr != nil {

@@ -40,6 +40,36 @@ export interface DriveExport {
   completed_at: string | null;
 }
 
+/** 下载组包原料:后端现场生成的便携 manifest + 网盘预签名视频 URL。 */
+export interface PackageManifest {
+  /** portable.Document(与后端 manifest.json 同构)。 */
+  document: {
+    format: string;
+    format_version: number;
+    exported_at: string;
+    video: {
+      id: string;
+      title: string;
+      description: string | null;
+      filename: string;
+      media_path: string;
+      content_type: string;
+      size_bytes: number;
+    };
+    annotation_track: {
+      format: string;
+      format_version: number;
+      annotations: unknown[];
+      extensions: Record<string, unknown>;
+    };
+    extensions: Record<string, unknown>;
+  };
+  video_url: string;
+  package_mime: string;
+  video_bytes: number;
+  filename: string;
+}
+
 export interface DriveExportStatus {
   enabled: boolean;
   export: DriveExport | null;

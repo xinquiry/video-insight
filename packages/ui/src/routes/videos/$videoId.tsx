@@ -30,8 +30,8 @@ import {
   useCreateAnnotationComment,
   useDeleteAnnotation,
   useDeleteVideo,
-  triggerDriveExportDownload,
   useDriveExport,
+  usePackageDownload,
   useUpdateAnnotation,
   useVideo,
 } from "@/features/videos/hooks";
@@ -147,6 +147,7 @@ function VideoDetailPage() {
   };
   const deleteVideo = useDeleteVideo();
   const driveExport = useDriveExport(videoId);
+  const packageDownload = usePackageDownload(videoId);
   const driveExportStatus = driveExport.status.data;
   const driveExportJob = driveExportStatus?.export ?? null;
   const driveExportActive =
@@ -536,43 +537,38 @@ function VideoDetailPage() {
           {driveExportStatus?.enabled && (
             <button
               type="button"
-              onClick={() => {
-                if (
-                  driveExportJob?.status === "completed" &&
-                  triggerDriveExportDownload(driveExportStatus, video.original_filename)
-                ) {
-                  return;
-                }
-                driveExport.queue.mutate();
-              }}
+              onClick={() => packageDownload.mutate(video.original_filename)}
               disabled={
                 video.processing_status !== "ready" ||
                 driveExportActive ||
-                driveExport.queue.isPending
+                packageDownload.isPending
               }
               className="vi-button-secondary disabled:opacity-60"
-              title={driveExportJob?.destination_path ?? t("videoDetail.driveExport.hint")}
+              title={t("videoDetail.driveExport.hint")}
             >
               <Download className="h-4 w-4" />
-              {driveExportJob?.status === "pending"
-                ? t("videoDetail.driveExport.pending")
-                : driveExportJob?.status === "preparing"
-                  ? t("videoDetail.driveExport.preparing")
-                  : driveExportJob?.status === "uploading"
-                    ? t("videoDetail.driveExport.uploading")
-                    : driveExportJob?.status === "failed"
-                      ? t("videoDetail.driveExport.retry")
-                      : driveExportJob?.status === "completed"
-                        ? t("videoDetail.driveExport.download")
-                        : t("videoDetail.driveExport.action")}
+              {driveExportActive
+                ? driveExportJob?.status === "pending"
+                  ? t("videoDetail.driveExport.pending")
+                  : driveExportJob?.status === "preparing"
+                    ? t("videoDetail.driveExport.preparing")
+                    : t("videoDetail.driveExport.uploading")
+                : packageDownload.isPending
+                  ? packageDownload.progress
+                    ? t("videoDetail.driveExport.downloading", {
+                        received: formatBytes(packageDownload.progress.received),
+                        total: formatBytes(packageDownload.progress.total),
+                      })
+                    : t("videoDetail.driveExport.preparing")
+                  : t("videoDetail.driveExport.action")}
             </button>
           )}
-          {(driveExportJob?.status === "failed" || driveExport.queue.isError) && (
+          {(driveExportJob?.status === "failed" || packageDownload.isError) && (
             <span
               className="hidden max-w-48 truncate text-xs text-[var(--danger)] lg:inline"
               title={
                 driveExportJob?.error ??
-                getErrorMessage(driveExport.queue.error, t, "videoDetail.driveExport.failed")
+                getErrorMessage(packageDownload.error, t, "videoDetail.driveExport.failed")
               }
             >
               {t("videoDetail.driveExport.failed")}

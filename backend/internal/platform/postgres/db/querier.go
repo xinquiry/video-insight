@@ -31,6 +31,7 @@ type Querier interface {
 	ListAnnotationComments(ctx context.Context, annotationID uuid.UUID) ([]ListAnnotationCommentsRow, error)
 	ListAnnotationsForVideo(ctx context.Context, videoID uuid.UUID) ([]Annotation, error)
 	ListGroups(ctx context.Context) ([]Group, error)
+	ListReadyVideosWithoutCompletedExport(ctx context.Context) ([]Video, error)
 	ListVideosForGroup(ctx context.Context, arg ListVideosForGroupParams) ([]Video, error)
 	MarkDriveExportCompleted(ctx context.Context, id uuid.UUID) (int64, error)
 	MarkDriveExportFailed(ctx context.Context, arg MarkDriveExportFailedParams) (int64, error)

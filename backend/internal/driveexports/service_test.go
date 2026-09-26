@@ -7,12 +7,12 @@ import (
 	"github.com/google/uuid"
 
 	"github.com/xinquiry/video-insight/backend/internal/model"
-	"github.com/xinquiry/video-insight/backend/internal/shared/apperror"
 )
 
 type fakeServiceStore struct {
-	video model.Video
-	job   *model.DriveExport
+	video  model.Video
+	job    *model.DriveExport
+	queued []model.DriveExport
 }
 
 func (f *fakeServiceStore) GetVideoByIDForGroup(_ context.Context, videoID, groupID uuid.UUID) (model.Video, bool, error) {
@@ -29,6 +29,10 @@ func (f *fakeServiceStore) GetDriveExportByVideoForGroup(context.Context, uuid.U
 	return *f.job, true, nil
 }
 
+func (f *fakeServiceStore) ListReadyVideosWithoutCompletedExport(context.Context) ([]model.Video, error) {
+	return nil, nil
+}
+
 func (f *fakeServiceStore) QueueDriveExport(
 	_ context.Context,
 	videoID, groupID, requestedBy uuid.UUID,
@@ -39,43 +43,81 @@ func (f *fakeServiceStore) QueueDriveExport(
 		Status: model.DriveExportPending, DestinationPath: destinationPath,
 	}
 	f.job = &job
+	f.queued = append(f.queued, job)
 	return job, nil
 }
 
-func TestQueueDriveExportBuildsStableDestination(t *testing.T) {
+func TestPublishObjectKeyIsStablePerVideo(t *testing.T) {
 	t.Parallel()
 	videoID := uuid.MustParse("12345678-1234-1234-1234-123456789012")
-	groupID := uuid.New()
 	store := &fakeServiceStore{video: model.Video{
-		ID: videoID, GroupID: groupID, OriginalFilename: `folder/Lesson #1?.mp4`,
+		ID: videoID, GroupID: uuid.New(), OriginalFilename: `folder/Lesson #1?.mp4`,
 		ProcessingStatus: model.VideoProcessingReady,
 	}}
-	service := NewService(store, ServiceConfig{Enabled: true, DestinationRoot: "/VideoInsight/"}, nil)
-	job, err := service.Queue(context.Background(), videoID, groupID, uuid.New())
-	if err != nil {
-		t.Fatal(err)
-	}
-	want := "VideoInsight/" + groupID.String() + "/Lesson _1_-12345678.vinsight"
-	if job.DestinationPath != want {
-		t.Fatalf("destination = %q, want %q", job.DestinationPath, want)
+	service := NewService(store, ServiceConfig{Enabled: true, DestinationRoot: "/published/"}, nil)
+	if got, want := service.PublishObjectKey(store.video), "published/"+videoID.String()+".mp4"; got != want {
+		t.Fatalf("object key = %q, want %q", got, want)
 	}
 }
 
-func TestQueueDriveExportRejectsDisabledAndActiveJobs(t *testing.T) {
+func TestPublishIsIdempotentAndRequiresReady(t *testing.T) {
 	t.Parallel()
 	videoID, groupID := uuid.New(), uuid.New()
 	store := &fakeServiceStore{video: model.Video{
 		ID: videoID, GroupID: groupID, OriginalFilename: "lesson.mp4",
 		ProcessingStatus: model.VideoProcessingReady,
 	}}
-	_, err := NewService(store, ServiceConfig{}, nil).Queue(context.Background(), videoID, groupID, uuid.New())
-	if appErr, ok := apperror.As(err); !ok || appErr.Code != "drive_export_disabled" {
-		t.Fatalf("disabled error = %v", err)
-	}
+	service := NewService(store, ServiceConfig{Enabled: true, DestinationRoot: "published"}, nil)
 
-	store.job = &model.DriveExport{Status: model.DriveExportUploading}
-	_, err = NewService(store, ServiceConfig{Enabled: true}, nil).Queue(context.Background(), videoID, groupID, uuid.New())
-	if appErr, ok := apperror.As(err); !ok || appErr.Code != "drive_export_in_progress" {
-		t.Fatalf("active error = %v", err)
+	if err := service.Publish(context.Background(), store.video, uuid.New()); err != nil {
+		t.Fatal(err)
+	}
+	if len(store.queued) != 1 {
+		t.Fatalf("queued %d jobs, want 1", len(store.queued))
+	}
+	// A second Publish while pending/uploading/completed must not re-queue.
+	for _, status := range []model.DriveExportStatus{
+		model.DriveExportPending, model.DriveExportPreparing, model.DriveExportUploading, model.DriveExportCompleted,
+	} {
+		store.job.Status = status
+		if err := service.Publish(context.Background(), store.video, uuid.New()); err != nil {
+			t.Fatal(err)
+		}
+		if len(store.queued) != 1 {
+			t.Fatalf("status %s re-queued (total %d)", status, len(store.queued))
+		}
+	}
+	// A failed job may be retried.
+	store.job.Status = model.DriveExportFailed
+	if err := service.Publish(context.Background(), store.video, uuid.New()); err != nil {
+		t.Fatal(err)
+	}
+	if len(store.queued) != 2 {
+		t.Fatalf("failed job did not re-queue (total %d)", len(store.queued))
+	}
+	// Not-ready videos are never queued.
+	store.job = nil
+	store.video.ProcessingStatus = model.VideoProcessingProcessing
+	if err := service.Publish(context.Background(), store.video, uuid.New()); err != nil {
+		t.Fatal(err)
+	}
+	if len(store.queued) != 2 {
+		t.Fatalf("processing video queued (total %d)", len(store.queued))
+	}
+}
+
+func TestPublishDisabledIsNoop(t *testing.T) {
+	t.Parallel()
+	videoID, groupID := uuid.New(), uuid.New()
+	store := &fakeServiceStore{video: model.Video{
+		ID: videoID, GroupID: groupID, OriginalFilename: "lesson.mp4",
+		ProcessingStatus: model.VideoProcessingReady,
+	}}
+	service := NewService(store, ServiceConfig{Enabled: false}, nil)
+	if err := service.Publish(context.Background(), store.video, uuid.New()); err != nil {
+		t.Fatal(err)
+	}
+	if len(store.queued) != 0 {
+		t.Fatalf("disabled service queued %d jobs", len(store.queued))
 	}
 }

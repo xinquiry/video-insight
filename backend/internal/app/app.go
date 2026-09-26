@@ -6,11 +6,14 @@ import (
 	"log/slog"
 	"net/http"
 
+	"github.com/google/uuid"
+
 	"github.com/xinquiry/video-insight/backend/internal/annotations"
 	"github.com/xinquiry/video-insight/backend/internal/auth"
 	"github.com/xinquiry/video-insight/backend/internal/driveexports"
 	"github.com/xinquiry/video-insight/backend/internal/groups"
 	"github.com/xinquiry/video-insight/backend/internal/httpapi"
+	"github.com/xinquiry/video-insight/backend/internal/model"
 	"github.com/xinquiry/video-insight/backend/internal/platform/config"
 	"github.com/xinquiry/video-insight/backend/internal/platform/media"
 	"github.com/xinquiry/video-insight/backend/internal/platform/postgres"
@@ -89,10 +92,19 @@ func New(ctx context.Context, cfg config.Config, logger *slog.Logger) (*App, err
 			store.Close()
 			return nil, fmt.Errorf("initialize video processor: %w", err)
 		}
+		publishHook := videos.PublishHook(nil)
+		if cfg.DriveExportEnabled {
+			systemUser := uuid.MustParse("00000000-0000-0000-0000-000000000000")
+			publishHook = func(ctx context.Context, video model.Video) {
+				if err := driveExportService.Publish(ctx, video, systemUser); err != nil {
+					logger.Error("queue drive publish", "video_id", video.ID, "error", err)
+				}
+			}
+		}
 		processor := videos.NewProcessor(store, optimizer, logger, videos.ProcessorConfig{
 			PollInterval: cfg.VideoProcessingPollInterval,
 			MaxAttempts:  cfg.VideoProcessingMaxAttempts,
-		})
+		}, publishHook)
 		processorCtx, cancel := context.WithCancel(ctx)
 		done := make(chan struct{})
 		application.processorCancel = cancel
@@ -111,14 +123,8 @@ func New(ctx context.Context, cfg config.Config, logger *slog.Logger) (*App, err
 		if recovered > 0 {
 			logger.Info("requeued interrupted drive export jobs", "count", recovered)
 		}
-		exporter, err := driveexports.NewPackageExporter(
-			videoService, annotationService, driveExportSigner, cfg.DriveExportTempDir, cfg.DriveExportMaxBytes,
-		)
-		if err != nil {
-			application.Close()
-			return nil, fmt.Errorf("initialize drive exporter: %w", err)
-		}
-		processor := driveexports.NewProcessor(store, exporter, logger, driveexports.ProcessorConfig{
+		publisher := driveexports.NewPublisher(videoService, driveExportSigner)
+		processor := driveexports.NewProcessor(store, publisher, logger, driveexports.ProcessorConfig{
 			PollInterval: cfg.DriveExportPollInterval, MaxAttempts: cfg.DriveExportMaxAttempts,
 		})
 		processorCtx, cancel := context.WithCancel(ctx)

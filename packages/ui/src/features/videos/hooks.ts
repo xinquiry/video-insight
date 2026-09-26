@@ -9,9 +9,9 @@ import {
   fetchAnnotations,
   fetchAnnotationComments,
   fetchDriveExport,
+  fetchPackageManifest,
   fetchVideo,
   fetchVideos,
-  queueDriveExport,
   updateAnnotation,
   updateVideo,
   uploadVideo,
@@ -115,7 +115,7 @@ export function useDeleteVideo() {
 }
 
 export function useDriveExport(videoId: string) {
-  const queryClient = useQueryClient();
+  // Publish state only drives the button label (publishing in progress).
   const status = useQuery({
     queryKey: ["drive-export", videoId],
     queryFn: () => fetchDriveExport(videoId),
@@ -127,36 +127,40 @@ export function useDriveExport(videoId: string) {
         : false;
     },
   });
-  const queue = useMutation({
-    mutationFn: () => queueDriveExport(videoId),
-    onSuccess: (job) => {
-      queryClient.setQueryData(["drive-export", videoId], {
-        enabled: true,
-        export: job,
-      });
-    },
-  });
-  return { status, queue };
+  return { status };
 }
 
 /**
- * 下载导出包：完成后端返回短时效 COS 预签名 URL，浏览器经它直连下载，
- * 字节不经过应用隧道。URL 的有效期内可重复触发。
+ * 下载 .vinsight:取 manifest(视频走网盘预签名直链,标注为现场生成),
+ * 浏览器流式组包落盘。未发布时抛 drive_export_not_published。
  */
-export function triggerDriveExportDownload(
-  status: { download_url?: string },
-  filename: string,
-) {
-  const url = status.download_url;
-  if (!url) return false;
-  const stem = filename.replace(/\.[^./\\]+$/, "") || "video";
-  const anchor = document.createElement("a");
-  anchor.href = url;
-  anchor.download = `${stem}.vinsight`;
-  document.body.appendChild(anchor);
-  anchor.click();
-  anchor.remove();
-  return true;
+export function usePackageDownload(videoId: string) {
+  const [progress, setProgress] = useState<{ received: number; total: number } | null>(null);
+  const mutation = useMutation({
+    mutationFn: async (filename: string) => {
+      const manifest = await fetchPackageManifest(videoId);
+      const { downloadVinsightPackage, externalizeAnnotationImages } = await import(
+        "@/platform/package-download"
+      );
+      const assets = new Map<string, { path: string; data: Uint8Array }>();
+      for (const annotation of manifest.document.annotation_track.annotations) {
+        externalizeAnnotationImages(annotation, assets);
+      }
+      const stem = filename.replace(/\.[^./\\]+$/, "") || "video";
+      setProgress({ received: 0, total: manifest.video_bytes });
+      return downloadVinsightPackage({
+        videoUrl: manifest.video_url,
+        document: manifest.document,
+        mediaPath: manifest.document.video.media_path,
+        videoBytes: manifest.video_bytes,
+        assets: [...assets.values()],
+        filename: stem,
+        onProgress: ({ receivedBytes, totalBytes }) => setProgress({ received: receivedBytes, total: totalBytes }),
+      });
+    },
+    onSettled: () => setProgress(null),
+  });
+  return { ...mutation, progress };
 }
 
 export function useAnnotations(videoId: string) {

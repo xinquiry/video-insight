@@ -90,6 +90,50 @@ func (q *Queries) GetDriveExportByVideoForGroup(ctx context.Context, arg GetDriv
 	return i, err
 }
 
+const listReadyVideosWithoutCompletedExport = `-- name: ListReadyVideosWithoutCompletedExport :many
+SELECT v.title, v.description, v.object_key, v.original_filename, v.content_type, v.size_bytes, v.processing_status, v.processing_error, v.processing_attempts, v.processing_started_at, v.processing_available_at, v.id, v.created_at, v.updated_at, v.group_id
+FROM videos v
+LEFT JOIN drive_exports de ON de.video_id = v.id
+WHERE v.processing_status = 'ready'
+  AND (de.id IS NULL OR de.status <> 'completed')
+`
+
+func (q *Queries) ListReadyVideosWithoutCompletedExport(ctx context.Context) ([]Video, error) {
+	rows, err := q.db.Query(ctx, listReadyVideosWithoutCompletedExport)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []Video{}
+	for rows.Next() {
+		var i Video
+		if err := rows.Scan(
+			&i.Title,
+			&i.Description,
+			&i.ObjectKey,
+			&i.OriginalFilename,
+			&i.ContentType,
+			&i.SizeBytes,
+			&i.ProcessingStatus,
+			&i.ProcessingError,
+			&i.ProcessingAttempts,
+			&i.ProcessingStartedAt,
+			&i.ProcessingAvailableAt,
+			&i.ID,
+			&i.CreatedAt,
+			&i.UpdatedAt,
+			&i.GroupID,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const markDriveExportCompleted = `-- name: MarkDriveExportCompleted :execrows
 UPDATE drive_exports
 SET

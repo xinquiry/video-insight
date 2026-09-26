@@ -150,12 +150,12 @@
     "deleteVideo": "删除视频",
     "driveExport": {
       "action": "下载便携包",
-      "pending": "正在准备下载…",
-      "preparing": "正在打包…",
-      "uploading": "正在上传到云盘…",
-      "retry": "重试下载",
-      "download": "下载便携包",
-      "hint": "打包视频与全部批注并下载（文件由云盘直接提供）。",
+      "pending": "发布中…",
+      "preparing": "发布中…",
+      "uploading": "发布中…",
+      "downloading": "下载中 {{received}} / {{total}}",
+      "retry": "下载便携包",
+      "hint": "打包视频与全部批注并保存；视频字节由网盘直链提供。",
       "failed": "便携包下载失败。"
     },
     "videoUnavailable": "视频链接不可用。",

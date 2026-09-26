@@ -52,7 +52,7 @@ func (f fakeOptimizer) Optimize(context.Context, model.Video) (int64, error) {
 func TestProcessorMarksSuccessfulOptimizationReady(t *testing.T) {
 	t.Parallel()
 	store := &fakeProcessingStore{}
-	processor := NewProcessor(store, fakeOptimizer{size: 1234}, discardLogger(), ProcessorConfig{MaxAttempts: 3})
+	processor := NewProcessor(store, fakeOptimizer{size: 1234}, discardLogger(), ProcessorConfig{MaxAttempts: 3}, nil)
 	processor.processOne(context.Background(), model.Video{ID: uuid.New(), ProcessingAttempts: 1})
 	if store.readySize != 1234 {
 		t.Fatalf("ready size = %d", store.readySize)
@@ -69,7 +69,7 @@ func TestProcessorRetriesThenMarksFailure(t *testing.T) {
 		{attempt: 3, want: model.VideoProcessingFailed},
 	} {
 		store := &fakeProcessingStore{}
-		processor := NewProcessor(store, fakeOptimizer{err: errors.New("broken video")}, discardLogger(), ProcessorConfig{MaxAttempts: 3})
+		processor := NewProcessor(store, fakeOptimizer{err: errors.New("broken video")}, discardLogger(), ProcessorConfig{MaxAttempts: 3}, nil)
 		processor.processOne(context.Background(), model.Video{ID: uuid.New(), ProcessingAttempts: test.attempt})
 		if store.failedStatus != test.want {
 			t.Fatalf("attempt %d status = %q, want %q", test.attempt, store.failedStatus, test.want)

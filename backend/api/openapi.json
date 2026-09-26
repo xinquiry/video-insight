@@ -2109,138 +2109,35 @@
         ]
       }
     },
-    "/api/videos/{video_id}/drive-export": {
+    "/api/videos/{videoID}/package-manifest": {
       "get": {
-        "operationId": "get_drive_export_status_api_videos__video_id__drive_export_get",
+        "summary": "Package manifest for client-side .vinsight assembly",
+        "description": "Returns the portable document (video metadata plus current annotations) and a presigned download URL for the published video object. The browser streams the video directly from COS and assembles the package locally.",
+        "operationId": "packageManifest",
+        "tags": [
+          "videos"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
         "parameters": [
           {
-            "in": "path",
-            "name": "video_id",
-            "required": true,
-            "schema": {
-              "type": "string",
-              "format": "uuid",
-              "title": "Video Id"
-            }
+            "$ref": "#/components/parameters/videoID"
           }
         ],
         "responses": {
           "200": {
-            "description": "Drive export status",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/DriveExportStatus"
-                }
-              }
-            }
-          },
-          "404": {
-            "description": "Video Not Found",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            }
-          },
-          "422": {
-            "description": "Validation Error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            }
-          }
-        },
-        "security": [
-          {
-            "HTTPBearer": []
-          }
-        ],
-        "summary": "Get Drive Export Status",
-        "tags": [
-          "videos"
-        ]
-      },
-      "post": {
-        "operationId": "queue_drive_export_api_videos__video_id__drive_export_post",
-        "parameters": [
-          {
-            "in": "path",
-            "name": "video_id",
-            "required": true,
-            "schema": {
-              "type": "string",
-              "format": "uuid",
-              "title": "Video Id"
-            }
-          }
-        ],
-        "responses": {
-          "202": {
-            "description": "Drive export queued",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/DriveExportRead"
-                }
-              }
-            }
-          },
-          "404": {
-            "description": "Video Not Found",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            }
+            "description": "Manifest and video URL"
           },
           "409": {
-            "description": "Video is not ready or an export is active",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            }
+            "description": "drive_export_not_published \u2014 the video has no published copy yet"
           },
-          "503": {
-            "description": "Drive export is not configured",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            }
-          },
-          "422": {
-            "description": "Validation Error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            }
+          "404": {
+            "description": "Video not found"
           }
-        },
-        "security": [
-          {
-            "HTTPBearer": []
-          }
-        ],
-        "summary": "Queue Drive Export",
-        "tags": [
-          "videos"
-        ]
+        }
       }
     }
   }

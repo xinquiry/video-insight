@@ -59,24 +59,22 @@ type gatewayUploadResponse struct {
 // part numbers per call.
 const renewBatchLimit = 50
 
-// Upload streams the package file to the drive in fixed-size presigned
-// parts. Signatures expire (15 minutes by default); parts are renewed in
-// batches of 50 shortly before the deadline.
-func (u *GatewayUploader) Upload(ctx context.Context, destinationPath, localPath, contentType string) error {
-	info, err := os.Stat(localPath)
+// Upload streams source to the drive in fixed-size presigned parts. SMH
+// requires the total part count when the session starts, so the object is
+// spooled to a temp file first (videos are streamed from RustFS; holding
+// them in memory is not an option). Signatures expire (15 minutes by
+// default); parts are renewed in batches of 50 before the deadline.
+func (u *GatewayUploader) Upload(ctx context.Context, destinationPath string, source io.Reader, contentType string) error {
+	staged, size, err := spool(source)
 	if err != nil {
-		return fmt.Errorf("stat drive export package: %w", err)
+		return err
 	}
-	if info.Size() <= 0 {
-		return fmt.Errorf("drive export package is empty")
+	defer func() { _ = os.Remove(staged) }()
+	if size <= 0 {
+		return fmt.Errorf("refusing to publish an empty object")
 	}
-	file, err := os.Open(localPath)
-	if err != nil {
-		return fmt.Errorf("open drive export package: %w", err)
-	}
-	defer func() { _ = file.Close() }()
 
-	session, err := u.startUpload(ctx, destinationPath, info.Size())
+	session, err := u.startUpload(ctx, destinationPath, size)
 	if err != nil {
 		return err
 	}
@@ -84,16 +82,22 @@ func (u *GatewayUploader) Upload(ctx context.Context, destinationPath, localPath
 	if partSize <= 0 {
 		return fmt.Errorf("gateway returned an invalid part size")
 	}
-	totalParts := (info.Size() + partSize - 1) / partSize
+	totalParts := (size + partSize - 1) / partSize
 	parts := partIndex(session.Parts)
 	expiry := time.Now().Add(time.Duration(session.ExpiresIn) * time.Second)
+
+	file, err := os.Open(staged)
+	if err != nil {
+		return fmt.Errorf("reopen staged object: %w", err)
+	}
+	defer func() { _ = file.Close() }()
 
 	for number := int64(1); number <= totalParts; number++ {
 		if ctx.Err() != nil {
 			return ctx.Err()
 		}
 		if part, ok := parts[int(number)]; ok && time.Now().Before(expiry) {
-			if err := u.putPart(ctx, part, file, (number-1)*partSize, partSize, info.Size(), contentType); err != nil {
+			if err := u.putPart(ctx, part, file, (number-1)*partSize, partSize, size, contentType); err != nil {
 				return fmt.Errorf("upload drive export part %d: %w", number, err)
 			}
 			continue
@@ -110,7 +114,7 @@ func (u *GatewayUploader) Upload(ctx context.Context, destinationPath, localPath
 			return fmt.Errorf("gateway did not renew part %d", number)
 		}
 		expiry = renewedExpiry
-		if err := u.putPart(ctx, part, file, (number-1)*partSize, partSize, info.Size(), contentType); err != nil {
+		if err := u.putPart(ctx, part, file, (number-1)*partSize, partSize, size, contentType); err != nil {
 			return fmt.Errorf("upload drive export part %d: %w", number, err)
 		}
 	}
@@ -119,10 +123,31 @@ func (u *GatewayUploader) Upload(ctx context.Context, destinationPath, localPath
 	if err != nil {
 		return err
 	}
-	if completed != info.Size() {
-		return fmt.Errorf("drive export assembled %d bytes on the drive, expected %d", completed, info.Size())
+	if completed != size {
+		return fmt.Errorf("drive export assembled %d bytes on the drive, expected %d", completed, size)
 	}
 	return nil
+}
+
+// spool writes source to a temp file (needed: SMH wants the total part
+// count before the first byte is signed).
+func spool(source io.Reader) (string, int64, error) {
+	file, err := os.CreateTemp("", "publish-*")
+	if err != nil {
+		return "", 0, fmt.Errorf("create publish staging file: %w", err)
+	}
+	name := file.Name()
+	size, err := io.Copy(file, source)
+	closeErr := file.Close()
+	if err != nil {
+		_ = os.Remove(name)
+		return "", 0, fmt.Errorf("spool object for publish: %w", err)
+	}
+	if closeErr != nil {
+		_ = os.Remove(name)
+		return "", 0, fmt.Errorf("close staged object: %w", closeErr)
+	}
+	return name, size, nil
 }
 
 func (u *GatewayUploader) startUpload(ctx context.Context, objectKey string, sizeBytes int64) (*gatewayUploadResponse, error) {

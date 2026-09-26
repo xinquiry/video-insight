@@ -76,3 +76,10 @@ SET
     available_at = $4,
     updated_at = now()
 WHERE id = $1 AND status IN ('preparing', 'uploading');
+
+-- name: ListReadyVideosWithoutCompletedExport :many
+SELECT v.*
+FROM videos v
+LEFT JOIN drive_exports de ON de.video_id = v.id
+WHERE v.processing_status = 'ready'
+  AND (de.id IS NULL OR de.status <> 'completed');
