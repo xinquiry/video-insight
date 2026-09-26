@@ -46,6 +46,11 @@ func (p *Publisher) Run(
 	}
 	defer func() { _ = result.Media.Close() }()
 
+	// Transition the job to uploading before the transfer starts; the size
+	// is unknown because the object streams straight from RustFS.
+	if err := onPrepared(0); err != nil {
+		return err
+	}
 	if err := p.uploader.Upload(ctx, job.DestinationPath, result.Media, result.Video.ContentType); err != nil {
 		return fmt.Errorf("upload published video: %w", err)
 	}
