@@ -30,11 +30,13 @@ type PartHeaders map[string]string
 
 // UploadSession is the result of starting a chunk upload.
 type UploadSession struct {
-	ConfirmKey string                 `json:"confirmKey"`
-	UploadID   string                 `json:"uploadId"`
-	Domain     string                 `json:"domain"`
-	Path       string                 `json:"path"`
-	Parts      map[string]PartHeaders `json:"parts"` // keyed by part number as string
+	ConfirmKey string `json:"confirmKey"`
+	UploadID   string `json:"uploadId"`
+	Domain     string `json:"domain"`
+	Path       string `json:"path"`
+	Parts      map[string]struct {
+		Headers PartHeaders `json:"headers"`
+	} `json:"parts"` // keyed by part number as string
 
 	// Expiration is derived from the wire "expiration" string (millisecond
 	// precision) and is not decoded directly.
@@ -138,7 +140,7 @@ func (c *Client) StartUpload(ctx context.Context, path string, partNumbers []int
 	first, last := partNumbers[0], partNumbers[len(partNumbers)-1]
 	body := fmt.Sprintf(`{"partNumberRange":["%d,%d"]}`, first, last)
 	raw, err := c.call(ctx, http.MethodPost, fmt.Sprintf("/api/v1/file/%s/%s/%s", creds.LibraryID, creds.SpaceID, escapePath(path)), strings.NewReader(body), url.Values{
-		"multipart":                    nil,
+		"multipart":                    {""}, // bare query flag; url.Values drops nil values
 		"conflict_resolution_strategy": {"rename"},
 		"access_token":                 {creds.AccessToken},
 	})
@@ -173,7 +175,7 @@ func (c *Client) RenewUpload(ctx context.Context, confirmKey string, partNumbers
 	first, last := partNumbers[0], partNumbers[len(partNumbers)-1]
 	body := fmt.Sprintf(`{"partNumberRange":["%d,%d"]}`, first, last)
 	raw, err := c.call(ctx, http.MethodPost, fmt.Sprintf("/api/v1/file/%s/%s/%s", creds.LibraryID, creds.SpaceID, escapePath(confirmKey)), strings.NewReader(body), url.Values{
-		"multipart":    nil,
+		"multipart":    {""},
 		"access_token": {creds.AccessToken},
 	})
 	if err != nil {
@@ -194,7 +196,7 @@ func (c *Client) Confirm(ctx context.Context, confirmKey, crc64 string) (size in
 		return 0, "", err
 	}
 	q := url.Values{
-		"confirm":                      nil,
+		"confirm":                      {""}, // bare query flag
 		"conflict_resolution_strategy": {"overwrite"},
 		"access_token":                 {creds.AccessToken},
 	}
@@ -257,7 +259,7 @@ func (c *Client) Stat(ctx context.Context, path string) (size int64, found bool,
 		return 0, false, err
 	}
 	raw, err := c.call(ctx, http.MethodGet, fmt.Sprintf("/api/v1/file/%s/%s/%s", creds.LibraryID, creds.SpaceID, escapePath(path)), nil, url.Values{
-		"info":         nil,
+		"info":         {""},
 		"access_token": {creds.AccessToken},
 	})
 	if err != nil {

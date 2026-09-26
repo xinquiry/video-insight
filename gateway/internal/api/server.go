@@ -155,7 +155,7 @@ func (s *Server) startUpload(w http.ResponseWriter, r *http.Request) {
 		parts = append(parts, partOut{
 			PartNumber: n,
 			URL:        "https://" + session.Domain + session.Path,
-			Headers:    part,
+			Headers:    part.Headers,
 		})
 	}
 	expiresIn := int(time.Until(session.Expiration).Seconds())
@@ -218,7 +218,7 @@ func (s *Server) renewUpload(w http.ResponseWriter, r *http.Request) {
 		parts = append(parts, partOut{
 			PartNumber: n,
 			URL:        "https://" + session.Domain + session.Path,
-			Headers:    part,
+			Headers:    part.Headers,
 		})
 	}
 	writeJSON(w, http.StatusOK, startUploadResponse{
