@@ -179,17 +179,49 @@ func (c *Client) startUploadBatch(ctx context.Context, endpoint, body string) (*
 }
 
 // StartUpload requests presigned part headers for the given part numbers.
-// More than 50 numbers are fetched in batches and merged into one session.
+// SMH signs at most 50 numbers per request, and each start request mints a
+// fresh session — so the first batch starts the upload and every further
+// batch renews against the first session's confirmKey. All parts are merged
+// into the one original session.
 func (c *Client) StartUpload(ctx context.Context, path string, partNumbers []int) (*UploadSession, error) {
+	if len(partNumbers) == 0 {
+		return nil, errors.New("smh: no part numbers requested")
+	}
+	first := partNumbers[:min(MaxPartNumbersPerRequest, len(partNumbers))]
+	session, err := c.startUploadBatch(ctx, path, rangeBody(first))
+	if err != nil {
+		return nil, err
+	}
+	for start := MaxPartNumbersPerRequest; start < len(partNumbers); start += MaxPartNumbersPerRequest {
+		batch := partNumbers[start:min(start+MaxPartNumbersPerRequest, len(partNumbers))]
+		renewed, renewErr := c.renewBatch(ctx, session.ConfirmKey, batch)
+		if renewErr != nil {
+			return nil, renewErr
+		}
+		for key, part := range renewed.Parts {
+			session.Parts[key] = part
+		}
+		if !renewed.Expiration.IsZero() {
+			session.Expiration = renewed.Expiration
+		}
+	}
+	return session, nil
+}
+
+func rangeBody(partNumbers []int) string {
+	numbers := make([]string, 0, len(partNumbers))
+	for _, n := range partNumbers {
+		numbers = append(numbers, strconv.Itoa(n))
+	}
+	return fmt.Sprintf(`{"partNumberRange":["%s"]}`, strings.Join(numbers, ","))
+}
+
+// RenewUpload re-requests part headers for an in-flight confirmKey.
+func (c *Client) RenewUpload(ctx context.Context, confirmKey string, partNumbers []int) (*UploadSession, error) {
 	var session *UploadSession
 	for start := 0; start < len(partNumbers); start += MaxPartNumbersPerRequest {
 		batch := partNumbers[start:min(start+MaxPartNumbersPerRequest, len(partNumbers))]
-		numbers := make([]string, 0, len(batch))
-		for _, n := range batch {
-			numbers = append(numbers, strconv.Itoa(n))
-		}
-		body := fmt.Sprintf(`{"partNumberRange":["%s"]}`, strings.Join(numbers, ","))
-		next, err := c.startUploadBatch(ctx, path, body)
+		next, err := c.renewBatch(ctx, confirmKey, batch)
 		if err != nil {
 			return nil, err
 		}
@@ -207,32 +239,9 @@ func (c *Client) StartUpload(ctx context.Context, path string, partNumbers []int
 	return session, nil
 }
 
-// RenewUpload re-requests part headers for an in-flight confirmKey.
-func (c *Client) RenewUpload(ctx context.Context, confirmKey string, partNumbers []int) (*UploadSession, error) {
-	var session *UploadSession
-	for start := 0; start < len(partNumbers); start += MaxPartNumbersPerRequest {
-		batch := partNumbers[start:min(start+MaxPartNumbersPerRequest, len(partNumbers))]
-		numbers := make([]string, 0, len(batch))
-		for _, n := range batch {
-			numbers = append(numbers, strconv.Itoa(n))
-		}
-		body := fmt.Sprintf(`{"partNumberRange":["%s"]}`, strings.Join(numbers, ","))
-		next, err := c.startUploadBatch(ctx, confirmKey, body)
-		if err != nil {
-			return nil, err
-		}
-		if session == nil {
-			session = next
-		} else {
-			for key, part := range next.Parts {
-				session.Parts[key] = part
-			}
-			if !next.Expiration.IsZero() {
-				session.Expiration = next.Expiration
-			}
-		}
-	}
-	return session, nil
+// renewBatch re-signs up to 50 part numbers for an existing confirmKey.
+func (c *Client) renewBatch(ctx context.Context, confirmKey string, batch []int) (*UploadSession, error) {
+	return c.startUploadBatch(ctx, confirmKey, rangeBody(batch))
 }
 
 // Confirm finalizes an upload. SMH verifies the assembled object's crc64 when
