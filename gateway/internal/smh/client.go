@@ -24,27 +24,18 @@ const (
 )
 
 // PartHeaders is the presigned SigV4 header set SMH returns per part.
-// The browser PUTs these headers verbatim to Domain+Path.
-type PartHeaders struct {
-	Date   string `json:"x-amz-date"`
-	SHA256 string `json:"x-amz-content-sha256"`
-	Auth   string `json:"authorization"`
-}
-
-// Part presign info for one part number.
-type Part struct {
-	PartNumber int         `json:"partNumber"`
-	Headers    PartHeaders `json:"headers"`
-}
+// Keys are the raw header names ("x-amz-date", "x-amz-content-sha256",
+// "authorization"); the browser PUTs them verbatim to Domain+Path.
+type PartHeaders map[string]string
 
 // UploadSession is the result of starting a chunk upload.
 type UploadSession struct {
-	ConfirmKey string          `json:"confirmKey"`
-	UploadID   string          `json:"uploadId"`
-	Domain     string          `json:"domain"`
-	Path       string          `json:"path"`
-	Parts      map[string]Part `json:"parts"` // keyed by part number as string
-	Expiration time.Time       `json:"expiration"`
+	ConfirmKey string                 `json:"confirmKey"`
+	UploadID   string                 `json:"uploadId"`
+	Domain     string                 `json:"domain"`
+	Path       string                 `json:"path"`
+	Parts      map[string]PartHeaders `json:"parts"` // keyed by part number as string
+	Expiration time.Time              `json:"expiration"`
 }
 
 // Client talks to pan.sjtu.edu.cn. It refreshes the space access token
@@ -115,7 +106,7 @@ func (c *Client) cred(ctx context.Context) (*spaceCred, error) {
 // ---- core API ----------------------------------------------------------------
 
 // EnsureDirectory creates dir (recursively implied by SMH full-path PUT)
-// if it does not exist. Idempotent.
+// if it does not exist. Idempotent: SameNameDirectoryOrFileExists is ok.
 func (c *Client) EnsureDirectory(ctx context.Context, dir string) error {
 	creds, err := c.cred(ctx)
 	if err != nil {
@@ -125,6 +116,12 @@ func (c *Client) EnsureDirectory(ctx context.Context, dir string) error {
 		"conflict_resolution_strategy": {"ask"},
 		"access_token":                 {creds.AccessToken},
 	})
+	if err != nil {
+		var ae *apiError
+		if errors.As(err, &ae) && ae.Code == "SameNameDirectoryOrFileExists" {
+			return nil
+		}
+	}
 	return err
 }
 

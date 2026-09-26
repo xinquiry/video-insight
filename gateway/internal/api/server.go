@@ -155,11 +155,7 @@ func (s *Server) startUpload(w http.ResponseWriter, r *http.Request) {
 		parts = append(parts, partOut{
 			PartNumber: n,
 			URL:        "https://" + session.Domain + session.Path,
-			Headers: map[string]string{
-				"x-amz-date":           part.Headers.Date,
-				"x-amz-content-sha256": part.Headers.SHA256,
-				"authorization":        part.Headers.Auth,
-			},
+			Headers:    part,
 		})
 	}
 	expiresIn := int(time.Until(session.Expiration).Seconds())
@@ -222,11 +218,7 @@ func (s *Server) renewUpload(w http.ResponseWriter, r *http.Request) {
 		parts = append(parts, partOut{
 			PartNumber: n,
 			URL:        "https://" + session.Domain + session.Path,
-			Headers: map[string]string{
-				"x-amz-date":           part.Headers.Date,
-				"x-amz-content-sha256": part.Headers.SHA256,
-				"authorization":        part.Headers.Auth,
-			},
+			Headers:    part,
 		})
 	}
 	writeJSON(w, http.StatusOK, startUploadResponse{
