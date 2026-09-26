@@ -35,7 +35,10 @@ type UploadSession struct {
 	Domain     string                 `json:"domain"`
 	Path       string                 `json:"path"`
 	Parts      map[string]PartHeaders `json:"parts"` // keyed by part number as string
-	Expiration time.Time              `json:"expiration"`
+
+	// Expiration is derived from the wire "expiration" string (millisecond
+	// precision) and is not decoded directly.
+	Expiration time.Time
 }
 
 // Client talks to pan.sjtu.edu.cn. It refreshes the space access token
@@ -142,21 +145,23 @@ func (c *Client) StartUpload(ctx context.Context, path string, partNumbers []int
 	if err != nil {
 		return nil, err
 	}
-	var rawSession struct {
+	var session struct {
 		UploadSession
-		ExpirationJSON string `json:"expiration"`
+		Expiration string `json:"expiration"`
 	}
-	if err := json.Unmarshal(raw, &rawSession); err != nil {
+	if err := json.Unmarshal(raw, &session); err != nil {
 		return nil, fmt.Errorf("decode upload session: %w", err)
-	}
-	session := rawSession.UploadSession
-	if t, err := time.Parse(time.RFC3339, rawSession.ExpirationJSON); err == nil {
-		session.Expiration = t
 	}
 	if session.ConfirmKey == "" || session.UploadID == "" {
 		return nil, fmt.Errorf("smh: incomplete upload session response")
 	}
-	return &session, nil
+	// Millisecond precision with trailing "Z", e.g. 2026-09-26T09:59:41.028Z.
+	expiration, err := time.Parse("2006-01-02T15:04:05.999Z07:00", session.Expiration)
+	if err != nil {
+		return nil, fmt.Errorf("parse upload session expiration %q: %w", session.Expiration, err)
+	}
+	session.UploadSession.Expiration = expiration
+	return &session.UploadSession, nil
 }
 
 // RenewUpload re-requests part headers for an in-flight confirmKey.
