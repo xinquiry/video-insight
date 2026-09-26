@@ -11,7 +11,6 @@ import {
   Plus,
   Send,
   Trash2,
-  Upload,
 } from "lucide-react";
 import { motion } from "motion/react";
 import {
@@ -31,10 +30,10 @@ import {
   useCreateAnnotationComment,
   useDeleteAnnotation,
   useDeleteVideo,
+  triggerDriveExportDownload,
   useDriveExport,
   useUpdateAnnotation,
   useVideo,
-  useVideoExport,
 } from "@/features/videos/hooks";
 import { isRichTextEmpty, RichTextContent, RichTextEditor } from "@/components/RichTextEditor";
 import {
@@ -147,9 +146,9 @@ function VideoDetailPage() {
     }
   };
   const deleteVideo = useDeleteVideo();
-  const exportVideo = useVideoExport();
   const driveExport = useDriveExport(videoId);
-  const driveExportJob = driveExport.status.data?.export ?? null;
+  const driveExportStatus = driveExport.status.data;
+  const driveExportJob = driveExportStatus?.export ?? null;
   const driveExportActive =
     driveExportJob?.status === "pending" ||
     driveExportJob?.status === "preparing" ||
@@ -515,16 +514,6 @@ function VideoDetailPage() {
           </p>
         </div>
         <div className="flex shrink-0 items-center gap-2">
-          {exportVideo.isSuccess && (
-            <span className="hidden text-xs text-[var(--muted)] lg:inline">
-              {t("videoDetail.export.started")}
-            </span>
-          )}
-          {exportVideo.isError && (
-            <span className="hidden text-xs text-[var(--danger)] lg:inline">
-              {getErrorMessage(exportVideo.error, t, "videoDetail.export.failed")}
-            </span>
-          )}
           {canCache && (
             <button
               type="button"
@@ -544,10 +533,18 @@ function VideoDetailPage() {
           {cacheError && (
             <span className="hidden text-xs text-[var(--danger)] lg:inline">{cacheError}</span>
           )}
-          {driveExport.status.data?.enabled && (
+          {driveExportStatus?.enabled && (
             <button
               type="button"
-              onClick={() => driveExport.queue.mutate()}
+              onClick={() => {
+                if (
+                  driveExportJob?.status === "completed" &&
+                  triggerDriveExportDownload(driveExportStatus, video.original_filename)
+                ) {
+                  return;
+                }
+                driveExport.queue.mutate();
+              }}
               disabled={
                 video.processing_status !== "ready" ||
                 driveExportActive ||
@@ -556,7 +553,7 @@ function VideoDetailPage() {
               className="vi-button-secondary disabled:opacity-60"
               title={driveExportJob?.destination_path ?? t("videoDetail.driveExport.hint")}
             >
-              <Upload className="h-4 w-4" />
+              <Download className="h-4 w-4" />
               {driveExportJob?.status === "pending"
                 ? t("videoDetail.driveExport.pending")
                 : driveExportJob?.status === "preparing"
@@ -566,7 +563,7 @@ function VideoDetailPage() {
                     : driveExportJob?.status === "failed"
                       ? t("videoDetail.driveExport.retry")
                       : driveExportJob?.status === "completed"
-                        ? t("videoDetail.driveExport.again")
+                        ? t("videoDetail.driveExport.download")
                         : t("videoDetail.driveExport.action")}
             </button>
           )}
@@ -581,23 +578,6 @@ function VideoDetailPage() {
               {t("videoDetail.driveExport.failed")}
             </span>
           )}
-          <button
-            type="button"
-            onClick={() => exportVideo.mutate({ id: videoId, filename: video.original_filename })}
-            disabled={video.processing_status !== "ready" || exportVideo.isPending}
-            className="vi-button-secondary disabled:opacity-60"
-            title={t("videoDetail.export.hint")}
-          >
-            <Download className="h-4 w-4" />
-            {exportVideo.isPending
-              ? exportVideo.receivedBytes !== null
-                ? t("videoDetail.export.downloading", {
-                    received: formatBytes(exportVideo.receivedBytes),
-                    total: formatBytes(video.size_bytes),
-                  })
-                : t("videoDetail.export.preparing")
-              : t("videoDetail.export.action")}
-          </button>
           <button
             type="button"
             onClick={handleDeleteVideo}

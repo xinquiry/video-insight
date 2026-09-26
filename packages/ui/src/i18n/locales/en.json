@@ -140,23 +140,15 @@
     "back": "Back to videos",
     "kicker": "Watching edition",
     "deleteVideo": "Delete Video",
-    "export": {
-      "action": "Export for local player",
-      "preparing": "Preparing export...",
-      "downloading": "Downloaded {{received}} / {{total}}",
-      "hint": "Downloads one portable package containing the video and all annotations.",
-      "started": "VideoInsight package saved.",
-      "failed": "Export could not be prepared."
-    },
     "driveExport": {
-      "action": "Export to drive",
-      "pending": "Drive export queued",
-      "preparing": "Packaging for drive…",
+      "action": "Download package",
+      "pending": "Preparing download…",
+      "preparing": "Packaging…",
       "uploading": "Uploading to drive…",
-      "retry": "Retry drive export",
-      "again": "Export to drive again",
-      "hint": "Creates the portable package on the server and uploads it to the configured drive.",
-      "failed": "Drive export failed."
+      "retry": "Retry download",
+      "download": "Download package",
+      "hint": "Packages the video with all annotations and downloads it (served directly from the drive).",
+      "failed": "Package download failed."
     },
     "videoUnavailable": "Video URL unavailable.",
     "processing": {

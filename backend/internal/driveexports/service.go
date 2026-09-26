@@ -24,19 +24,27 @@ type ServiceConfig struct {
 	DestinationRoot string
 }
 
+// URLSigner signs short-lived download URLs for exported packages (the
+// sjtu-oss-gateway uploader implements it).
+type URLSigner interface {
+	DownloadURL(ctx context.Context, objectKey string) (string, error)
+}
+
 type Status struct {
-	Enabled bool
-	Job     *model.DriveExport
+	Enabled     bool
+	Job         *model.DriveExport
+	DownloadURL string // present when a completed export can still be served
 }
 
 type Service struct {
 	store  ServiceStore
 	config ServiceConfig
+	signer URLSigner
 }
 
-func NewService(store ServiceStore, config ServiceConfig) *Service {
+func NewService(store ServiceStore, config ServiceConfig, signer URLSigner) *Service {
 	config.DestinationRoot = strings.Trim(config.DestinationRoot, "/")
-	return &Service{store: store, config: config}
+	return &Service{store: store, config: config, signer: signer}
 }
 
 func (s *Service) Status(ctx context.Context, videoID, groupID uuid.UUID) (Status, error) {
@@ -50,7 +58,15 @@ func (s *Service) Status(ctx context.Context, videoID, groupID uuid.UUID) (Statu
 	if !found {
 		return Status{Enabled: s.config.Enabled}, nil
 	}
-	return Status{Enabled: s.config.Enabled, Job: &job}, nil
+	status := Status{Enabled: s.config.Enabled, Job: &job}
+	if job.Status == model.DriveExportCompleted && s.signer != nil {
+		if url, signErr := s.signer.DownloadURL(ctx, job.DestinationPath); signErr == nil {
+			status.DownloadURL = url
+		}
+		// Signing failures are not fatal: the client sees a completed export
+		// and can re-queue to regenerate the package.
+	}
+	return status, nil
 }
 
 func (s *Service) Queue(ctx context.Context, videoID, groupID, requestedBy uuid.UUID) (model.DriveExport, error) {

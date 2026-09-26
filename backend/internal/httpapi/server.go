@@ -6,9 +6,7 @@ import (
 	"errors"
 	"io"
 	"log/slog"
-	"mime"
 	"net/http"
-	"path"
 	"strconv"
 	"strings"
 	"time"
@@ -22,7 +20,6 @@ import (
 	"github.com/xinquiry/video-insight/backend/internal/driveexports"
 	"github.com/xinquiry/video-insight/backend/internal/groups"
 	"github.com/xinquiry/video-insight/backend/internal/model"
-	"github.com/xinquiry/video-insight/backend/internal/portable"
 	"github.com/xinquiry/video-insight/backend/internal/shared/apperror"
 	"github.com/xinquiry/video-insight/backend/internal/videos"
 )
@@ -91,7 +88,6 @@ func New(
 			protected.Post("/videos/uploads/abort", server.abortUpload)
 			protected.Post("/videos", server.completeUpload)
 			protected.Get("/videos/{videoID}", server.getVideo)
-			protected.Get("/videos/{videoID}/export", server.exportVideo)
 			protected.Get("/videos/{videoID}/drive-export", server.getDriveExport)
 			protected.Post("/videos/{videoID}/drive-export", server.queueDriveExport)
 			protected.Patch("/videos/{videoID}", server.updateVideo)
@@ -270,46 +266,6 @@ func (s *Server) getVideo(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	writeJSON(w, http.StatusOK, videoDTO(result))
-}
-
-func (s *Server) exportVideo(w http.ResponseWriter, r *http.Request) {
-	videoID, ok := pathUUID(w, r, "videoID")
-	if !ok {
-		return
-	}
-	groupID := currentUser(r).GroupID
-	result, err := s.videos.OpenExport(r.Context(), videoID, groupID)
-	if err != nil {
-		s.writeError(w, r, err)
-		return
-	}
-	defer func() { _ = result.Media.Close() }()
-	items, err := s.annotations.List(r.Context(), videoID, groupID)
-	if err != nil {
-		s.writeError(w, r, err)
-		return
-	}
-	portableVideo := result.Video
-	portableVideo.OriginalFilename = result.Filename
-	mediaPath := "media/" + result.Filename
-	bundle, err := portable.NewBundle(portableVideo, mediaPath, items, time.Now())
-	if err != nil {
-		s.writeError(w, r, err)
-		return
-	}
-	packageStem := strings.TrimSuffix(result.Filename, path.Ext(result.Filename))
-	if packageStem == "" {
-		packageStem = "video-" + videoID.String()
-	}
-	packageName := packageStem + portable.PackageExtension
-	w.Header().Set("Cache-Control", "private, no-store")
-	w.Header().Set("Content-Type", portable.PackageMIME)
-	w.Header().Set("Content-Disposition", mime.FormatMediaType("attachment", map[string]string{"filename": packageName}))
-	w.Header().Set("X-Content-Type-Options", "nosniff")
-	w.WriteHeader(http.StatusOK)
-	if err := portable.WritePackage(w, bundle, result.Media); err != nil {
-		s.logger.Error("stream video export", "request_id", middleware.GetReqID(r.Context()), "video_id", videoID, "error", err)
-	}
 }
 
 func (s *Server) getDriveExport(w http.ResponseWriter, r *http.Request) {

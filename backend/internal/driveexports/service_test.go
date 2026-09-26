@@ -50,7 +50,7 @@ func TestQueueDriveExportBuildsStableDestination(t *testing.T) {
 		ID: videoID, GroupID: groupID, OriginalFilename: `folder/Lesson #1?.mp4`,
 		ProcessingStatus: model.VideoProcessingReady,
 	}}
-	service := NewService(store, ServiceConfig{Enabled: true, DestinationRoot: "/VideoInsight/"})
+	service := NewService(store, ServiceConfig{Enabled: true, DestinationRoot: "/VideoInsight/"}, nil)
 	job, err := service.Queue(context.Background(), videoID, groupID, uuid.New())
 	if err != nil {
 		t.Fatal(err)
@@ -68,13 +68,13 @@ func TestQueueDriveExportRejectsDisabledAndActiveJobs(t *testing.T) {
 		ID: videoID, GroupID: groupID, OriginalFilename: "lesson.mp4",
 		ProcessingStatus: model.VideoProcessingReady,
 	}}
-	_, err := NewService(store, ServiceConfig{}).Queue(context.Background(), videoID, groupID, uuid.New())
+	_, err := NewService(store, ServiceConfig{}, nil).Queue(context.Background(), videoID, groupID, uuid.New())
 	if appErr, ok := apperror.As(err); !ok || appErr.Code != "drive_export_disabled" {
 		t.Fatalf("disabled error = %v", err)
 	}
 
 	store.job = &model.DriveExport{Status: model.DriveExportUploading}
-	_, err = NewService(store, ServiceConfig{Enabled: true}).Queue(context.Background(), videoID, groupID, uuid.New())
+	_, err = NewService(store, ServiceConfig{Enabled: true}, nil).Queue(context.Background(), videoID, groupID, uuid.New())
 	if appErr, ok := apperror.As(err); !ok || appErr.Code != "drive_export_in_progress" {
 		t.Fatalf("active error = %v", err)
 	}

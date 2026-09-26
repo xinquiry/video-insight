@@ -70,6 +70,10 @@ type driveExportResponse struct {
 type driveExportStatusResponse struct {
 	Enabled bool                 `json:"enabled"`
 	Export  *driveExportResponse `json:"export"`
+	// DownloadURL is a short-lived COS presigned URL present when the export
+	// completed; the browser downloads the package through it directly,
+	// bypassing the application tunnel.
+	DownloadURL string `json:"download_url,omitempty"`
 }
 
 type annotationResponse struct {
@@ -231,7 +235,7 @@ func videoDTO(read videos.Read) videoResponse {
 }
 
 func driveExportStatusDTO(status driveexports.Status) driveExportStatusResponse {
-	response := driveExportStatusResponse{Enabled: status.Enabled}
+	response := driveExportStatusResponse{Enabled: status.Enabled, DownloadURL: status.DownloadURL}
 	if status.Job != nil {
 		exported := driveExportDTO(*status.Job)
 		response.Export = &exported

@@ -6,7 +6,6 @@ import {
   createAnnotationComment,
   deleteAnnotation,
   deleteVideo,
-  exportVideo,
   fetchAnnotations,
   fetchAnnotationComments,
   fetchDriveExport,
@@ -115,19 +114,6 @@ export function useDeleteVideo() {
   });
 }
 
-export function useVideoExport() {
-  const [receivedBytes, setReceivedBytes] = useState<number | null>(null);
-  const mutation = useMutation({
-    mutationFn: (input: { id: string; filename: string }) =>
-      exportVideo({
-        ...input,
-        onProgress: (received) => setReceivedBytes(received),
-      }),
-    onSettled: () => setReceivedBytes(null),
-  });
-  return { ...mutation, receivedBytes };
-}
-
 export function useDriveExport(videoId: string) {
   const queryClient = useQueryClient();
   const status = useQuery({
@@ -151,6 +137,26 @@ export function useDriveExport(videoId: string) {
     },
   });
   return { status, queue };
+}
+
+/**
+ * 下载导出包：完成后端返回短时效 COS 预签名 URL，浏览器经它直连下载，
+ * 字节不经过应用隧道。URL 的有效期内可重复触发。
+ */
+export function triggerDriveExportDownload(
+  status: { download_url?: string },
+  filename: string,
+) {
+  const url = status.download_url;
+  if (!url) return false;
+  const stem = filename.replace(/\.[^./\\]+$/, "") || "video";
+  const anchor = document.createElement("a");
+  anchor.href = url;
+  anchor.download = `${stem}.vinsight`;
+  document.body.appendChild(anchor);
+  anchor.click();
+  anchor.remove();
+  return true;
 }
 
 export function useAnnotations(videoId: string) {

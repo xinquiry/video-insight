@@ -86,6 +86,17 @@ The web and desktop products share one React codebase in a pnpm workspace:
 
 Production nginx serves the web bundle and proxies `/api` to the Go service.
 
+### Export / package download
+
+Videos are exported as `.vinsight` portable packages. The interactive flow is
+queue-then-download: the user queues a package job for a video
+(`POST /api/videos/{id}/drive-export`), the worker packages the video with its
+annotations and uploads it to the SJTU Drive through the storage gateway
+(`gateway/`), and the status response then carries a short-lived presigned
+COS `download_url` the browser fetches directly — package bytes never cross
+the application tunnel. There is no synchronous streaming export endpoint and
+no client-side package assembly.
+
 ### Storage gateway (`gateway/`)
 
 `sjtu-oss-gateway`, the presign broker that turns the SJTU Drive (Tencent

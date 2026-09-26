@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"net/url"
 	"os"
 	"strings"
 	"time"
@@ -189,6 +190,23 @@ func (u *GatewayUploader) putPart(ctx context.Context, part gatewayPart, file *o
 		return fmt.Errorf("part PUT returned %s", response.Status)
 	}
 	return nil
+}
+
+// DownloadURL signs a short-lived download URL for an exported object via
+// the gateway. The browser fetches it directly from COS; the bytes never
+// cross the application tunnel.
+func (u *GatewayUploader) DownloadURL(ctx context.Context, objectKey string) (string, error) {
+	var response struct {
+		URL string `json:"url"`
+	}
+	err := u.call(ctx, http.MethodGet, "/v1/objects/download-url?key="+url.QueryEscape(objectKey), nil, &response)
+	if err != nil {
+		return "", fmt.Errorf("sign drive export download: %w", err)
+	}
+	if response.URL == "" {
+		return "", fmt.Errorf("gateway returned an empty download URL")
+	}
+	return response.URL, nil
 }
 
 func (u *GatewayUploader) call(ctx context.Context, method, path string, payload any, result any) error {

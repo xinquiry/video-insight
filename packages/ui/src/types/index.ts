@@ -43,6 +43,8 @@ export interface DriveExport {
 export interface DriveExportStatus {
   enabled: boolean;
   export: DriveExport | null;
+  /** 短时效 COS 预签名 URL，仅在 export.status === "completed" 时存在；浏览器经它直连下载。 */
+  download_url?: string;
 }
 
 export interface Group {

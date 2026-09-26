@@ -64,9 +64,16 @@ func New(ctx context.Context, cfg config.Config, logger *slog.Logger) (*App, err
 		ProcessingEnabled: cfg.VideoProcessingEnabled,
 	})
 	annotationService := annotations.NewService(store)
+	driveExportSigner, err := driveexports.NewGatewayUploader(driveexports.GatewayConfig{
+		BaseURL: cfg.DriveExportGatewayURL, AccessKey: cfg.DriveExportAccessKey,
+		Secret: cfg.DriveExportSecret, Timeout: cfg.DriveExportTimeout,
+	})
+	if err != nil {
+		return nil, fmt.Errorf("initialize drive export gateway client: %w", err)
+	}
 	driveExportService := driveexports.NewService(store, driveexports.ServiceConfig{
 		Enabled: cfg.DriveExportEnabled, DestinationRoot: cfg.DriveExportDestinationRoot,
-	})
+	}, driveExportSigner)
 	handler := httpapi.New(
 		authService, groupService, videoService, annotationService, driveExportService,
 		tokens, store, logger, cfg.CORSOrigins,
@@ -104,16 +111,8 @@ func New(ctx context.Context, cfg config.Config, logger *slog.Logger) (*App, err
 		if recovered > 0 {
 			logger.Info("requeued interrupted drive export jobs", "count", recovered)
 		}
-		uploader, err := driveexports.NewGatewayUploader(driveexports.GatewayConfig{
-			BaseURL: cfg.DriveExportGatewayURL, AccessKey: cfg.DriveExportAccessKey,
-			Secret: cfg.DriveExportSecret, Timeout: cfg.DriveExportTimeout,
-		})
-		if err != nil {
-			application.Close()
-			return nil, fmt.Errorf("initialize drive export gateway uploader: %w", err)
-		}
 		exporter, err := driveexports.NewPackageExporter(
-			videoService, annotationService, uploader, cfg.DriveExportTempDir, cfg.DriveExportMaxBytes,
+			videoService, annotationService, driveExportSigner, cfg.DriveExportTempDir, cfg.DriveExportMaxBytes,
 		)
 		if err != nil {
 			application.Close()
