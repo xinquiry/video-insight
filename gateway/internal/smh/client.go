@@ -196,15 +196,21 @@ func (c *Client) startUploadBatch(ctx context.Context, endpoint, body string) (*
 	return &session.UploadSession, nil
 }
 
+// startBatchLimit is the SMH cap on part numbers per start request
+// (verified live: >100 returns ParamInvalid). Renewals are capped at 50.
+const startBatchLimit = 100
+
 // StartUpload requests presigned part headers for the given part numbers.
-// SMH signs an arbitrary number of parts in one request; only renewals are
-// capped at 50 numbers per call. Each returned part carries its own
-// complete PUT URL so callers never see session internals.
+// SMH signs at most 100 numbers per start request and 50 per renewal, so
+// large uploads start with the first 100 parts and extend with renew
+// batches against the original confirmKey. Every part carries its own
+// complete PUT URL — renewed parts bind to a new uploadId and path.
 func (c *Client) StartUpload(ctx context.Context, path string, partNumbers []int) (*ResolvedSession, error) {
 	if len(partNumbers) == 0 {
 		return nil, errors.New("smh: no part numbers requested")
 	}
-	session, err := c.startUploadBatch(ctx, path, rangeBody(partNumbers))
+	first := partNumbers[:min(startBatchLimit, len(partNumbers))]
+	session, err := c.startUploadBatch(ctx, path, rangeBody(first))
 	if err != nil {
 		return nil, err
 	}
@@ -215,6 +221,17 @@ func (c *Client) StartUpload(ctx context.Context, path string, partNumbers []int
 		Expiration: session.Expiration,
 	}
 	collect(resolved, session)
+	for start := startBatchLimit; start < len(partNumbers); start += MaxPartNumbersPerRequest {
+		batch := partNumbers[start:min(start+MaxPartNumbersPerRequest, len(partNumbers))]
+		renewed, renewErr := c.startUploadBatch(ctx, session.ConfirmKey, rangeBody(batch))
+		if renewErr != nil {
+			return nil, renewErr
+		}
+		collect(resolved, renewed)
+		if !renewed.Expiration.IsZero() {
+			resolved.Expiration = renewed.Expiration
+		}
+	}
 	return resolved, nil
 }
 
