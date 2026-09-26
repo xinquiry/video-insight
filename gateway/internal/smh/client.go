@@ -12,6 +12,7 @@ import (
 	"io"
 	"net/http"
 	"net/url"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -130,20 +131,31 @@ func (c *Client) EnsureDirectory(ctx context.Context, dir string) error {
 	return err
 }
 
-// StartUpload requests presigned part headers for the given part numbers.
-func (c *Client) StartUpload(ctx context.Context, path string, partNumbers []int) (*UploadSession, error) {
+// MaxPartNumbersPerRequest matches the SMH RenewChunkUpload restriction:
+// at most 50 part numbers per call. StartUpload obeys the same limit.
+const MaxPartNumbersPerRequest = 50
+
+// startUploadBatch is the shared part-signature request for both start and
+// renew. partNumberRange must enumerate individual part numbers
+// (comma-separated, e.g. "1,2,3"), not a "first,last" range — SMH
+// interprets the latter as exactly two part numbers.
+func (c *Client) startUploadBatch(ctx context.Context, endpoint, body string) (*UploadSession, error) {
 	creds, err := c.cred(ctx)
 	if err != nil {
 		return nil, err
 	}
-	// partNumberRange uses "first,last" for contiguous ranges.
-	first, last := partNumbers[0], partNumbers[len(partNumbers)-1]
-	body := fmt.Sprintf(`{"partNumberRange":["%d,%d"]}`, first, last)
-	raw, err := c.call(ctx, http.MethodPost, fmt.Sprintf("/api/v1/file/%s/%s/%s", creds.LibraryID, creds.SpaceID, escapePath(path)), strings.NewReader(body), url.Values{
-		"multipart":                    {""}, // bare query flag; url.Values drops nil values
-		"conflict_resolution_strategy": {"rename"},
-		"access_token":                 {creds.AccessToken},
-	})
+	q := url.Values{
+		"multipart":    {""}, // bare query flag; url.Values drops nil values
+		"access_token": {creds.AccessToken},
+	}
+	if endpoint == "" {
+		q.Set("conflict_resolution_strategy", "rename")
+	}
+	path := endpoint
+	if path == "" {
+		return nil, errors.New("smh: empty upload endpoint")
+	}
+	raw, err := c.call(ctx, http.MethodPost, fmt.Sprintf("/api/v1/file/%s/%s/%s", creds.LibraryID, creds.SpaceID, escapePath(path)), strings.NewReader(body), q)
 	if err != nil {
 		return nil, err
 	}
@@ -166,26 +178,61 @@ func (c *Client) StartUpload(ctx context.Context, path string, partNumbers []int
 	return &session.UploadSession, nil
 }
 
+// StartUpload requests presigned part headers for the given part numbers.
+// More than 50 numbers are fetched in batches and merged into one session.
+func (c *Client) StartUpload(ctx context.Context, path string, partNumbers []int) (*UploadSession, error) {
+	var session *UploadSession
+	for start := 0; start < len(partNumbers); start += MaxPartNumbersPerRequest {
+		batch := partNumbers[start:min(start+MaxPartNumbersPerRequest, len(partNumbers))]
+		numbers := make([]string, 0, len(batch))
+		for _, n := range batch {
+			numbers = append(numbers, strconv.Itoa(n))
+		}
+		body := fmt.Sprintf(`{"partNumberRange":["%s"]}`, strings.Join(numbers, ","))
+		next, err := c.startUploadBatch(ctx, path, body)
+		if err != nil {
+			return nil, err
+		}
+		if session == nil {
+			session = next
+		} else {
+			for key, part := range next.Parts {
+				session.Parts[key] = part
+			}
+			if !next.Expiration.IsZero() {
+				session.Expiration = next.Expiration
+			}
+		}
+	}
+	return session, nil
+}
+
 // RenewUpload re-requests part headers for an in-flight confirmKey.
 func (c *Client) RenewUpload(ctx context.Context, confirmKey string, partNumbers []int) (*UploadSession, error) {
-	creds, err := c.cred(ctx)
-	if err != nil {
-		return nil, err
+	var session *UploadSession
+	for start := 0; start < len(partNumbers); start += MaxPartNumbersPerRequest {
+		batch := partNumbers[start:min(start+MaxPartNumbersPerRequest, len(partNumbers))]
+		numbers := make([]string, 0, len(batch))
+		for _, n := range batch {
+			numbers = append(numbers, strconv.Itoa(n))
+		}
+		body := fmt.Sprintf(`{"partNumberRange":["%s"]}`, strings.Join(numbers, ","))
+		next, err := c.startUploadBatch(ctx, confirmKey, body)
+		if err != nil {
+			return nil, err
+		}
+		if session == nil {
+			session = next
+		} else {
+			for key, part := range next.Parts {
+				session.Parts[key] = part
+			}
+			if !next.Expiration.IsZero() {
+				session.Expiration = next.Expiration
+			}
+		}
 	}
-	first, last := partNumbers[0], partNumbers[len(partNumbers)-1]
-	body := fmt.Sprintf(`{"partNumberRange":["%d,%d"]}`, first, last)
-	raw, err := c.call(ctx, http.MethodPost, fmt.Sprintf("/api/v1/file/%s/%s/%s", creds.LibraryID, creds.SpaceID, escapePath(confirmKey)), strings.NewReader(body), url.Values{
-		"multipart":    {""},
-		"access_token": {creds.AccessToken},
-	})
-	if err != nil {
-		return nil, err
-	}
-	var session UploadSession
-	if err := json.Unmarshal(raw, &session); err != nil {
-		return nil, fmt.Errorf("decode renew response: %w", err)
-	}
-	return &session, nil
+	return session, nil
 }
 
 // Confirm finalizes an upload. SMH verifies the assembled object's crc64 when
