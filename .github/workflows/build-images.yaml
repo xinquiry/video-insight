@@ -57,6 +57,10 @@ jobs:
             context: .
             dockerfile: ./docker/tbox-webdav.Dockerfile
             image_suffix: tbox-webdav
+          - service: gateway
+            context: ./gateway
+            dockerfile: ./gateway/Dockerfile
+            image_suffix: gateway
 
     steps:
       - name: Checkout
