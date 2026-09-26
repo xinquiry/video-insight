@@ -53,42 +53,6 @@ services:
       timeout: 5s
       retries: 3
 
-  tbox-webdav:
-    profiles: ["drive-export"]
-    image: ${IMAGE_REPOSITORY:?set IMAGE_REPOSITORY in docker/.env.prod}-tbox-webdav:${IMAGE_TAG:-latest}
-    restart: unless-stopped
-    env_file:
-      - .env.example
-      - .env.prod
-    healthcheck:
-      test:
-        [
-          "CMD-SHELL",
-          "curl --fail --silent --output /dev/null --request PROPFIND --header 'Depth: 0' --user \"$${DRIVE_EXPORT_USERNAME}:$${DRIVE_EXPORT_PASSWORD}\" http://127.0.0.1:65472/",
-        ]
-      interval: 30s
-      timeout: 10s
-      retries: 5
-
-  minio:
-    image: minio/minio:RELEASE.2025-09-07T16-13-09Z
-    restart: unless-stopped
-    profiles: ["selfhosted-minio"]
-    command: server /data --console-address ":9001"
-    ports:
-      - "127.0.0.1:${MINIO_PORT:-9000}:9000"
-      - "127.0.0.1:${MINIO_CONSOLE_PORT:-9001}:9001"
-    environment:
-      MINIO_ROOT_USER: ${MINIO_ROOT_USER}
-      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD}
-    volumes:
-      - minio-data:/data
-    healthcheck:
-      test: ["CMD", "mc", "ready", "local"]
-      interval: 5s
-      timeout: 3s
-      retries: 10
-
 volumes:
   pg-data:
   minio-data:

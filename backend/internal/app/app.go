@@ -104,13 +104,13 @@ func New(ctx context.Context, cfg config.Config, logger *slog.Logger) (*App, err
 		if recovered > 0 {
 			logger.Info("requeued interrupted drive export jobs", "count", recovered)
 		}
-		uploader, err := driveexports.NewWebDAVClient(driveexports.WebDAVConfig{
-			BaseURL: cfg.DriveExportWebDAVURL, Username: cfg.DriveExportUsername,
-			Password: cfg.DriveExportPassword, Timeout: cfg.DriveExportTimeout,
+		uploader, err := driveexports.NewGatewayUploader(driveexports.GatewayConfig{
+			BaseURL: cfg.DriveExportGatewayURL, AccessKey: cfg.DriveExportAccessKey,
+			Secret: cfg.DriveExportSecret, Timeout: cfg.DriveExportTimeout,
 		})
 		if err != nil {
 			application.Close()
-			return nil, fmt.Errorf("initialize drive export WebDAV client: %w", err)
+			return nil, fmt.Errorf("initialize drive export gateway uploader: %w", err)
 		}
 		exporter, err := driveexports.NewPackageExporter(
 			videoService, annotationService, uploader, cfg.DriveExportTempDir, cfg.DriveExportMaxBytes,

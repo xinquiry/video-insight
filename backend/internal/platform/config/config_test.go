@@ -42,9 +42,9 @@ func TestLoadCanDisableStartupAdminSeed(t *testing.T) {
 
 func TestLoadDriveExportConfiguration(t *testing.T) {
 	t.Setenv("DRIVE_EXPORT_ENABLED", "true")
-	t.Setenv("DRIVE_EXPORT_WEBDAV_URL", "http://tbox-webdav:65472")
-	t.Setenv("DRIVE_EXPORT_USERNAME", "videoinsight")
-	t.Setenv("DRIVE_EXPORT_PASSWORD", "drive-secret")
+	t.Setenv("DRIVE_EXPORT_GATEWAY_URL", "http://sjtu-oss-gateway.infra.svc:8200")
+	t.Setenv("DRIVE_EXPORT_ACCESS_KEY", "videoinsight")
+	t.Setenv("DRIVE_EXPORT_SECRET", "drive-secret")
 	cfg, err := Load()
 	if err != nil {
 		t.Fatal(err)

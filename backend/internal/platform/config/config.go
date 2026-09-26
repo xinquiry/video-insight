@@ -40,9 +40,9 @@ type Config struct {
 	VideoProcessingPollInterval time.Duration
 	VideoProcessingMaxAttempts  int
 	DriveExportEnabled          bool
-	DriveExportWebDAVURL        string
-	DriveExportUsername         string
-	DriveExportPassword         string
+	DriveExportGatewayURL       string
+	DriveExportAccessKey        string
+	DriveExportSecret           string
 	DriveExportDestinationRoot  string
 	DriveExportTempDir          string
 	DriveExportPollInterval     time.Duration
@@ -148,9 +148,9 @@ func Load() (Config, error) {
 		VideoProcessingPollInterval: time.Duration(processingPollSeconds) * time.Second,
 		VideoProcessingMaxAttempts:  processingMaxAttempts,
 		DriveExportEnabled:          driveExportEnabled,
-		DriveExportWebDAVURL:        env("DRIVE_EXPORT_WEBDAV_URL", "http://tbox-webdav:65472"),
-		DriveExportUsername:         env("DRIVE_EXPORT_USERNAME", "videoinsight"),
-		DriveExportPassword:         os.Getenv("DRIVE_EXPORT_PASSWORD"),
+		DriveExportGatewayURL:       env("DRIVE_EXPORT_GATEWAY_URL", "http://sjtu-oss-gateway.infra.svc:8200"),
+		DriveExportAccessKey:        env("DRIVE_EXPORT_ACCESS_KEY", ""),
+		DriveExportSecret:           os.Getenv("DRIVE_EXPORT_SECRET"),
 		DriveExportDestinationRoot:  env("DRIVE_EXPORT_DESTINATION_ROOT", "VideoInsight"),
 		DriveExportTempDir:          env("DRIVE_EXPORT_TEMP_DIR", filepath.Join(processingTempDir, "drive-exports")),
 		DriveExportPollInterval:     time.Duration(driveExportPollSeconds) * time.Second,
@@ -186,15 +186,12 @@ func (c Config) Validate() error {
 		}
 	}
 	if c.DriveExportEnabled {
-		if c.DriveExportUsername == "" || c.DriveExportPassword == "" {
-			return errors.New("DRIVE_EXPORT_USERNAME and DRIVE_EXPORT_PASSWORD must not be empty when drive export is enabled")
+		if c.DriveExportAccessKey == "" || c.DriveExportSecret == "" {
+			return errors.New("DRIVE_EXPORT_ACCESS_KEY and DRIVE_EXPORT_SECRET must not be empty when drive export is enabled")
 		}
-		if strings.Contains(c.DriveExportUsername, ":") || strings.Contains(c.DriveExportPassword, ":") {
-			return errors.New("DRIVE_EXPORT_USERNAME and DRIVE_EXPORT_PASSWORD must not contain ':'")
-		}
-		endpoint, err := url.Parse(c.DriveExportWebDAVURL)
+		endpoint, err := url.Parse(c.DriveExportGatewayURL)
 		if err != nil || endpoint.Host == "" || (endpoint.Scheme != "http" && endpoint.Scheme != "https") {
-			return errors.New("DRIVE_EXPORT_WEBDAV_URL must be an absolute http or https URL")
+			return errors.New("DRIVE_EXPORT_GATEWAY_URL must be an absolute http or https URL")
 		}
 		if strings.Trim(c.DriveExportDestinationRoot, "/") == "" || c.DriveExportTempDir == "" {
 			return errors.New("drive export destination root and temp directory must not be empty")

@@ -65,22 +65,12 @@ case "${1:-up}" in
   up)
     echo "Pulling production images..."
     compose pull postgresql backend frontend
-    if profile_enabled drive-export; then
-      compose pull tbox-webdav
-    fi
-
     echo "Starting stateful dependencies..."
     compose up -d postgresql
     wait_for_healthy postgresql
     if profile_enabled selfhosted-minio; then
       compose up -d minio
       wait_for_healthy minio
-    fi
-
-    if profile_enabled drive-export; then
-      echo "Starting the private TboxWebdav sidecar..."
-      compose up -d tbox-webdav
-      wait_for_healthy tbox-webdav
     fi
 
     echo "Starting Go backend and applying pending database migrations..."
