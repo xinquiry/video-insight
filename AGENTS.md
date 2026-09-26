@@ -86,6 +86,19 @@ The web and desktop products share one React codebase in a pnpm workspace:
 
 Production nginx serves the web bundle and proxies `/api` to the Go service.
 
+### Storage gateway (`gateway/`)
+
+`sjtu-oss-gateway`, the presign broker that turns the SJTU Drive (Tencent
+SMH) into OSS-like object storage. Code lives here (Go module at
+`gateway/`, distroless Dockerfile); deployment is cluster infra in the
+deploy repo (`~/Projects/Lab/deploy/sjtu-oss-gateway/`, namespace `infra`,
+in-cluster Service `sjtu-oss-gateway.infra.svc:8200`). CI matrix in
+`.github/workflows/build-images.yaml` publishes
+`ghcr.io/xinquiry/video-insight-gateway`. The gateway never moves object
+bytes — it only brokers SMH presigned URLs; browsers upload/download
+directly against COS. See `gateway/README.md` for the API and the
+spike-verified wire contract.
+
 ### Classroom system (`class-button/`)
 
 `class-button/` is a nested host-side Cargo workspace:
