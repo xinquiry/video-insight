@@ -47,6 +47,16 @@ type gatewayPart struct {
 	Headers    map[string]string `json:"headers"`
 }
 
+// partURL appends the part addressing query that the presigned COS URL
+// requires: part.URL from the gateway is the bare object path.
+func partURL(part gatewayPart, uploadID string) string {
+	separator := "?"
+	if strings.Contains(part.URL, "?") {
+		separator = "&"
+	}
+	return fmt.Sprintf("%s%spartNumber=%d&uploadId=%s", part.URL, separator, part.PartNumber, uploadID)
+}
+
 type gatewayUploadResponse struct {
 	UploadID  string        `json:"uploadId"`
 	PartSize  int64         `json:"partSize"`
@@ -79,6 +89,7 @@ func (u *GatewayUploader) Upload(ctx context.Context, destinationPath, localPath
 	if err != nil {
 		return err
 	}
+	smhUploadID := compositeUploadID(session.UploadID)
 	partSize := session.PartSize
 	if partSize <= 0 {
 		return fmt.Errorf("gateway returned an invalid part size")
@@ -92,7 +103,7 @@ func (u *GatewayUploader) Upload(ctx context.Context, destinationPath, localPath
 			return ctx.Err()
 		}
 		if part, ok := parts[int(number)]; ok && time.Now().Before(expiry) {
-			if err := u.putPart(ctx, part, file, (number-1)*partSize, partSize, info.Size(), contentType); err != nil {
+			if err := u.putPart(ctx, part, smhUploadID, file, (number-1)*partSize, partSize, info.Size(), contentType); err != nil {
 				return fmt.Errorf("upload drive export part %d: %w", number, err)
 			}
 			continue
@@ -109,7 +120,7 @@ func (u *GatewayUploader) Upload(ctx context.Context, destinationPath, localPath
 			return fmt.Errorf("gateway did not renew part %d", number)
 		}
 		expiry = renewedExpiry
-		if err := u.putPart(ctx, part, file, (number-1)*partSize, partSize, info.Size(), contentType); err != nil {
+		if err := u.putPart(ctx, part, smhUploadID, file, (number-1)*partSize, partSize, info.Size(), contentType); err != nil {
 			return fmt.Errorf("upload drive export part %d: %w", number, err)
 		}
 	}
@@ -167,9 +178,9 @@ func (u *GatewayUploader) completeUpload(ctx context.Context, objectKey, uploadI
 	return response.SizeBytes, nil
 }
 
-func (u *GatewayUploader) putPart(ctx context.Context, part gatewayPart, file *os.File, offset, partSize, totalSize int64, contentType string) error {
+func (u *GatewayUploader) putPart(ctx context.Context, part gatewayPart, smhUploadID string, file *os.File, offset, partSize, totalSize int64, contentType string) error {
 	length := min(partSize, totalSize-offset)
-	req, err := http.NewRequestWithContext(ctx, http.MethodPut, part.URL, io.NewSectionReader(file, offset, length))
+	req, err := http.NewRequestWithContext(ctx, http.MethodPut, partURL(part, smhUploadID), io.NewSectionReader(file, offset, length))
 	if err != nil {
 		return fmt.Errorf("create part request: %w", err)
 	}
@@ -225,6 +236,15 @@ func (u *GatewayUploader) call(ctx context.Context, method, path string, payload
 		return fmt.Errorf("decode response: %w", err)
 	}
 	return nil
+}
+
+// compositeUploadID extracts the SMH uploadId half of the gateway's opaque
+// "<smhId>|<confirmKey>" token (used only for COS part addressing).
+func compositeUploadID(uploadID string) string {
+	if idx := strings.Index(uploadID, "|"); idx >= 0 {
+		return uploadID[:idx]
+	}
+	return uploadID
 }
 
 func partIndex(parts []gatewayPart) map[int]gatewayPart {
