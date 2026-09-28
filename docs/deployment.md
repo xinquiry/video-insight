@@ -34,7 +34,7 @@ vet, and race-enabled tests must pass before the workflow publishes:
 ```text
 ghcr.io/OWNER/video-insight-backend:latest
 ghcr.io/OWNER/video-insight-frontend:latest
-ghcr.io/OWNER/video-insight-tbox-webdav:latest
+ghcr.io/OWNER/video-insight-gateway:latest
 ```
 
 Every image also receives an immutable `sha-...` tag. Production should pin an
@@ -143,71 +143,36 @@ to roughly 67 MiB, so the annotation endpoints and production nginx allow JSON
 request bodies up to 72 MiB. Keep any upstream proxy request-body limit at or
 above 72 MiB when changing ingress.
 
-## Export To SJTU Drive
+## Publish To SJTU Drive
 
-VideoInsight can generate a `.vinsight` package on the server and upload it to
-SJTU Drive through a private TboxWebdav sidecar. This is optional and disabled
-by default. The browser only queues the job and polls its status; the video does
-not pass through the browser or the public application tunnel.
+Videos are published to SJTU Drive automatically when processing marks
+them ready: a publish job copies the object from RustFS to the drive
+through the `sjtu-oss-gateway` (the `gateway/` component of this
+repository, deployed in the cluster's `infra` namespace). The published
+copy is the download CDN — `.vinsight` downloads stream the video
+directly from COS with a per-request presigned URL and assemble the
+package (annotations read from PostgreSQL at request time) in the
+browser. Nothing about export passes through the public application
+tunnel.
 
-The worker first writes the package under `/var/tmp/video-insight/drive-exports`
-because TboxWebdav requires an exact `Content-Length`. It uploads one export at
-a time, verifies the remote size with `HEAD`, removes the temporary package,
-and retries failed jobs up to three times. Keep free temporary disk space at
-least as large as the biggest video in addition to the space needed by video
-processing.
-
-TboxWebdav is pinned to v1.0.1, built in CI from its published Linux
-binary, kept inside the Compose network, and configured with `NoDelete` access. Do not
-publish port 65472. Its source and GPL-2.0 license are available at
-<https://github.com/1357310795/TboxWebdav>.
-
-### Obtain The JAAuthCookie
-
-1. Sign in to an SJTU site through jAccount in a private browser session.
-2. Open <https://jaccount.sjtu.edu.cn/jaccount/>.
-3. In the browser developer tools, open Application, then Cookies, and copy the
-   complete `JAAuthCookie` value.
-4. Treat it as a password. Do not commit it, paste it into logs, or send it to
-   the browser. Close the private browser session after configuring Matrix.
-
-The cookie can expire or be revoked. If jobs begin failing with an
-authentication error, replace it in `docker/.env.prod` and redeploy.
+Publishing is idempotent (keyed `projects/<project>/published/<video
+UUID>.<ext>` on the drive); re-publishing overwrites the same object.
+The gateway credentials live in the deploy repo under
+`sjtu-oss-gateway/` (`smh-credentials` secret: UserToken plus
+per-project access keys). The SJTU Drive UserToken expires roughly every
+30 days — replace it via the jAccount SSO flow and
+`kubectl -n infra rollout restart deployment/sjtu-oss-gateway`.
 
 ### Enable On Matrix
 
-Add these overrides to the ignored `docker/.env.prod`:
-
 ```text
-COMPOSE_PROFILES=drive-export
 DRIVE_EXPORT_ENABLED=true
-DRIVE_EXPORT_PASSWORD=<48 hex characters from: openssl rand -hex 24>
-TBOX_JA_AUTH_COOKIE=<complete JAAuthCookie value>
+DRIVE_EXPORT_ACCESS_KEY=videoinsight
+DRIVE_EXPORT_SECRET=<project secret from the gateway access keys>
 ```
 
-`DRIVE_EXPORT_PASSWORD` only protects the private backend-to-sidecar request;
-it is not the jAccount password. The defaults put exports under
-`VideoInsight/<group UUID>/` in SJTU Drive. Override
-`DRIVE_EXPORT_DESTINATION_ROOT` to use another root directory.
-If Matrix uses the bundled MinIO service, set
-`COMPOSE_PROFILES=selfhosted-minio,drive-export` so enabling this feature does
-not disable MinIO.
-
-Deploy normally:
-
-```sh
-just deploy
-```
-
-The first enabled deployment pulls the pinned TboxWebdav sidecar image and may
-take several minutes. After both containers are healthy, open a ready video and use
-**Export to drive**. The button progresses through queued, packaging, and
-uploading states. A completed job exposes its destination path as the button
-tooltip; download the package from the SJTU Drive website or a WebDAV mount.
-
-Before relying on the feature, export a representative large video three times
-and confirm the package sizes in SJTU Drive. Keep the existing local export as
-a fallback.
+Kubernetes deployments already default these through the ConfigMap and
+Secret in the deploy repo.
 
 ## Deploy
 
