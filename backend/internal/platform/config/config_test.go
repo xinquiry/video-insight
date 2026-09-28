@@ -49,7 +49,7 @@ func TestLoadDriveExportConfiguration(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if !cfg.DriveExportEnabled || cfg.DriveExportDestinationRoot != "VideoInsight" {
+	if !cfg.DriveExportEnabled || cfg.DriveExportDestinationRoot != "published" {
 		t.Fatalf("drive export config: %+v", cfg)
 	}
 }
