@@ -86,6 +86,16 @@ The web and desktop products share one React codebase in a pnpm workspace:
 
 Production nginx serves the web bundle and proxies `/api` to the Go service.
 
+### Soft deletion
+
+Videos are soft-deleted (`videos.deleted_at`): user-facing reads (list,
+detail, annotation attachment, package manifest) filter deleted rows, so a
+deleted video behaves as gone while its PostgreSQL row, annotations, RustFS
+object, and published drive copy survive for recovery. The soft-delete SQL
+keeps the processing/publishing guards (no deleting while a job is active).
+Hard purge (`PurgeVideo`) and restore (`RestoreVideo`) exist at the store
+level for future admin tooling but have no HTTP surface yet.
+
 ### Publish & package download
 
 A video's `.vinsight` download is assembled by the browser from two sources:

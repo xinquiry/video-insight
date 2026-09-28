@@ -89,5 +89,6 @@ type Video struct {
 	ID                    uuid.UUID        `json:"id"`
 	CreatedAt             pgtype.Timestamp `json:"created_at"`
 	UpdatedAt             pgtype.Timestamp `json:"updated_at"`
+	DeletedAt             pgtype.Timestamp `json:"deleted_at"`
 	GroupID               uuid.UUID        `json:"group_id"`
 }

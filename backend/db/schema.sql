@@ -35,12 +35,14 @@ CREATE TABLE videos (
     id uuid DEFAULT gen_random_uuid() NOT NULL PRIMARY KEY,
     created_at timestamp without time zone DEFAULT now() NOT NULL,
     updated_at timestamp without time zone DEFAULT now(),
+    deleted_at timestamp without time zone,
     group_id uuid NOT NULL REFERENCES groups(id)
 );
 ALTER TABLE videos ADD CONSTRAINT ck_videos_processing_status
     CHECK (processing_status IN ('pending', 'processing', 'ready', 'failed'));
 CREATE INDEX ix_videos_title ON videos (title);
 CREATE INDEX ix_videos_group_id ON videos (group_id);
+CREATE INDEX ix_videos_not_deleted ON videos (group_id) WHERE deleted_at IS NULL;
 CREATE INDEX ix_videos_processing_queue
     ON videos (processing_status, processing_available_at);
 

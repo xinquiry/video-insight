@@ -34,7 +34,7 @@ SET
     processing_started_at = now(),
     updated_at = now()
 WHERE id = (SELECT id FROM candidate)
-RETURNING title, description, object_key, original_filename, content_type, size_bytes, processing_status, processing_error, processing_attempts, processing_started_at, processing_available_at, id, created_at, updated_at, group_id
+RETURNING title, description, object_key, original_filename, content_type, size_bytes, processing_status, processing_error, processing_attempts, processing_started_at, processing_available_at, id, created_at, updated_at, deleted_at, group_id
 `
 
 func (q *Queries) ClaimVideoForProcessing(ctx context.Context) (Video, error) {
@@ -55,13 +55,14 @@ func (q *Queries) ClaimVideoForProcessing(ctx context.Context) (Video, error) {
 		&i.ID,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.DeletedAt,
 		&i.GroupID,
 	)
 	return i, err
 }
 
 const countVideosForGroup = `-- name: CountVideosForGroup :one
-SELECT count(*) FROM videos WHERE group_id = $1
+SELECT count(*) FROM videos WHERE group_id = $1 AND deleted_at IS NULL
 `
 
 func (q *Queries) CountVideosForGroup(ctx context.Context, groupID uuid.UUID) (int64, error) {
@@ -76,7 +77,7 @@ INSERT INTO videos (
     group_id, title, description, object_key, original_filename, content_type, size_bytes,
     processing_status
 ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
-RETURNING title, description, object_key, original_filename, content_type, size_bytes, processing_status, processing_error, processing_attempts, processing_started_at, processing_available_at, id, created_at, updated_at, group_id
+RETURNING title, description, object_key, original_filename, content_type, size_bytes, processing_status, processing_error, processing_attempts, processing_started_at, processing_available_at, id, created_at, updated_at, deleted_at, group_id
 `
 
 type CreateVideoParams struct {
@@ -117,40 +118,15 @@ func (q *Queries) CreateVideo(ctx context.Context, arg CreateVideoParams) (Video
 		&i.ID,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.DeletedAt,
 		&i.GroupID,
 	)
 	return i, err
 }
 
-const deleteVideo = `-- name: DeleteVideo :execrows
-DELETE FROM videos
-WHERE
-    videos.id = $1
-    AND videos.group_id = $2
-    AND videos.processing_status <> 'processing'
-    AND NOT EXISTS (
-        SELECT 1
-        FROM drive_exports
-        WHERE drive_exports.video_id = videos.id
-          AND drive_exports.status IN ('preparing', 'uploading')
-    )
-`
-
-type DeleteVideoParams struct {
-	ID      uuid.UUID `json:"id"`
-	GroupID uuid.UUID `json:"group_id"`
-}
-
-func (q *Queries) DeleteVideo(ctx context.Context, arg DeleteVideoParams) (int64, error) {
-	result, err := q.db.Exec(ctx, deleteVideo, arg.ID, arg.GroupID)
-	if err != nil {
-		return 0, err
-	}
-	return result.RowsAffected(), nil
-}
-
 const getVideoByIDForGroup = `-- name: GetVideoByIDForGroup :one
-SELECT title, description, object_key, original_filename, content_type, size_bytes, processing_status, processing_error, processing_attempts, processing_started_at, processing_available_at, id, created_at, updated_at, group_id FROM videos WHERE id = $1 AND group_id = $2
+SELECT title, description, object_key, original_filename, content_type, size_bytes, processing_status, processing_error, processing_attempts, processing_started_at, processing_available_at, id, created_at, updated_at, deleted_at, group_id FROM videos
+WHERE id = $1 AND group_id = $2 AND deleted_at IS NULL
 `
 
 type GetVideoByIDForGroupParams struct {
@@ -176,14 +152,48 @@ func (q *Queries) GetVideoByIDForGroup(ctx context.Context, arg GetVideoByIDForG
 		&i.ID,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.DeletedAt,
+		&i.GroupID,
+	)
+	return i, err
+}
+
+const getVideoByIDForGroupIncludingDeleted = `-- name: GetVideoByIDForGroupIncludingDeleted :one
+SELECT title, description, object_key, original_filename, content_type, size_bytes, processing_status, processing_error, processing_attempts, processing_started_at, processing_available_at, id, created_at, updated_at, deleted_at, group_id FROM videos WHERE id = $1 AND group_id = $2
+`
+
+type GetVideoByIDForGroupIncludingDeletedParams struct {
+	ID      uuid.UUID `json:"id"`
+	GroupID uuid.UUID `json:"group_id"`
+}
+
+func (q *Queries) GetVideoByIDForGroupIncludingDeleted(ctx context.Context, arg GetVideoByIDForGroupIncludingDeletedParams) (Video, error) {
+	row := q.db.QueryRow(ctx, getVideoByIDForGroupIncludingDeleted, arg.ID, arg.GroupID)
+	var i Video
+	err := row.Scan(
+		&i.Title,
+		&i.Description,
+		&i.ObjectKey,
+		&i.OriginalFilename,
+		&i.ContentType,
+		&i.SizeBytes,
+		&i.ProcessingStatus,
+		&i.ProcessingError,
+		&i.ProcessingAttempts,
+		&i.ProcessingStartedAt,
+		&i.ProcessingAvailableAt,
+		&i.ID,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+		&i.DeletedAt,
 		&i.GroupID,
 	)
 	return i, err
 }
 
 const listVideosForGroup = `-- name: ListVideosForGroup :many
-SELECT title, description, object_key, original_filename, content_type, size_bytes, processing_status, processing_error, processing_attempts, processing_started_at, processing_available_at, id, created_at, updated_at, group_id FROM videos
-WHERE group_id = $1
+SELECT title, description, object_key, original_filename, content_type, size_bytes, processing_status, processing_error, processing_attempts, processing_started_at, processing_available_at, id, created_at, updated_at, deleted_at, group_id FROM videos
+WHERE group_id = $1 AND deleted_at IS NULL
 ORDER BY created_at DESC
 OFFSET $2 LIMIT $3
 `
@@ -218,6 +228,7 @@ func (q *Queries) ListVideosForGroup(ctx context.Context, arg ListVideosForGroup
 			&i.ID,
 			&i.CreatedAt,
 			&i.UpdatedAt,
+			&i.DeletedAt,
 			&i.GroupID,
 		); err != nil {
 			return nil, err
@@ -285,6 +296,24 @@ func (q *Queries) MarkVideoProcessingReady(ctx context.Context, arg MarkVideoPro
 	return result.RowsAffected(), nil
 }
 
+const purgeVideo = `-- name: PurgeVideo :execrows
+DELETE FROM videos
+WHERE id = $1 AND group_id = $2 AND deleted_at IS NOT NULL
+`
+
+type PurgeVideoParams struct {
+	ID      uuid.UUID `json:"id"`
+	GroupID uuid.UUID `json:"group_id"`
+}
+
+func (q *Queries) PurgeVideo(ctx context.Context, arg PurgeVideoParams) (int64, error) {
+	result, err := q.db.Exec(ctx, purgeVideo, arg.ID, arg.GroupID)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
+}
+
 const requeueInterruptedVideoProcessing = `-- name: RequeueInterruptedVideoProcessing :execrows
 UPDATE videos
 SET
@@ -303,11 +332,59 @@ func (q *Queries) RequeueInterruptedVideoProcessing(ctx context.Context) (int64,
 	return result.RowsAffected(), nil
 }
 
+const restoreVideo = `-- name: RestoreVideo :execrows
+UPDATE videos
+SET deleted_at = NULL, updated_at = now()
+WHERE id = $1 AND group_id = $2 AND deleted_at IS NOT NULL
+`
+
+type RestoreVideoParams struct {
+	ID      uuid.UUID `json:"id"`
+	GroupID uuid.UUID `json:"group_id"`
+}
+
+func (q *Queries) RestoreVideo(ctx context.Context, arg RestoreVideoParams) (int64, error) {
+	result, err := q.db.Exec(ctx, restoreVideo, arg.ID, arg.GroupID)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
+}
+
+const softDeleteVideo = `-- name: SoftDeleteVideo :execrows
+UPDATE videos v
+SET deleted_at = now(), updated_at = now()
+WHERE
+    v.id = $1
+    AND v.group_id = $2
+    AND v.deleted_at IS NULL
+    AND v.processing_status <> 'processing'
+    AND NOT EXISTS (
+        SELECT 1
+        FROM drive_exports
+        WHERE drive_exports.video_id = v.id
+          AND drive_exports.status IN ('preparing', 'uploading')
+    )
+`
+
+type SoftDeleteVideoParams struct {
+	ID      uuid.UUID `json:"id"`
+	GroupID uuid.UUID `json:"group_id"`
+}
+
+func (q *Queries) SoftDeleteVideo(ctx context.Context, arg SoftDeleteVideoParams) (int64, error) {
+	result, err := q.db.Exec(ctx, softDeleteVideo, arg.ID, arg.GroupID)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
+}
+
 const updateVideo = `-- name: UpdateVideo :one
 UPDATE videos
 SET title = $3, description = $4, updated_at = now()
 WHERE id = $1 AND group_id = $2
-RETURNING title, description, object_key, original_filename, content_type, size_bytes, processing_status, processing_error, processing_attempts, processing_started_at, processing_available_at, id, created_at, updated_at, group_id
+RETURNING title, description, object_key, original_filename, content_type, size_bytes, processing_status, processing_error, processing_attempts, processing_started_at, processing_available_at, id, created_at, updated_at, deleted_at, group_id
 `
 
 type UpdateVideoParams struct {
@@ -340,6 +417,7 @@ func (q *Queries) UpdateVideo(ctx context.Context, arg UpdateVideoParams) (Video
 		&i.ID,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.DeletedAt,
 		&i.GroupID,
 	)
 	return i, err

@@ -265,8 +265,22 @@ func (s *Store) UpdateVideo(ctx context.Context, video model.Video) (model.Video
 	return videoModel(value), err
 }
 
-func (s *Store) DeleteVideo(ctx context.Context, videoID, groupID uuid.UUID) (bool, error) {
-	rows, err := s.queries.DeleteVideo(ctx, db.DeleteVideoParams{ID: videoID, GroupID: groupID})
+// SoftDeleteVideo marks a video deleted (user-facing reads hide it); the
+// row, its annotations, and the published drive copy survive.
+func (s *Store) SoftDeleteVideo(ctx context.Context, videoID, groupID uuid.UUID) (bool, error) {
+	rows, err := s.queries.SoftDeleteVideo(ctx, db.SoftDeleteVideoParams{ID: videoID, GroupID: groupID})
+	return rows > 0, err
+}
+
+// RestoreVideo un-deletes a soft-deleted video.
+func (s *Store) RestoreVideo(ctx context.Context, videoID, groupID uuid.UUID) (bool, error) {
+	rows, err := s.queries.RestoreVideo(ctx, db.RestoreVideoParams{ID: videoID, GroupID: groupID})
+	return rows > 0, err
+}
+
+// PurgeVideo hard-deletes a soft-deleted video (annotations cascade).
+func (s *Store) PurgeVideo(ctx context.Context, videoID, groupID uuid.UUID) (bool, error) {
+	rows, err := s.queries.PurgeVideo(ctx, db.PurgeVideoParams{ID: videoID, GroupID: groupID})
 	return rows > 0, err
 }
 

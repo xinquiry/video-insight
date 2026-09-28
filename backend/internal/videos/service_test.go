@@ -49,7 +49,7 @@ func (f *fakeStore) UpdateVideo(_ context.Context, video model.Video) (model.Vid
 	return video, nil
 }
 
-func (f *fakeStore) DeleteVideo(context.Context, uuid.UUID, uuid.UUID) (bool, error) {
+func (f *fakeStore) SoftDeleteVideo(context.Context, uuid.UUID, uuid.UUID) (bool, error) {
 	f.deleteCalled = true
 	return f.deleteOK, nil
 }
@@ -204,7 +204,7 @@ func TestDeleteRejectsVideoBeingProcessed(t *testing.T) {
 
 func TestDeleteRejectsVideoBeingExported(t *testing.T) {
 	t.Parallel()
-	store := &fakeStore{found: true, video: model.Video{
+	store := &fakeStore{found: true, deleteOK: false, video: model.Video{
 		ID: uuid.New(), GroupID: uuid.New(), ProcessingStatus: model.VideoProcessingReady,
 	}}
 	service := NewService(store, &fakeStorage{}, Config{})
@@ -215,6 +215,25 @@ func TestDeleteRejectsVideoBeingExported(t *testing.T) {
 	}
 	if !store.deleteCalled {
 		t.Fatal("ready video did not reach guarded database deletion")
+	}
+}
+
+func TestDeleteSoftDeletesReadyVideo(t *testing.T) {
+	t.Parallel()
+	store := &fakeStore{found: true, deleteOK: true, video: model.Video{
+		ID: uuid.New(), GroupID: uuid.New(), ProcessingStatus: model.VideoProcessingReady, ObjectKey: "videos/k",
+	}}
+	storage := &fakeStorage{}
+	service := NewService(store, storage, Config{})
+	if err := service.Delete(context.Background(), store.video.ID, store.video.GroupID); err != nil {
+		t.Fatal(err)
+	}
+	if !store.deleteCalled {
+		t.Fatal("soft delete not issued")
+	}
+	// Soft delete keeps the object bytes and drive copy: no storage deletion.
+	if storage.deletedKey != "" {
+		t.Fatalf("soft delete removed object %q from storage", storage.deletedKey)
 	}
 }
 

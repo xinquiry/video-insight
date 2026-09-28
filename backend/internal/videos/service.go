@@ -23,7 +23,7 @@ type Store interface {
 	ListVideosForGroup(ctx context.Context, groupID uuid.UUID, offset, limit int) ([]model.Video, int64, error)
 	CreateVideo(ctx context.Context, video model.Video) (model.Video, error)
 	UpdateVideo(ctx context.Context, video model.Video) (model.Video, error)
-	DeleteVideo(ctx context.Context, videoID, groupID uuid.UUID) (bool, error)
+	SoftDeleteVideo(ctx context.Context, videoID, groupID uuid.UUID) (bool, error)
 }
 
 type Storage interface {
@@ -241,31 +241,27 @@ func (s *Service) Update(ctx context.Context, videoID, groupID uuid.UUID, input 
 }
 
 func (s *Service) Delete(ctx context.Context, videoID, groupID uuid.UUID) error {
-	video, err := s.get(ctx, videoID, groupID)
+	video, found, err := s.store.GetVideoByIDForGroup(ctx, videoID, groupID)
 	if err != nil {
 		return err
+	}
+	if !found {
+		return apperror.New(http.StatusNotFound, "Video not found")
 	}
 	if video.ProcessingStatus == model.VideoProcessingProcessing {
 		return apperror.New(http.StatusConflict, "Video is currently being processed")
 	}
-	deleted, err := s.store.DeleteVideo(ctx, videoID, groupID)
+	// Soft delete: the PG row (with annotations) and the published drive
+	// copy survive for recovery; only user-facing reads hide the video.
+	deleted, err := s.store.SoftDeleteVideo(ctx, videoID, groupID)
 	if err != nil {
 		return err
 	}
 	if !deleted {
-		current, found, getErr := s.store.GetVideoByIDForGroup(ctx, videoID, groupID)
-		if getErr != nil {
-			return getErr
-		}
-		if found && current.ProcessingStatus == model.VideoProcessingProcessing {
-			return apperror.New(http.StatusConflict, "Video is currently being processed")
-		}
-		if found {
-			return apperror.New(http.StatusConflict, "Video is currently being exported to the drive")
-		}
-		return apperror.New(http.StatusNotFound, "Video not found")
+		// Racing publish/processing transitions — report conflict.
+		return apperror.New(http.StatusConflict, "Video cannot be deleted right now")
 	}
-	return s.storage.DeleteObject(ctx, video.ObjectKey)
+	return nil
 }
 
 func (s *Service) get(ctx context.Context, videoID, groupID uuid.UUID) (model.Video, error) {

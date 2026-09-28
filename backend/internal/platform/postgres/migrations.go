@@ -134,10 +134,19 @@ type migration struct {
 
 // Keep migrations append-only and ordered by version. A migration must remain
 // safe to retry because a transaction can be interrupted before it is recorded.
+// videoSoftDeleteMigration introduces soft deletion for videos: user-facing
+// reads filter deleted_at IS NULL, and the row (plus annotations and the
+// published drive copy) survives for recovery.
+const videoSoftDeleteMigration = `
+ALTER TABLE videos ADD COLUMN IF NOT EXISTS deleted_at timestamp without time zone;
+CREATE INDEX IF NOT EXISTS ix_videos_not_deleted ON videos (group_id) WHERE deleted_at IS NULL;
+`
+
 var migrations = []migration{
 	{version: "202608200001_rich_text_annotations_and_comments", sql: annotationRichTextMigration},
 	{version: "202608210001_video_processing", sql: videoProcessingMigration},
 	{version: "202609140001_drive_exports", sql: driveExportsMigration},
+	{version: "202609280001_video_soft_delete", sql: videoSoftDeleteMigration},
 }
 
 func runMigrations(ctx context.Context, pool *pgxpool.Pool) error {

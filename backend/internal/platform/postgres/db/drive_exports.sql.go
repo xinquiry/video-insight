@@ -91,7 +91,7 @@ func (q *Queries) GetDriveExportByVideoForGroup(ctx context.Context, arg GetDriv
 }
 
 const listReadyVideosWithoutCompletedExport = `-- name: ListReadyVideosWithoutCompletedExport :many
-SELECT v.title, v.description, v.object_key, v.original_filename, v.content_type, v.size_bytes, v.processing_status, v.processing_error, v.processing_attempts, v.processing_started_at, v.processing_available_at, v.id, v.created_at, v.updated_at, v.group_id
+SELECT v.title, v.description, v.object_key, v.original_filename, v.content_type, v.size_bytes, v.processing_status, v.processing_error, v.processing_attempts, v.processing_started_at, v.processing_available_at, v.id, v.created_at, v.updated_at, v.deleted_at, v.group_id
 FROM videos v
 LEFT JOIN drive_exports de ON de.video_id = v.id
 WHERE v.processing_status = 'ready'
@@ -122,6 +122,7 @@ func (q *Queries) ListReadyVideosWithoutCompletedExport(ctx context.Context) ([]
 			&i.ID,
 			&i.CreatedAt,
 			&i.UpdatedAt,
+			&i.DeletedAt,
 			&i.GroupID,
 		); err != nil {
 			return nil, err

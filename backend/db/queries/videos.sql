@@ -1,12 +1,16 @@
 -- name: GetVideoByIDForGroup :one
+SELECT * FROM videos
+WHERE id = $1 AND group_id = $2 AND deleted_at IS NULL;
+
+-- name: GetVideoByIDForGroupIncludingDeleted :one
 SELECT * FROM videos WHERE id = $1 AND group_id = $2;
 
 -- name: CountVideosForGroup :one
-SELECT count(*) FROM videos WHERE group_id = $1;
+SELECT count(*) FROM videos WHERE group_id = $1 AND deleted_at IS NULL;
 
 -- name: ListVideosForGroup :many
 SELECT * FROM videos
-WHERE group_id = $1
+WHERE group_id = $1 AND deleted_at IS NULL
 ORDER BY created_at DESC
 OFFSET $2 LIMIT $3;
 
@@ -23,18 +27,29 @@ SET title = $3, description = $4, updated_at = now()
 WHERE id = $1 AND group_id = $2
 RETURNING *;
 
--- name: DeleteVideo :execrows
-DELETE FROM videos
+-- name: SoftDeleteVideo :execrows
+UPDATE videos v
+SET deleted_at = now(), updated_at = now()
 WHERE
-    videos.id = $1
-    AND videos.group_id = $2
-    AND videos.processing_status <> 'processing'
+    v.id = $1
+    AND v.group_id = $2
+    AND v.deleted_at IS NULL
+    AND v.processing_status <> 'processing'
     AND NOT EXISTS (
         SELECT 1
         FROM drive_exports
-        WHERE drive_exports.video_id = videos.id
+        WHERE drive_exports.video_id = v.id
           AND drive_exports.status IN ('preparing', 'uploading')
     );
+
+-- name: RestoreVideo :execrows
+UPDATE videos
+SET deleted_at = NULL, updated_at = now()
+WHERE id = $1 AND group_id = $2 AND deleted_at IS NOT NULL;
+
+-- name: PurgeVideo :execrows
+DELETE FROM videos
+WHERE id = $1 AND group_id = $2 AND deleted_at IS NOT NULL;
 
 -- name: RequeueInterruptedVideoProcessing :execrows
 UPDATE videos
