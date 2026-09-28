@@ -151,7 +151,7 @@ func Load() (Config, error) {
 		DriveExportGatewayURL:       env("DRIVE_EXPORT_GATEWAY_URL", "http://sjtu-oss-gateway.infra.svc:8200"),
 		DriveExportAccessKey:        env("DRIVE_EXPORT_ACCESS_KEY", ""),
 		DriveExportSecret:           os.Getenv("DRIVE_EXPORT_SECRET"),
-		DriveExportDestinationRoot:  env("DRIVE_EXPORT_DESTINATION_ROOT", "VideoInsight"),
+		DriveExportDestinationRoot:  env("DRIVE_EXPORT_DESTINATION_ROOT", "published"),
 		DriveExportTempDir:          env("DRIVE_EXPORT_TEMP_DIR", filepath.Join(processingTempDir, "drive-exports")),
 		DriveExportPollInterval:     time.Duration(driveExportPollSeconds) * time.Second,
 		DriveExportMaxAttempts:      driveExportMaxAttempts,

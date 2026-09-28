@@ -31,7 +31,7 @@ case "$role" in
         ;;
     esac
     shift
-    receiver_mac=${1:-}
+    receiver_mac=${2:-}
     case "$receiver_mac" in
       '')
         echo "WARNING: 未指定 receiver-mac，按钮将回落到广播盲发模式（不可靠，仅调试用）" >&2

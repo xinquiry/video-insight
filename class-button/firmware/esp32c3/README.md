@@ -33,12 +33,13 @@ cargo build --release --bin button
 | button | `90:da:72:88:cc:c8` |
 | button | `90:da:72:88:be:c8` |
 | button | `48:f6:ee:17:36:bc` |
+| button | `90:da:72:89:74:f8` |
 
 板卡为 ESP32-C3 rev 0.4、4MB flash。两个固件固定使用 ESP-NOW channel 1。
 按钮向烧录时注入的接收器 MAC 单播发送 Press（`flash-c3.sh button <id> <mac>`，
 单播帧享有 MAC 层重传），接收器从 Press 帧动态学习按钮 MAC 并单播回 ACK，
 因此新增 button 无需配置接收器。未注入接收器 MAC 时按钮回落到广播盲发
-（仅调试用）。按钮的调试 `device_id` 分别为 `1001`/`1002`/`1003`，与
+（仅调试用）。按钮的调试 `device_id` 分别为 `1001`/`1002`/`1003`/`1004`，与
 `config/classroom.example.json` 对应。电池 ADC 尚未接入时上报 `0 mV`。
 
 烧录（推荐走脚本，见 `scripts/flash-c3.sh`）：

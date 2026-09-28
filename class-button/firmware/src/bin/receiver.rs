@@ -1,6 +1,9 @@
 use std::{
-    sync::{mpsc, Arc},
-    time::Duration,
+    sync::{
+        atomic::{AtomicUsize, Ordering},
+        mpsc, Arc, Mutex,
+    },
+    time::{Duration, Instant},
 };
 
 use class_button_protocol::{encode_hex, Message, MessageKind};
@@ -9,12 +12,92 @@ use esp_idf_svc::{
     espnow::{EspNow, PeerInfo, ReceiveInfo},
     hal::peripherals::Peripherals,
     nvs::EspDefaultNvsPartition,
-    sys::{esp_mac_type_t_ESP_MAC_WIFI_STA, esp_read_mac, esp_wifi_set_channel},
+    sys::{
+        esp_mac_type_t_ESP_MAC_WIFI_STA, esp_read_mac, esp_wifi_set_channel,
+        esp_wifi_set_ps, wifi_ps_type_t_WIFI_PS_NONE,
+    },
     wifi::{ClientConfiguration, Configuration, EspWifi, WifiEvent},
 };
 
 const CHANNEL: u8 = 1;
 const WIFI_START_TIMEOUT: Duration = Duration::from_secs(5);
+
+// ===== 诊断：混杂模式抓包（定位按钮帧）=====
+// 按实际到达信道归因的总帧数。14 个信道槽。
+static SNIFF_CH_TOTAL: [AtomicUsize; 16] = [const { AtomicUsize::new(0) }; 16];
+// 来自已知按钮 MAC 的帧数，同样按信道归因。
+static SNIFF_CH_BUTTON: [AtomicUsize; 16] = [const { AtomicUsize::new(0) }; 16];
+// 首个「Espressif vendor action 帧」转储（不管源 MAC 是谁）。
+static VENDOR_DUMP: Mutex<Option<String>> = Mutex::new(None);
+// 全部已知按钮 MAC（含 1004）。Addr2/发送侧 STA MAC。
+const BUTTON_MACS: [[u8; 6]; 4] = [
+    [0x90, 0xda, 0x72, 0x88, 0xcc, 0xc8], // 1001
+    [0x90, 0xda, 0x72, 0x88, 0xbe, 0xc8], // 1002
+    [0x48, 0xf6, 0xee, 0x17, 0x36, 0xbc], // 1003
+    [0x90, 0xda, 0x72, 0x89, 0x74, 0xf8], // 1004
+];
+
+unsafe extern "C" fn promiscuous_cb(
+    buf: *mut core::ffi::c_void,
+    _kind: esp_idf_svc::sys::wifi_promiscuous_pkt_type_t,
+) {
+    let pkt = buf as *const esp_idf_svc::sys::wifi_promiscuous_pkt_t;
+    let rx_ctrl = &(*pkt).rx_ctrl;
+    let ch = rx_ctrl.channel() as usize;
+    let sig_len = rx_ctrl.sig_len() as usize;
+    if ch < SNIFF_CH_TOTAL.len() {
+        SNIFF_CH_TOTAL[ch].fetch_add(1, Ordering::Relaxed);
+    }
+    if sig_len < 28 {
+        return;
+    }
+    let payload = (*pkt).payload.as_ptr();
+    // 802.11 MAC 头：FC(2) dur(2) addr1(6) addr2(6) → 源地址在偏移 10。
+    let src: [u8; 6] = [
+        *payload.add(10),
+        *payload.add(11),
+        *payload.add(12),
+        *payload.add(13),
+        *payload.add(14),
+        *payload.add(15),
+    ];
+    if BUTTON_MACS.contains(&src) && ch < SNIFF_CH_BUTTON.len() {
+        SNIFF_CH_BUTTON[ch].fetch_add(1, Ordering::Relaxed);
+    }
+    // 任何 vendor-specific action 帧（FC 子类型 0xD，偏移 24 起是
+    // category=127 + OUI）。不区分 OUI，任何厂商的都转储，绝不漏。
+    let fc = *payload;
+    let category = *payload.add(24);
+    if fc & 0xf0 == 0xd0 {
+        let oui = [
+            *payload.add(25),
+            *payload.add(26),
+            *payload.add(27),
+        ];
+        let dump_len = sig_len.min(48);
+        let mut dump = String::with_capacity(dump_len * 3);
+        for i in 0..dump_len {
+            dump.push_str(&format!("{:02x} ", *payload.add(i)));
+        }
+        let text = format!(
+            "cat={} oui={:02x}:{:02x}:{:02x} src={} rssi={} ch={} len={} hex={}",
+            category,
+            oui[0],
+            oui[1],
+            oui[2],
+            mac_hex(&src),
+            rx_ctrl.rssi(),
+            ch,
+            sig_len,
+            dump
+        );
+        if let Ok(mut slot) = VENDOR_DUMP.lock() {
+            if slot.is_none() {
+                *slot = Some(text);
+            }
+        }
+    }
+}
 
 fn main() -> anyhow::Result<()> {
     esp_idf_svc::sys::link_patches();
@@ -28,8 +111,13 @@ fn main() -> anyhow::Result<()> {
     wifi.set_configuration(&Configuration::Client(ClientConfiguration::default()))?;
     start_wifi_and_wait(&mut wifi, &system_loop)?;
 
-    let mac = station_mac()?;
+    // 与 button.rs 顺序完全一致：先设信道、后关 modem 省电。
+    // esp_wifi_set_ps 在不同状态下可能重置信道，顺序必须与发送端对齐。
     set_radio_channel()?;
+    unsafe {
+        esp_wifi_set_ps(wifi_ps_type_t_WIFI_PS_NONE);
+    }
+    let mac = station_mac()?;
 
     let espnow = Arc::new(EspNow::take()?);
     let (tx, rx) = mpsc::channel::<([u8; 6], Vec<u8>)>();
@@ -40,22 +128,69 @@ fn main() -> anyhow::Result<()> {
     })?;
     register_tx_status_cb(&espnow)?;
 
+    // 诊断：开混杂模式抓空口帧（espnow 初始化后注册，避免被覆盖）。
+    unsafe {
+        esp_idf_svc::sys::esp!(esp_idf_svc::sys::esp_wifi_set_promiscuous(true))?;
+        esp_idf_svc::sys::esp!(esp_idf_svc::sys::esp_wifi_set_promiscuous_rx_cb(
+            Some(promiscuous_cb)
+        ))?;
+    }
+    let mut last_total: [usize; 16] = [0; 16];
+    let mut last_button: [usize; 16] = [0; 16];
+
     println!(
-        "INFO receiver-ready mac={} channel={CHANNEL}",
+        "INFO receiver-ready mac={} channel-sweep 1-13",
         mac_hex(&mac)
     );
 
+    // 诊断主循环：轮询 1-13 信道，每信道驻留 DWELL，期间非阻塞地处理
+    // ESP-NOW 接收事件（若按钮就在当前驻留信道上，EV/ACK 全链路照常）。
+    // 每轮扫完打印各信道帧数与按钮帧数增量，定位按钮实际所在信道。
+    const DWELL: Duration = Duration::from_millis(700);
     loop {
-        let (source, frame) = match rx.recv_timeout(Duration::from_secs(30)) {
-            Ok(received) => received,
-            Err(mpsc::RecvTimeoutError::Timeout) => {
-                println!("INFO receiver-alive mac={}", mac_hex(&mac));
-                continue;
+        for ch in 1..=13u8 {
+            unsafe {
+                esp_idf_svc::sys::esp!(esp_idf_svc::sys::esp_wifi_set_channel(
+                    ch,
+                    esp_idf_svc::sys::wifi_second_chan_t_WIFI_SECOND_CHAN_NONE,
+                ))?;
             }
-            Err(mpsc::RecvTimeoutError::Disconnected) => anyhow::bail!("ESP-NOW callback stopped"),
-        };
+            let deadline = Instant::now() + DWELL;
+            while let Some(remaining) = deadline.checked_duration_since(Instant::now()) {
+                match rx.recv_timeout(remaining.min(Duration::from_millis(50))) {
+                    Ok((source, frame)) => handle_frame(&espnow, source, &frame)?,
+                    Err(mpsc::RecvTimeoutError::Timeout) => {}
+                    Err(mpsc::RecvTimeoutError::Disconnected) => {
+                        anyhow::bail!("ESP-NOW callback stopped")
+                    }
+                }
+                if let Ok(mut slot) = VENDOR_DUMP.lock() {
+                    if let Some(dump) = slot.take() {
+                        println!("INFO btn-frame {dump}");
+                    }
+                }
+            }
+        }
+        let mut total_report = String::new();
+        let mut button_report = String::new();
+        for ch in 1..=13usize {
+            let total = SNIFF_CH_TOTAL[ch].load(Ordering::Relaxed);
+            let button = SNIFF_CH_BUTTON[ch].load(Ordering::Relaxed);
+            total_report.push_str(&format!("{}:{:+} ", ch, total as isize - last_total[ch] as isize));
+            button_report.push_str(&format!("{}:{:+} ", ch, button as isize - last_button[ch] as isize));
+            last_total[ch] = total;
+            last_button[ch] = button;
+        }
+        println!(
+            "SWEEP tot {}| btn {}",
+            total_report.trim_end(),
+            button_report.trim_end()
+        );
+    }
+}
 
-        match Message::decode(&frame) {
+fn handle_frame(espnow: &EspNow<'_>, source: [u8; 6], frame: &[u8]) -> anyhow::Result<()> {
+    match Message::decode(frame) {
             Ok(message) if message.kind == MessageKind::Press => {
                 // 单播回 ACK：把发送方 MAC 加为 peer（首次见到自动学习，
                 // 已存在则按当前信道刷新），单播帧有 MAC 层重传，比广播可靠。
@@ -84,7 +219,7 @@ fn main() -> anyhow::Result<()> {
                 frame.len()
             ),
         }
-    }
+    Ok(())
 }
 
 fn start_wifi_and_wait(wifi: &mut EspWifi<'_>, system_loop: &EspSystemEventLoop) -> anyhow::Result<()> {
