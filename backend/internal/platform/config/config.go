@@ -49,6 +49,8 @@ type Config struct {
 	DriveExportMaxAttempts      int
 	DriveExportTimeout          time.Duration
 	DriveExportMaxBytes         int64
+	VideoGCInterval             time.Duration
+	VideoGCKeep                 time.Duration
 }
 
 func Load() (Config, error) {
@@ -116,6 +118,14 @@ func Load() (Config, error) {
 	if err != nil {
 		return Config{}, err
 	}
+	gcIntervalHours, err := envInt64("VIDEO_GC_INTERVAL_HOURS", 24)
+	if err != nil {
+		return Config{}, err
+	}
+	gcKeepDays, err := envInt64("VIDEO_GC_KEEP_DAYS", 30)
+	if err != nil {
+		return Config{}, err
+	}
 
 	endpoint := env("MINIO_ENDPOINT", "localhost:9000")
 	publicEndpoint := env("MINIO_PUBLIC_ENDPOINT", endpoint)
@@ -157,6 +167,8 @@ func Load() (Config, error) {
 		DriveExportMaxAttempts:      driveExportMaxAttempts,
 		DriveExportTimeout:          time.Duration(driveExportTimeoutMinutes) * time.Minute,
 		DriveExportMaxBytes:         driveExportMaxBytes,
+		VideoGCInterval:             time.Duration(gcIntervalHours) * time.Hour,
+		VideoGCKeep:                 time.Duration(gcKeepDays) * 24 * time.Hour,
 	}
 	if err := cfg.Validate(); err != nil {
 		return Config{}, err

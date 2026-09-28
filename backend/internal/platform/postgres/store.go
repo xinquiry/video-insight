@@ -284,6 +284,20 @@ func (s *Store) PurgeVideo(ctx context.Context, videoID, groupID uuid.UUID) (boo
 	return rows > 0, err
 }
 
+// ListStaleDeletedVideos returns soft-deleted videos past the retention
+// window (the GC sweep set).
+func (s *Store) ListStaleDeletedVideos(ctx context.Context, olderThan time.Time) ([]model.Video, error) {
+	values, err := s.queries.ListStaleDeletedVideos(ctx, pgtype.Timestamp{Time: olderThan, Valid: true})
+	if err != nil {
+		return nil, err
+	}
+	videos := make([]model.Video, 0, len(values))
+	for _, value := range values {
+		videos = append(videos, videoModel(value))
+	}
+	return videos, nil
+}
+
 func (s *Store) GetAnnotationByID(ctx context.Context, id uuid.UUID) (model.Annotation, bool, error) {
 	value, err := s.queries.GetAnnotationByID(ctx, id)
 	if ok, foundErr := found(err); !ok || foundErr != nil {

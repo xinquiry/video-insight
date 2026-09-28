@@ -103,3 +103,8 @@ SET
     processing_available_at = $4,
     updated_at = now()
 WHERE id = $1 AND processing_status = 'processing';
+
+-- name: ListStaleDeletedVideos :many
+SELECT * FROM videos
+WHERE deleted_at IS NOT NULL AND deleted_at < $1
+ORDER BY deleted_at ASC;

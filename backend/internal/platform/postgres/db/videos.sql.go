@@ -191,6 +191,49 @@ func (q *Queries) GetVideoByIDForGroupIncludingDeleted(ctx context.Context, arg 
 	return i, err
 }
 
+const listStaleDeletedVideos = `-- name: ListStaleDeletedVideos :many
+SELECT title, description, object_key, original_filename, content_type, size_bytes, processing_status, processing_error, processing_attempts, processing_started_at, processing_available_at, id, created_at, updated_at, deleted_at, group_id FROM videos
+WHERE deleted_at IS NOT NULL AND deleted_at < $1
+ORDER BY deleted_at ASC
+`
+
+func (q *Queries) ListStaleDeletedVideos(ctx context.Context, deletedAt pgtype.Timestamp) ([]Video, error) {
+	rows, err := q.db.Query(ctx, listStaleDeletedVideos, deletedAt)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []Video{}
+	for rows.Next() {
+		var i Video
+		if err := rows.Scan(
+			&i.Title,
+			&i.Description,
+			&i.ObjectKey,
+			&i.OriginalFilename,
+			&i.ContentType,
+			&i.SizeBytes,
+			&i.ProcessingStatus,
+			&i.ProcessingError,
+			&i.ProcessingAttempts,
+			&i.ProcessingStartedAt,
+			&i.ProcessingAvailableAt,
+			&i.ID,
+			&i.CreatedAt,
+			&i.UpdatedAt,
+			&i.DeletedAt,
+			&i.GroupID,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const listVideosForGroup = `-- name: ListVideosForGroup :many
 SELECT title, description, object_key, original_filename, content_type, size_bytes, processing_status, processing_error, processing_attempts, processing_started_at, processing_available_at, id, created_at, updated_at, deleted_at, group_id FROM videos
 WHERE group_id = $1 AND deleted_at IS NULL

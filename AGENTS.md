@@ -93,8 +93,11 @@ detail, annotation attachment, package manifest) filter deleted rows, so a
 deleted video behaves as gone while its PostgreSQL row, annotations, RustFS
 object, and published drive copy survive for recovery. The soft-delete SQL
 keeps the processing/publishing guards (no deleting while a job is active).
-Hard purge (`PurgeVideo`) and restore (`RestoreVideo`) exist at the store
-level for future admin tooling but have no HTTP surface yet.
+Hard purge and restore (`PurgeVideo`/`RestoreVideo`) exist at the store
+level; purging is automated — a daily GC sweep (`driveexports/gc.go`,
+`VIDEO_GC_KEEP_DAYS`, default 30 days) removes stale soft-deleted videos
+from RustFS, the published drive copy, and PostgreSQL (annotations
+cascade) in that order; failures skip the video and retry next sweep.
 
 ### Publish & package download
 

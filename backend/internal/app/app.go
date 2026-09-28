@@ -26,6 +26,8 @@ type App struct {
 	store             *postgres.Store
 	processorCancel   context.CancelFunc
 	processorDone     <-chan struct{}
+	videoGCCancel     context.CancelFunc
+	videoGCDone       <-chan struct{}
 	driveExportCancel context.CancelFunc
 	driveExportDone   <-chan struct{}
 }
@@ -136,13 +138,58 @@ func New(ctx context.Context, cfg config.Config, logger *slog.Logger) (*App, err
 			processor.Run(processorCtx)
 		}()
 	}
+	{
+		rustfsPurger := &storageDeleter{storage: objectStorage}
+		drivePurger := &driveexportsGatewayDeleter{uploader: driveExportSigner}
+		gc := driveexports.NewGC(store, driveexports.NewPurger(rustfsPurger, drivePurger), driveExportService, logger, driveexports.GCConfig{
+			Interval: cfg.VideoGCInterval, Keep: cfg.VideoGCKeep,
+		})
+		gcCtx, cancel := context.WithCancel(ctx)
+		gcDone := make(chan struct{})
+		application.videoGCCancel = cancel
+		application.videoGCDone = gcDone
+		go func() {
+			defer close(gcDone)
+			gc.Run(gcCtx)
+		}()
+	}
 	return application, nil
+}
+
+// storageDeleter adapts the S3-compatible storage to the GC's purger.
+type storageDeleter struct {
+	storage *storage.S3
+}
+
+func (d *storageDeleter) DeleteRustFSObject(ctx context.Context, objectKey string) error {
+	return d.storage.DeleteObject(ctx, objectKey)
+}
+
+func (d *storageDeleter) DeleteDriveObject(context.Context, string) error {
+	return nil
+}
+
+// driveexportsGatewayDeleter adapts the gateway uploader.
+type driveexportsGatewayDeleter struct {
+	uploader *driveexports.GatewayUploader
+}
+
+func (d *driveexportsGatewayDeleter) DeleteRustFSObject(context.Context, string) error {
+	return nil
+}
+
+func (d *driveexportsGatewayDeleter) DeleteDriveObject(ctx context.Context, objectKey string) error {
+	return d.uploader.DeleteObject(ctx, objectKey)
 }
 
 func (a *App) Close() {
 	if a.driveExportCancel != nil {
 		a.driveExportCancel()
 		<-a.driveExportDone
+	}
+	if a.videoGCCancel != nil {
+		a.videoGCCancel()
+		<-a.videoGCDone
 	}
 	if a.processorCancel != nil {
 		a.processorCancel()

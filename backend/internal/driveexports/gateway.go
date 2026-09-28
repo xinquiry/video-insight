@@ -234,6 +234,11 @@ func (u *GatewayUploader) DownloadURL(ctx context.Context, objectKey string) (st
 	return response.URL, nil
 }
 
+// DeleteObject removes a published object from the drive.
+func (u *GatewayUploader) DeleteObject(ctx context.Context, objectKey string) error {
+	return u.call(ctx, http.MethodDelete, "/v1/objects?key="+url.QueryEscape(objectKey), nil, nil)
+}
+
 func (u *GatewayUploader) call(ctx context.Context, method, path string, payload any, result any) error {
 	var body io.Reader
 	if payload != nil {
