@@ -9,7 +9,10 @@
   and browser adapter. ESP32-C3 firmware is a separate nested workspace
   so its ESP-IDF target does not affect host builds.
 - Storage: PostgreSQL 16 plus MinIO locally or Cloudflare R2 in production.
-- Orchestration: layered Docker Compose driven by `scripts/dev.sh` and `scripts/deploy-prod.sh`.
+- Orchestration: development runs on Docker Compose (`scripts/dev.sh`).
+  Production runs on a k8s cluster whose manifests live in a separate
+  deploy repository; this repository only builds code and publishes CI
+  images.
 
 ## Common commands
 
@@ -33,7 +36,7 @@ just check web              # verify backend and frontend
 just check desktop          # verify Rust host and Electron application
 just fix                    # format supported products
 just release <version>      # bump, tag, and push a desktop release
-just deploy                 # pull backend/frontend/tbox-webdav images and deploy
+# (production deploys via the deploy repo's k8s manifests, not from here)
 ```
 
 The root Justfile exposes workflows, not component-level wrappers. Use Go,
@@ -118,14 +121,13 @@ desktop sidecar parses the same format.
 
 `sjtu-oss-gateway`, the presign broker that turns the SJTU Drive (Tencent
 SMH) into OSS-like object storage. Code lives here (Go module at
-`gateway/`, distroless Dockerfile); deployment is cluster infra in the
-deploy repo (`~/Projects/Lab/deploy/sjtu-oss-gateway/`, namespace `infra`,
-in-cluster Service `sjtu-oss-gateway.infra.svc:8200`). CI matrix in
+`gateway/`, distroless Dockerfile). CI matrix in
 `.github/workflows/build-images.yaml` publishes
 `ghcr.io/xinquiry/video-insight-gateway`. The gateway never moves object
 bytes — it only brokers SMH presigned URLs; browsers upload/download
-directly against COS. See `gateway/README.md` for the API and the
-spike-verified wire contract.
+directly against COS. In-cluster service discovery name:
+`sjtu-oss-gateway.infra.svc:8200`. See `gateway/README.md` for the API and
+the spike-verified wire contract.
 
 ### Classroom system (`class-button/`)
 
@@ -214,13 +216,13 @@ dimensions (waist Ø25, four Ø4 recesses at r=8) in sync with the physical cap.
 
 ## Deployment
 
-- Local: `just dev` builds the Go dev image and starts bundled MinIO.
-- Production: `just deploy` pulls immutable `video-insight-backend`, `video-insight-frontend`,
-  and (with the `drive-export` profile) `video-insight-tbox-webdav` images.
-- Only frontend port 8080 is bound to the host. Cloudflared publishes the app; R2 or browser-reachable MinIO serves object URLs.
-- Preserve `GO_SEED_ADMIN_ON_STARTUP=false` after the first production bootstrap.
+This repository is for development only: code, tests, and CI images. The
+production cluster, its manifests, secrets, and topology live in the
+separate deploy repository — see that repository's AGENTS.md.
+
+- Local development: `just dev` (Docker Compose with hot reload).
 - Desktop packages are produced by `class-button/scripts/package-macos.sh` or
   `class-button/scripts/package-windows.ps1` into `apps/dist/electron`;
   generated `target/` and `dist/` trees stay ignored.
 
-See `docs/deployment.md` for the runbook.
+See `docs/deployment.md` for the environment reference.
