@@ -10,10 +10,9 @@
   so its ESP-IDF target does not affect host builds.
 - Storage: PostgreSQL 16 plus MinIO locally or Cloudflare R2 in production.
 - Orchestration: development runs on Docker Compose (`scripts/dev.sh`).
-  Production runs on a k8s cluster whose manifests live in the separate
-  deploy repository at `~/Projects/Lab/deploy` (add it to the session with
-  `/add-dir ~/Projects/Lab/deploy` when production work is needed); this
-  repository only builds code and publishes CI images.
+  Production runs on a k8s cluster whose manifests live in a separate
+  deploy repository; this repository only builds code and publishes CI
+  images.
 
 ## Common commands
 
@@ -217,9 +216,8 @@ dimensions (waist Ø25, four Ø4 recesses at r=8) in sync with the physical cap.
 
 ## Deployment
 
-This repository is for development only: code, tests, and CI images. The
-production cluster, its manifests, secrets, and topology live in the
-separate deploy repository — see that repository's AGENTS.md.
+This repository is for development only: code, tests, and CI images.
+Production is deployed elsewhere.
 
 - Local development: `just dev` (Docker Compose with hot reload).
 - Desktop packages are produced by `class-button/scripts/package-macos.sh` or
